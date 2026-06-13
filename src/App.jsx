@@ -25,6 +25,7 @@ const C = {
 const T = {
   en: {
     tagline: "Fuel Your Flight",
+    tagline_sub: "Nutrition, jet lag, and meal planning built for flight crews",
     start: "Begin Check-In",
     step_lang: "Select Language",
     step_name: "Full Name",
@@ -87,6 +88,7 @@ const T = {
   },
   fr: {
     tagline: "Alimentez Votre Vol",
+    tagline_sub: "Nutrition, décalage horaire et planification des repas pour le personnel de cabine",
     start: "Commencer l'Enregistrement",
     step_lang: "Choisir la Langue",
     step_name: "Nom Complet",
@@ -148,6 +150,7 @@ const T = {
   },
   es: {
     tagline: "Combustible Para Tu Vuelo",
+    tagline_sub: "Nutrición, jet lag y planificación de comidas para tripulaciones de vuelo",
     start: "Comenzar Check-In",
     step_lang: "Seleccionar Idioma",
     step_name: "Nombre Completo",
@@ -561,6 +564,7 @@ function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onS
           </div>
           <div style={styles.appName}>NutriCrew</div>
           <div style={styles.appTagline}>{t.tagline}</div>
+          <div style={styles.appTaglineSub}>{t.tagline_sub}</div>
         </div>
 
         {/* Runway */}
@@ -1377,6 +1381,7 @@ const styles = {
     textShadow: `0 0 30px ${C.gold}66`, marginTop: 12,
   },
   appTagline: { fontSize: 12, color: C.muted, letterSpacing: "3px", marginTop: 6, textTransform: "uppercase" },
+  appTaglineSub: { fontSize: 12, color: C.muted, marginTop: 8, textAlign: "center", maxWidth: 260, lineHeight: 1.5 },
 
   freeTrialBadge: {
     display: "inline-block", padding: "4px 14px", borderRadius: 20,
