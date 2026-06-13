@@ -65,6 +65,24 @@ const T = {
     kg: "kg", lbs: "lbs",
     hours_diff: "Hours difference from home",
     jetlag_note: "Jetlag detected — meals adjusted for your circadian rhythm",
+    jetlag_title: "Jet Lag Control",
+    jetlag_advisory: "Jet Lag Advisory",
+    jetlag_diff_label: "Time difference",
+    jetlag_hours: "hours",
+    jetlag_ahead: "ahead",
+    jetlag_behind: "behind",
+    jetlag_none_title: "No Significant Jet Lag",
+    jetlag_none_text: "Your route has a time difference of less than 4 hours — your body clock shouldn't need major adjustments. Stay hydrated and keep a regular meal schedule.",
+    jetlag_eastward_title: "Advance Your Body Clock",
+    jetlag_eastward_text: "Your destination is ahead of home. Shift your sleep and meals earlier each day before departure if possible, and get bright light in the morning at your destination.",
+    jetlag_westward_title: "Delay Your Body Clock",
+    jetlag_westward_text: "Your destination is behind home. Stay up later and delay meals and sleep gradually, and get bright light in the evening at your destination.",
+    jetlag_tips_title: "General Tips",
+    jetlag_tip_1: "Stay hydrated — drink plenty of water and limit alcohol and caffeine during the flight.",
+    jetlag_tip_2: "Get natural daylight at your destination as soon as possible to reset your body clock.",
+    jetlag_tip_3: "Use caffeine strategically to stay alert during destination daytime — avoid it close to bedtime.",
+    jetlag_tip_4: "Short naps (20-30 minutes) can help, but avoid long naps that disrupt nighttime sleep.",
+    jetlag_tip_5: "Eat meals aligned with your destination's local time as soon as possible.",
     premium_title: "Premium Feature",
     premium_msg: "You've used your free pairing. Upgrade to continue.",
     upgrade: "Upgrade to Premium",
@@ -127,6 +145,24 @@ const T = {
     kg: "kg", lbs: "lbs",
     hours_diff: "Heures de différence",
     jetlag_note: "Décalage détecté — repas ajustés pour votre rythme circadien",
+    jetlag_title: "Contrôle du Décalage Horaire",
+    jetlag_advisory: "Alerte Décalage Horaire",
+    jetlag_diff_label: "Décalage horaire",
+    jetlag_hours: "heures",
+    jetlag_ahead: "en avance",
+    jetlag_behind: "en retard",
+    jetlag_none_title: "Pas de Décalage Important",
+    jetlag_none_text: "Votre trajet présente un décalage de moins de 4 heures — votre horloge interne ne devrait pas avoir besoin d'ajustements majeurs. Restez hydraté et gardez un horaire de repas régulier.",
+    jetlag_eastward_title: "Avancez Votre Horloge Interne",
+    jetlag_eastward_text: "Votre destination est en avance par rapport à votre domicile. Avancez progressivement votre sommeil et vos repas avant le départ si possible, et exposez-vous à la lumière du matin à destination.",
+    jetlag_westward_title: "Retardez Votre Horloge Interne",
+    jetlag_westward_text: "Votre destination est en retard par rapport à votre domicile. Couchez-vous plus tard et retardez progressivement vos repas et votre sommeil, et exposez-vous à la lumière du soir à destination.",
+    jetlag_tips_title: "Conseils Généraux",
+    jetlag_tip_1: "Restez hydraté — buvez beaucoup d'eau et limitez l'alcool et la caféine pendant le vol.",
+    jetlag_tip_2: "Exposez-vous à la lumière naturelle à destination dès que possible pour réinitialiser votre horloge interne.",
+    jetlag_tip_3: "Utilisez la caféine stratégiquement pour rester alerte pendant la journée à destination — évitez-la avant de dormir.",
+    jetlag_tip_4: "De courtes siestes (20-30 minutes) peuvent aider, mais évitez les longues siestes qui perturbent le sommeil nocturne.",
+    jetlag_tip_5: "Mangez selon l'heure locale de votre destination dès que possible.",
     premium_title: "Fonctionnalité Premium",
     premium_msg: "Vous avez utilisé votre pairing gratuit. Passez au Premium.",
     upgrade: "Passer au Premium",
@@ -189,6 +225,24 @@ const T = {
     kg: "kg", lbs: "lbs",
     hours_diff: "Horas de diferencia",
     jetlag_note: "Jet lag detectado — comidas ajustadas para tu ritmo circadiano",
+    jetlag_title: "Control del Jet Lag",
+    jetlag_advisory: "Aviso de Jet Lag",
+    jetlag_diff_label: "Diferencia horaria",
+    jetlag_hours: "horas",
+    jetlag_ahead: "adelante",
+    jetlag_behind: "atrás",
+    jetlag_none_title: "Sin Jet Lag Significativo",
+    jetlag_none_text: "Tu ruta tiene una diferencia horaria menor a 4 horas — tu reloj interno no debería necesitar ajustes importantes. Mantente hidratado y conserva un horario de comidas regular.",
+    jetlag_eastward_title: "Adelanta tu Reloj Interno",
+    jetlag_eastward_text: "Tu destino está adelantado respecto a tu hogar. Adelanta gradualmente tu sueño y comidas antes de la salida si es posible, y busca luz natural por la mañana en tu destino.",
+    jetlag_westward_title: "Retrasa tu Reloj Interno",
+    jetlag_westward_text: "Tu destino está atrasado respecto a tu hogar. Acuéstate más tarde y retrasa gradualmente tus comidas y sueño, y busca luz natural por la noche en tu destino.",
+    jetlag_tips_title: "Consejos Generales",
+    jetlag_tip_1: "Mantente hidratado — bebe mucha agua y limita el alcohol y la cafeína durante el vuelo.",
+    jetlag_tip_2: "Recibe luz natural en tu destino lo antes posible para reiniciar tu reloj interno.",
+    jetlag_tip_3: "Usa la cafeína estratégicamente para mantenerte alerta durante el día en tu destino — evítala antes de dormir.",
+    jetlag_tip_4: "Las siestas cortas (20-30 minutos) pueden ayudar, pero evita siestas largas que alteren el sueño nocturno.",
+    jetlag_tip_5: "Come según la hora local de tu destino lo antes posible.",
     premium_title: "Función Premium",
     premium_msg: "Usaste tu pairing gratuito. Actualiza para continuar.",
     upgrade: "Actualizar a Premium",
@@ -325,6 +379,14 @@ const CalorieIcon = () => (
   </svg>
 );
 
+const JetlagIcon = () => (
+  <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+    <circle cx="11" cy="11" r="8" stroke={C.gold} strokeWidth="1.5" fill="none"/>
+    <path d="M11 6.5v4.5l3 2" stroke={C.gold} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M11 2v1.5M11 19.5V21M2 11h1.5M18.5 11H20" stroke={C.gold} strokeWidth="1.5" strokeLinecap="round"/>
+  </svg>
+);
+
 // ─── HELPERS ──────────────────────────────────────────────────────
 const storage = {
   get: (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
@@ -374,6 +436,7 @@ export default function NutriCrew() {
   const [calorieText, setCalorieText] = useState("");
   const [calorieResult, setCalorieResult] = useState(null);
   const [calorieLoading, setCalorieLoading] = useState(false);
+  const [showJetlag, setShowJetlag] = useState(false);
   const [returningUser, setReturningUser] = useState(false);
 
   const t = T[lang];
@@ -531,6 +594,16 @@ export default function NutriCrew() {
               result={calorieResult} loading={calorieLoading}
               onEstimate={handleEstimateCalories}
               onClose={() => { setShowCalorie(false); setCalorieResult(null); setCalorieText(""); }}
+            />
+          )}
+          <button style={styles.floatBtnJetlag} onClick={() => setShowJetlag(true)}>
+            <JetlagIcon/>
+          </button>
+          {showJetlag && (
+            <JetlagModal
+              t={t}
+              pairing={pairing}
+              onClose={() => setShowJetlag(false)}
             />
           )}
         </>
@@ -1023,7 +1096,7 @@ function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, 
         <div style={styles.jetlagBanner}>
           <span style={{fontSize:20}}>😴</span>
           <div>
-            <div style={styles.jetlagBannerTitle}>Jet Lag Advisory</div>
+            <div style={styles.jetlagBannerTitle}>{t.jetlag_advisory}</div>
             <div style={styles.jetlagBannerText}>{t.jetlag_note}</div>
           </div>
         </div>
@@ -1247,6 +1320,50 @@ function CalorieModal({ t, text, setText, result, loading, onEstimate, onClose }
           </div>
         )}
         <div style={styles.calorieDisclaimer}>{t.calorie_disclaimer}</div>
+      </div>
+    </div>
+  );
+}
+
+function JetlagModal({ t, pairing, onClose }) {
+  const tz = parseInt(pairing.timezone || 0, 10);
+  const hasJetlag = Math.abs(tz) >= 4;
+  const tips = [t.jetlag_tip_1, t.jetlag_tip_2, t.jetlag_tip_3, t.jetlag_tip_4, t.jetlag_tip_5];
+  return (
+    <div style={styles.modalOverlay}>
+      <div style={styles.modal}>
+        <div style={styles.modalHeader}>
+          <span style={styles.modalTitle}>{t.jetlag_title}</span>
+          <button style={styles.closeBtn} onClick={onClose}>✕</button>
+        </div>
+
+        {hasJetlag ? (
+          <>
+            <div style={{...styles.jetlagCard, marginTop: 0}}>
+              <span style={{fontSize:18}}>🕐</span>
+              <span>{t.jetlag_diff_label}: {Math.abs(tz)} {t.jetlag_hours} ({tz > 0 ? t.jetlag_ahead : t.jetlag_behind})</span>
+            </div>
+            <div style={styles.restrictCard}>
+              <div style={styles.restrictTitle}>{tz > 0 ? t.jetlag_eastward_title : t.jetlag_westward_title}</div>
+              <div style={styles.restrictText}>{tz > 0 ? t.jetlag_eastward_text : t.jetlag_westward_text}</div>
+            </div>
+          </>
+        ) : (
+          <div style={styles.restrictCard}>
+            <div style={styles.restrictTitle}>{t.jetlag_none_title}</div>
+            <div style={styles.restrictText}>{t.jetlag_none_text}</div>
+          </div>
+        )}
+
+        <div style={styles.restrictCard}>
+          <div style={styles.restrictTitle}>{t.jetlag_tips_title}</div>
+          {tips.map((tip, i) => (
+            <div key={i} style={styles.jetlagTipRow}>
+              <span style={{color:C.gold}}>•</span>
+              <span style={styles.restrictText}>{tip}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -1719,6 +1836,17 @@ const styles = {
     border: `1.5px solid ${C.gold}`, cursor: "pointer",
     display: "flex", alignItems: "center", justifyContent: "center",
     boxShadow: `0 4px 16px ${C.gold}33`, zIndex: 100,
+  },
+  floatBtnJetlag: {
+    position: "fixed", bottom: 88, right: 20,
+    width: 52, height: 52, borderRadius: "50%",
+    background: `linear-gradient(135deg, ${C.navyCard}, ${C.navyMid})`,
+    border: `1.5px solid ${C.gold}`, cursor: "pointer",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    boxShadow: `0 4px 16px ${C.gold}33`, zIndex: 100,
+  },
+  jetlagTipRow: {
+    display: "flex", gap: 8, marginBottom: 6,
   },
   // CALORIE MODAL
   modalOverlay: {
