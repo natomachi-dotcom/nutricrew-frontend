@@ -1,5 +1,9 @@
 import { useState, useEffect } from "react";
 
+// AI backend base URL. Empty in local dev (Vite proxies /api to localhost:3001);
+// set VITE_API_BASE_URL on Vercel to point at the deployed nutricrew-backend.
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
+
 // ─── DESIGN TOKENS ────────────────────────────────────────────────
 const C = {
   navy:    "#0A1628",
@@ -1309,7 +1313,7 @@ The "days" and "gymRoutine.days" arrays must each contain exactly ${data.pairing
 Vary the meal choices — pick different recipes, ingredients, and combinations than a typical/generic plan each time you generate one, so returning crew members don't get repetitive suggestions. Every meal must include a "tip" (a short, practical packing/timing/prep/substitution tip) and a "recyclingTip" (a short waste-reduction or recycling/composting tip specific to that meal's packaging or leftovers, tailored to the crew member's ${data.diet === "other" ? data.diet_other : data.diet} diet).`;
 
   // Calls our own backend (server.js), which keeps the Anthropic API key secret
-  const res = await fetch("/api/generate-plan", {
+  const res = await fetch(`${API_BASE}/api/generate-plan`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ prompt })
@@ -1330,7 +1334,7 @@ async function estimateCalories(description, lang) {
   "note": "Brief note about accuracy"
 }`;
 
-  const res = await fetch("/api/estimate-calories", {
+  const res = await fetch(`${API_BASE}/api/estimate-calories`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ prompt })
