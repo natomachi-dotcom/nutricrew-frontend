@@ -1239,84 +1239,12 @@ function CheckGroup({ label, options, values, onChange }) {
 
 // ─── API CALLS ────────────────────────────────────────────────────
 async function generatePlan(data, lang) {
-  const langName = lang === "fr" ? "French" : lang === "es" ? "Spanish" : "English";
-  const jetlag = Math.abs(parseInt(data.timezone || 0)) >= 4;
-  
-  const prompt = `You are a professional nutritionist specializing in aviation crew health. Generate a detailed ${data.pairing_days || 1}-day nutrition plan.
-
-CREW PROFILE:
-- Name: ${data.name}, Position: ${data.position}, Gender: ${data.gender}
-- Weight: ${data.weight}, Diet: ${data.diet === "other" ? data.diet_other : data.diet}
-- Goals: ${(data.goals || []).join(", ")}
-- Budget: $${data.budget_amount || "open"} per ${data.budget_type || "day"}
-- Route: ${data.departure} → ${(data.destinations || []).join(" → ")}
-- Daily itinerary:
-${(data.destinations || []).map((d, i) => `  Day ${i+1}: ${d}`).join("\n")}
-- Going to USA: ${data.going_usa}
-- Jet lag (timezone diff): ${data.timezone || 0} hours ${jetlag ? "— SIGNIFICANT JET LAG, adjust meal timing for circadian rhythm" : ""}
-- Kitchen access: ${(data.kitchen || []).join(", ")}
-
-Respond ONLY in ${langName}. Return ONLY valid JSON, no markdown:
-{
-  "summary": "2-sentence plan overview",
-  "days": [
-    {
-      "day": 1,
-      "label": "Day label",
-      "jetlagNote": "jet lag meal timing advice if applicable, else null",
-      "totalCalories": 2100,
-      "meals": [
-        {
-          "type": "Breakfast",
-          "name": "Meal name",
-          "description": "Short description",
-          "prep": "How to prepare given kitchen access",
-          "calories": 450,
-          "protein": 30,
-          "carbs": 40,
-          "fat": 15,
-          "tags": ["High Protein", "Quick"],
-          "tip": "Short practical tip (packing, timing, substitution, etc.)",
-          "recyclingTip": "Short waste-reduction or recycling tip tailored to a ${data.diet === "other" ? data.diet_other : data.diet} diet"
-        }
-      ]
-    }
-  ],
-  "groceryList": {
-    "produce": ["item1"],
-    "protein": ["item1"],
-    "pantry": ["item1"],
-    "snacks": ["item1"],
-    "dairy": ["item1"]
-  },
-  "gymRoutine": {
-    "note": "Hotel-room friendly, no equipment needed, adapted for your schedule and position",
-    "days": [
-      {
-        "day": 1,
-        "focus": "Upper Body / Core",
-        "exercises": [
-          {"name": "Push-ups", "sets": "3", "reps": "15"},
-          {"name": "Plank", "sets": "3", "reps": "45 sec"}
-        ]
-      }
-    ]
-  },
-  "foodRestrictions": {
-    "usa": "Detailed list of what you CANNOT bring into the USA and why",
-    "destination": "Food rules and restrictions for ${(data.destinations || []).join(', ')}",
-    "general": "General tips for this route"
-  }
-}
-Include Breakfast, Lunch, Dinner, and 1-2 Snacks per day. Be specific to the crew's situation.
-The "days" and "gymRoutine.days" arrays must each contain exactly ${data.pairing_days || 1} entries, one per day of the pairing — use that day's destination (from the daily itinerary above) for location-specific meals and food sourcing. The gym routine must require NO gym or equipment (bodyweight exercises only), take 20-30 minutes, and fit in a hotel room, adapted to the crew member's position and schedule.
-Vary the meal choices — pick different recipes, ingredients, and combinations than a typical/generic plan each time you generate one, so returning crew members don't get repetitive suggestions. Every meal must include a "tip" (a short, practical packing/timing/prep/substitution tip) and a "recyclingTip" (a short waste-reduction or recycling/composting tip specific to that meal's packaging or leftovers, tailored to the crew member's ${data.diet === "other" ? data.diet_other : data.diet} diet).`;
-
-  // Calls our own backend (server.js), which keeps the Anthropic API key secret
+  // Calls our own backend (server.js), which builds the prompts, keeps the
+  // Anthropic API key secret, and generates each day in parallel.
   const res = await fetch(`${API_BASE}/api/generate-plan`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt })
+    body: JSON.stringify({ data, lang })
   });
   if (!res.ok) throw new Error("Failed to generate plan");
   return await res.json();
