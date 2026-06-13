@@ -65,9 +65,9 @@ const T = {
     hours_diff: "Hours difference from home",
     jetlag_note: "Jetlag detected — meals adjusted for your circadian rhythm",
     premium_title: "Premium Feature",
-    premium_msg: "You've used your 3 free pairings. Upgrade to continue.",
+    premium_msg: "You've used your free pairing. Upgrade to continue.",
     upgrade: "Upgrade to Premium",
-    free_trial: "First 3 Pairings Free",
+    free_trial: "First Pairing Free",
     calorie_title: "Calorie Estimator",
     calorie_placeholder: "Describe what you ate (e.g. chicken sandwich, coffee with milk)...",
     calorie_btn: "Estimate Calories",
@@ -126,9 +126,9 @@ const T = {
     hours_diff: "Heures de différence",
     jetlag_note: "Décalage détecté — repas ajustés pour votre rythme circadien",
     premium_title: "Fonctionnalité Premium",
-    premium_msg: "Vous avez utilisé vos 3 pairings gratuits. Passez au Premium.",
+    premium_msg: "Vous avez utilisé votre pairing gratuit. Passez au Premium.",
     upgrade: "Passer au Premium",
-    free_trial: "3 Premiers Pairings Gratuits",
+    free_trial: "Premier Pairing Gratuit",
     calorie_title: "Estimateur de Calories",
     calorie_placeholder: "Décrivez ce que vous avez mangé...",
     calorie_btn: "Estimer les Calories",
@@ -187,9 +187,9 @@ const T = {
     hours_diff: "Horas de diferencia",
     jetlag_note: "Jet lag detectado — comidas ajustadas para tu ritmo circadiano",
     premium_title: "Función Premium",
-    premium_msg: "Usaste tus 3 pairings gratuitos. Actualiza para continuar.",
+    premium_msg: "Usaste tu pairing gratuito. Actualiza para continuar.",
     upgrade: "Actualizar a Premium",
-    free_trial: "Primeros 3 Pairings Gratis",
+    free_trial: "Primer Pairing Gratis",
     calorie_title: "Estimador de Calorías",
     calorie_placeholder: "Describe lo que comiste (ej: sándwich de pollo, café con leche)...",
     calorie_btn: "Estimar Calorías",
@@ -385,7 +385,7 @@ export default function NutriCrew() {
   }, []);
 
   const pairingCount = storage.get(PAIRING_COUNT_KEY) || 0;
-  const isPremiumNeeded = pairingCount >= 3;
+  const isPremiumNeeded = pairingCount >= 1;
 
   // ── STEP DEFINITIONS (check-in flow) ──────────────────────────
   // If returning user, skip personal steps
