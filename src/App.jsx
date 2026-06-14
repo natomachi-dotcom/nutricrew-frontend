@@ -2024,6 +2024,7 @@ const styles = {
     background: C.navyMid, borderRadius: "20px 20px 0 0",
     border: `1px solid ${C.navyBorder}`, padding: "24px",
     width: "100%", maxWidth: 440,
+    maxHeight: "85vh", overflowY: "auto",
     display: "flex", flexDirection: "column", gap: 14,
   },
   modalHeader: {
