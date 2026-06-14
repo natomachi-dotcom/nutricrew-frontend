@@ -92,7 +92,6 @@ const T = {
     calorie_btn: "Estimate Calories",
     tab_plan: "Meal Plan",
     tab_grocery: "Grocery List",
-    tab_gym: "Gym Routine",
     tab_restrictions: "Food Rules",
     new_pairing: "New Pairing",
     view_last_plan: "View Last Plan",
@@ -174,7 +173,6 @@ const T = {
     calorie_btn: "Estimer les Calories",
     tab_plan: "Plan Repas",
     tab_grocery: "Liste de Courses",
-    tab_gym: "Routine Gym",
     tab_restrictions: "Règles Alimentaires",
     new_pairing: "Nouveau Pairing",
     view_last_plan: "Voir le Dernier Plan",
@@ -256,7 +254,6 @@ const T = {
     calorie_btn: "Estimar Calorías",
     tab_plan: "Plan de Comidas",
     tab_grocery: "Lista de Compras",
-    tab_gym: "Rutina de Gym",
     tab_restrictions: "Reglas Alimentarias",
     new_pairing: "Nuevo Pairing",
     view_last_plan: "Ver Último Plan",
@@ -1137,13 +1134,13 @@ function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, 
 
       {/* Tabs */}
       <div style={styles.tabBar}>
-        {["plan","grocery","gym","restrictions"].map(tab => (
+        {["plan","grocery","restrictions"].map(tab => (
           <button key={tab}
             style={{...styles.tab, ...(activeTab===tab?styles.tabActive:{})}}
             onClick={() => setActiveTab(tab)}>
-            {tab === "plan" ? "🍽️" : tab === "grocery" ? "🛒" : tab === "gym" ? "💪" : "🚫"}
+            {tab === "plan" ? "🍽️" : tab === "grocery" ? "🛒" : "🚫"}
             <span style={styles.tabLabel}>
-              {tab === "plan" ? t.tab_plan : tab === "grocery" ? t.tab_grocery : tab === "gym" ? t.tab_gym : t.tab_restrictions}
+              {tab === "plan" ? t.tab_plan : tab === "grocery" ? t.tab_grocery : t.tab_restrictions}
             </span>
           </button>
         ))}
@@ -1168,9 +1165,6 @@ function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, 
         )}
         {activeTab === "grocery" && plan.groceryList && (
           <GroceryList list={plan.groceryList}/>
-        )}
-        {activeTab === "gym" && plan.gymRoutine && (
-          <GymRoutine routine={plan.gymRoutine}/>
         )}
         {activeTab === "restrictions" && plan.foodRestrictions && (
           <FoodRestrictions data={plan.foodRestrictions} pairing={pairing}/>
@@ -1260,25 +1254,6 @@ function GroceryList({ list }) {
   );
 }
 
-function GymRoutine({ routine }) {
-  return (
-    <div>
-      <div style={styles.gymNote}>{routine.note}</div>
-      {routine.days?.map((d,i) => (
-        <div key={i} style={styles.gymDay}>
-          <div style={styles.gymDayTitle}>Day {d.day} — {d.focus}</div>
-          {d.exercises?.map((ex,j) => (
-            <div key={j} style={styles.gymExercise}>
-              <span style={styles.gymExName}>{ex.name}</span>
-              <span style={styles.gymExDetail}>{ex.sets} × {ex.reps}</span>
-            </div>
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function FoodRestrictions({ data, pairing }) {
   return (
     <div>
@@ -1312,7 +1287,7 @@ function PremiumScreen({ t, onBack }) {
       <div style={styles.premiumTitle}>{t.premium_title}</div>
       <div style={styles.premiumMsg}>{t.premium_msg}</div>
       <div style={styles.premiumFeatures}>
-        {["Daily meal plans for your full pairing","Hotel-room gym routines","Jetlag-optimized meal timing","Country food rules","Grocery lists"].map(f => (
+        {["Daily meal plans for your full pairing","Jetlag-optimized meal timing","Country food rules","Grocery lists"].map(f => (
           <div key={f} style={styles.premiumFeature}>✓ {f}</div>
         ))}
       </div>
@@ -1872,21 +1847,6 @@ const styles = {
     border: `1.5px solid ${C.navyBorder}`, flexShrink: 0,
   },
   grocText: { fontSize: 13, color: C.white },
-  gymNote: {
-    fontSize: 12, color: C.muted, marginBottom: 16,
-    background: C.navyMid, borderRadius: 8, padding: "10px",
-  },
-  gymDay: {
-    background: C.navyMid, borderRadius: 12, padding: "14px",
-    marginBottom: 10, border: `1px solid ${C.navyBorder}`,
-  },
-  gymDayTitle: { fontSize: 14, fontWeight: 700, color: C.sky, marginBottom: 10 },
-  gymExercise: {
-    display: "flex", justifyContent: "space-between",
-    padding: "6px 0", borderBottom: `1px solid ${C.navyBorder}`,
-  },
-  gymExName: { fontSize: 13, color: C.white },
-  gymExDetail: { fontSize: 13, color: C.gold },
   restrictCard: {
     background: C.navyMid, borderRadius: 12, padding: "14px",
     marginBottom: 12, border: `1px solid ${C.navyBorder}`,
