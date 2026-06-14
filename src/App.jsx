@@ -573,6 +573,7 @@ export default function NutriCrew() {
           onStart={() => setScreen("checkin")}
           onNewPairing={startNewPairing}
           onViewLastPlan={viewLastPlan}
+          onOpenSavedMeals={() => setShowSavedMeals(true)}
         />
       )}
 
@@ -634,15 +635,16 @@ export default function NutriCrew() {
           <button style={styles.floatBtnSaved} onClick={() => setShowSavedMeals(true)}>
             <SavedMealsIcon/>
           </button>
-          {showSavedMeals && (
-            <SavedMealsModal
-              t={t}
-              favorites={favorites}
-              onToggleFavorite={toggleFavorite}
-              onClose={() => setShowSavedMeals(false)}
-            />
-          )}
         </>
+      )}
+
+      {showSavedMeals && (
+        <SavedMealsModal
+          t={t}
+          favorites={favorites}
+          onToggleFavorite={toggleFavorite}
+          onClose={() => setShowSavedMeals(false)}
+        />
       )}
 
       <style>{globalCSS}</style>
@@ -651,7 +653,7 @@ export default function NutriCrew() {
 }
 
 // ─── SPLASH SCREEN ────────────────────────────────────────────────
-function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onStart, onNewPairing, onViewLastPlan }) {
+function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onStart, onNewPairing, onViewLastPlan, onOpenSavedMeals }) {
   return (
     <div style={styles.splash}>
       <div style={styles.splashInner}>
@@ -690,6 +692,9 @@ function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onS
                 {t.view_last_plan}
               </button>
             )}
+            <button style={styles.secondaryBtn} onClick={onOpenSavedMeals}>
+              {t.saved_meals_title}
+            </button>
           </div>
         ) : (
           <div>
