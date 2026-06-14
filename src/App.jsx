@@ -90,6 +90,13 @@ const T = {
     calorie_title: "Calorie Estimator",
     calorie_placeholder: "Describe what you ate (e.g. chicken sandwich, coffee with milk)...",
     calorie_btn: "Estimate Calories",
+    airplane_meal_title: "Check Airplane Meal",
+    airplane_meal_placeholder: "Describe the meal you were served on the plane...",
+    airplane_meal_btn: "Check Meal",
+    airplane_meal_error: "Could not check this meal. Please try again.",
+    fits_yes: "Fits your diet",
+    fits_no: "Doesn't fit your diet",
+    fits_partial: "Partially fits your diet",
     tab_plan: "Meal Plan",
     tab_grocery: "Grocery List",
     tab_restrictions: "Food Rules",
@@ -174,6 +181,13 @@ const T = {
     calorie_title: "Estimateur de Calories",
     calorie_placeholder: "Décrivez ce que vous avez mangé...",
     calorie_btn: "Estimer les Calories",
+    airplane_meal_title: "Vérifier le Repas à Bord",
+    airplane_meal_placeholder: "Décrivez le repas qui vous a été servi dans l'avion...",
+    airplane_meal_btn: "Vérifier",
+    airplane_meal_error: "Impossible de vérifier ce repas. Veuillez réessayer.",
+    fits_yes: "Convient à votre alimentation",
+    fits_no: "Ne convient pas à votre alimentation",
+    fits_partial: "Convient partiellement à votre alimentation",
     tab_plan: "Plan Repas",
     tab_grocery: "Liste de Courses",
     tab_restrictions: "Règles Alimentaires",
@@ -258,6 +272,13 @@ const T = {
     calorie_title: "Estimador de Calorías",
     calorie_placeholder: "Describe lo que comiste (ej: sándwich de pollo, café con leche)...",
     calorie_btn: "Estimar Calorías",
+    airplane_meal_title: "Revisar Comida del Avión",
+    airplane_meal_placeholder: "Describe la comida que te sirvieron en el avión...",
+    airplane_meal_btn: "Revisar",
+    airplane_meal_error: "No se pudo revisar esta comida. Inténtalo de nuevo.",
+    fits_yes: "Se ajusta a tu dieta",
+    fits_no: "No se ajusta a tu dieta",
+    fits_partial: "Se ajusta parcialmente a tu dieta",
     tab_plan: "Plan de Comidas",
     tab_grocery: "Lista de Compras",
     tab_restrictions: "Reglas Alimentarias",
@@ -462,6 +483,10 @@ export default function NutriCrew() {
   const [calorieText, setCalorieText] = useState("");
   const [calorieResult, setCalorieResult] = useState(null);
   const [calorieLoading, setCalorieLoading] = useState(false);
+  const [showAirplaneMeal, setShowAirplaneMeal] = useState(false);
+  const [airplaneMealText, setAirplaneMealText] = useState("");
+  const [airplaneMealResult, setAirplaneMealResult] = useState(null);
+  const [airplaneMealLoading, setAirplaneMealLoading] = useState(false);
   const [showJetlag, setShowJetlag] = useState(false);
   const [showSavedMeals, setShowSavedMeals] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
@@ -546,6 +571,16 @@ export default function NutriCrew() {
     setCalorieLoading(false);
   };
 
+  const handleCheckAirplaneMeal = async () => {
+    if (!airplaneMealText.trim()) return;
+    setAirplaneMealLoading(true);
+    try {
+      const r = await checkAirplaneMeal(airplaneMealText, pairing.diet, pairing.diet_other, lang);
+      setAirplaneMealResult(r);
+    } catch { setAirplaneMealResult({ error: true }); }
+    setAirplaneMealLoading(false);
+  };
+
   const toggleFavorite = (meal) => {
     const id = `${meal.type}-${meal.name}`;
     setFavorites(prev => {
@@ -622,6 +657,7 @@ export default function NutriCrew() {
           activeDay={activeDay} setActiveDay={setActiveDay}
           onNewPairing={startNewPairing} lang={lang}
           favorites={favorites} onToggleFavorite={toggleFavorite}
+          onOpenAirplaneMeal={() => setShowAirplaneMeal(true)}
         />
       )}
 
@@ -658,6 +694,16 @@ export default function NutriCrew() {
             <SavedMealsIcon/>
           </button>
         </>
+      )}
+
+      {showAirplaneMeal && (
+        <AirplaneMealModal
+          t={t}
+          text={airplaneMealText} setText={setAirplaneMealText}
+          result={airplaneMealResult} loading={airplaneMealLoading}
+          onCheck={handleCheckAirplaneMeal}
+          onClose={() => { setShowAirplaneMeal(false); setAirplaneMealResult(null); setAirplaneMealText(""); }}
+        />
       )}
 
       {showSavedMeals && (
@@ -1114,7 +1160,7 @@ function BPField({ label, value, highlight }) {
 }
 
 // ─── PLAN SCREEN ──────────────────────────────────────────────────
-function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, activeDay, setActiveDay, onNewPairing, favorites, onToggleFavorite }) {
+function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, activeDay, setActiveDay, onNewPairing, favorites, onToggleFavorite, onOpenAirplaneMeal }) {
   const days = pairing.pairing_days || 1;
   const hasJetlag = Math.abs(parseInt(pairing.timezone||0)) >= 4;
 
@@ -1200,7 +1246,7 @@ function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, 
 
       <div style={styles.planContent}>
         {activeTab === "plan" && plan.days?.[activeDay] && (
-          <DayPlan day={plan.days[activeDay]} t={t} favorites={favorites} onToggleFavorite={onToggleFavorite}/>
+          <DayPlan day={plan.days[activeDay]} t={t} favorites={favorites} onToggleFavorite={onToggleFavorite} onOpenAirplaneMeal={onOpenAirplaneMeal}/>
         )}
         {activeTab === "grocery" && plan.groceryList && (
           <GroceryList list={plan.groceryList}/>
@@ -1213,7 +1259,7 @@ function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, 
   );
 }
 
-function DayPlan({ day, t, favorites, onToggleFavorite }) {
+function DayPlan({ day, t, favorites, onToggleFavorite, onOpenAirplaneMeal }) {
   const mealColors = { Breakfast: C.gold, Lunch: C.sky, Dinner: C.green, Snack: C.muted };
   return (
     <div>
@@ -1232,6 +1278,9 @@ function DayPlan({ day, t, favorites, onToggleFavorite }) {
               </span>
               <div style={styles.mealTopRight}>
                 <span style={styles.mealCals}>🔥 {meal.calories} kcal</span>
+                <button style={styles.favoriteBtn} onClick={() => onOpenAirplaneMeal?.()} aria-label="check airplane meal" title={t.airplane_meal_title}>
+                  🍱
+                </button>
                 <button style={styles.favoriteBtn} onClick={() => onToggleFavorite?.(meal)} aria-label="favorite">
                   {isFav ? "❤️" : "🤍"}
                 </button>
@@ -1363,6 +1412,40 @@ function CalorieModal({ t, text, setText, result, loading, onEstimate, onClose }
                 <span style={{color:C.gold}}>{item.calories} kcal</span>
               </div>
             ))}
+            {result.note && <div style={styles.calNote}>{result.note}</div>}
+          </div>
+        )}
+        <div style={styles.calorieDisclaimer}>{t.calorie_disclaimer}</div>
+      </div>
+    </div>
+  );
+}
+
+function AirplaneMealModal({ t, text, setText, result, loading, onCheck, onClose }) {
+  const fitsColor = { yes: C.green, no: C.red, partial: C.gold }[result?.fits] || C.gold;
+  const fitsIcon = { yes: "✅", no: "❌", partial: "⚠️" }[result?.fits] || "";
+  const fitsLabel = { yes: t.fits_yes, no: t.fits_no, partial: t.fits_partial }[result?.fits] || "";
+  return (
+    <div style={styles.modalOverlay}>
+      <div style={styles.modal}>
+        <div style={styles.modalHeader}>
+          <span style={styles.modalTitle}>{t.airplane_meal_title}</span>
+          <button style={styles.closeBtn} onClick={onClose}>✕</button>
+        </div>
+        <textarea style={styles.calorieInput} value={text}
+          onChange={e => setText(e.target.value)}
+          placeholder={t.airplane_meal_placeholder} rows={4}/>
+        <button style={styles.primaryBtn} onClick={onCheck} disabled={loading || !text.trim()}>
+          {loading ? "..." : t.airplane_meal_btn}
+        </button>
+        {result && result.error && (
+          <div style={styles.calorieError}>{t.airplane_meal_error}</div>
+        )}
+        {result && !result.error && (
+          <div style={styles.calorieResult}>
+            <div style={{...styles.calResultTotal, color: fitsColor}}>{fitsIcon} {fitsLabel}</div>
+            {result.dietNote && <div style={styles.calNote}>{result.dietNote}</div>}
+            <div style={{...styles.calResultTotal, marginTop: 10}}>≈ {result.calories} kcal</div>
             {result.note && <div style={styles.calNote}>{result.note}</div>}
           </div>
         )}
@@ -1619,12 +1702,34 @@ async function estimateCalories(description, lang) {
   return await res.json();
 }
 
+async function checkAirplaneMeal(description, diet, dietOther, lang) {
+  const langName = lang === "fr" ? "French" : lang === "es" ? "Spanish" : "English";
+  const dietLabel = diet === "other" ? (dietOther || "no specific diet") : (diet || "no specific diet");
+  const prompt = `A flight crew member follows this diet: "${dietLabel}". They were served this meal on the plane: "${description}".
+Respond in ${langName}. Return ONLY JSON:
+{
+  "fits": "yes",
+  "dietNote": "Brief explanation of whether this meal fits their diet and why",
+  "calories": 650,
+  "note": "Brief note about the calorie estimate accuracy"
+}
+"fits" must be exactly "yes", "no", or "partial".`;
+
+  const res = await fetch(`${API_BASE}/api/check-airplane-meal`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt })
+  });
+  if (!res.ok) throw new Error("Failed to check airplane meal");
+  return await res.json();
+}
+
 // ─── STYLES ───────────────────────────────────────────────────────
 const styles = {
   root: {
     background: C.bg,
     minHeight: "100vh",
-    fontFamily: "'Orbitron', 'Inter', system-ui, sans-serif",
+    fontFamily: "'Inter', system-ui, sans-serif",
     color: C.white,
     maxWidth: 440,
     margin: "0 auto",
@@ -1657,8 +1762,9 @@ const styles = {
   appName: {
     fontSize: 38, fontWeight: 900, letterSpacing: "4px", color: C.white,
     textShadow: `0 0 30px ${C.gold}66`, marginTop: 12,
+    fontFamily: "'Orbitron', sans-serif",
   },
-  appTagline: { fontSize: 12, color: C.muted, letterSpacing: "3px", marginTop: 6, textTransform: "uppercase" },
+  appTagline: { fontSize: 13, fontWeight: 600, color: C.skyLight, letterSpacing: "2px", marginTop: 6, textTransform: "uppercase" },
   appTaglineSub: { fontSize: 12, color: C.muted, marginTop: 8, textAlign: "center", maxWidth: 260, lineHeight: 1.5 },
 
   freeTrialBadge: {
