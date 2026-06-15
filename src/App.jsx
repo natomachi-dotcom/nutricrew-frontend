@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 // AI backend base URL. Empty in local dev (Vite proxies /api to localhost:3001);
 // set VITE_API_BASE_URL on Vercel to point at the deployed nutricrew-backend.
@@ -391,20 +391,6 @@ const PassportIcon = () => (
   </svg>
 );
 
-const StarIcon = ({ filled }) => (
-  <svg width="14" height="14" viewBox="0 0 14 14" fill={filled ? C.gold : "none"} stroke={C.gold} strokeWidth="1.2">
-    <polygon points="7,1 8.8,5.2 13.4,5.6 10,8.6 11,13.2 7,10.8 3,13.2 4,8.6 0.6,5.6 5.2,5.2"/>
-  </svg>
-);
-
-const GroceryIcon = () => (
-  <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-    <path d="M3 3h2l2.5 10h9l2-7H7" stroke={C.gold} strokeWidth="1.5" strokeLinecap="round"/>
-    <circle cx="9" cy="18" r="1.5" fill={C.gold}/>
-    <circle cx="15" cy="18" r="1.5" fill={C.gold}/>
-  </svg>
-);
-
 const CalorieIcon = () => (
   <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
     <path d="M11 2C6.5 2 3 5.5 3 10c0 5 8 12 8 12s8-7 8-12c0-4.5-3.5-8-8-8z" stroke={C.gold} strokeWidth="1.5" fill="none"/>
@@ -437,7 +423,7 @@ const ProfileIcon = () => (
 // ─── HELPERS ──────────────────────────────────────────────────────
 const storage = {
   get: (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
-  set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage unavailable */ } },
 };
 
 const PAIRING_COUNT_KEY = "nutricrew_pairing_count";
@@ -470,10 +456,10 @@ function findSavedPlan(key) {
 
 // ─── MAIN APP ─────────────────────────────────────────────────────
 export default function NutriCrew() {
-  const [lang, setLang] = useState("en");
+  const [user, setUser] = useState(() => storage.get(USER_KEY));
+  const [lang, setLang] = useState(() => user?.lang || "en");
   const [screen, setScreen] = useState("splash"); // splash | checkin | passport | boarding | plan | premium
   const [step, setStep] = useState(0);
-  const [user, setUser] = useState(null);
   const [pairing, setPairing] = useState({});
   const [plan, setPlan] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -491,18 +477,9 @@ export default function NutriCrew() {
   const [showSavedMeals, setShowSavedMeals] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [favorites, setFavorites] = useState(() => storage.get(FAVORITES_KEY) || []);
-  const [returningUser, setReturningUser] = useState(false);
+  const [returningUser] = useState(() => !!user);
 
   const t = T[lang];
-
-  useEffect(() => {
-    const saved = storage.get(USER_KEY);
-    if (saved) {
-      setUser(saved);
-      setLang(saved.lang || "en");
-      setReturningUser(true);
-    }
-  }, []);
 
   const FREE_PAIRING_LIMIT = 3;
   const pairingCount = storage.get(PAIRING_COUNT_KEY) || 0;
@@ -645,12 +622,12 @@ export default function NutriCrew() {
           t={t} lang={lang} step={step} totalSteps={totalSteps}
           currentStep={currentStep} pairing={pairing} user={user}
           upd={upd} onContinue={handleContinue} onBack={handleBack}
-          setUser={setUser} setLang={setLang}
+          setUser={setUser}
         />
       )}
 
       {screen === "boarding" && (
-        <BoardingPassScreen t={t} user={user} pairing={pairing} lang={lang}
+        <BoardingPassScreen t={t} user={user} pairing={pairing}
           onGenerate={handleGenerate} onBack={() => setScreen("checkin")}
           isPremiumNeeded={isPremiumNeeded}
         />
@@ -674,7 +651,7 @@ export default function NutriCrew() {
       {/* Floating calorie button */}
       {(screen === "plan" || screen === "boarding") && (
         <>
-          <button style={styles.floatBtn} onClick={() => setShowCalorie(true)}>
+          <button style={styles.floatBtn} onClick={() => setShowCalorie(true)} aria-label="calorie estimator">
             <CalorieIcon/>
           </button>
           {showCalorie && (
@@ -686,7 +663,7 @@ export default function NutriCrew() {
               onClose={() => { setShowCalorie(false); setCalorieResult(null); setCalorieText(""); }}
             />
           )}
-          <button style={styles.floatBtnJetlag} onClick={() => setShowJetlag(true)}>
+          <button style={styles.floatBtnJetlag} onClick={() => setShowJetlag(true)} aria-label="jet lag info">
             <JetlagIcon/>
           </button>
           {showJetlag && (
@@ -696,7 +673,7 @@ export default function NutriCrew() {
               onClose={() => setShowJetlag(false)}
             />
           )}
-          <button style={styles.floatBtnSaved} onClick={() => setShowSavedMeals(true)}>
+          <button style={styles.floatBtnSaved} onClick={() => setShowSavedMeals(true)} aria-label="saved meals">
             <SavedMealsIcon/>
           </button>
         </>
@@ -798,19 +775,16 @@ function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onS
 }
 
 // ─── CHECK-IN SCREEN ──────────────────────────────────────────────
-function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, upd, onContinue, onBack, setUser, setLang }) {
-  const [localVal, setLocalVal] = useState("");
+function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, upd, onContinue, onBack, setUser }) {
+  const [localVal, setLocalVal] = useState(() => pairing[currentStep] ?? user?.[currentStep] ?? "");
   const [weightUnit, setWeightUnit] = useState("kg");
+  const [prevStep, setPrevStep] = useState(currentStep);
+  const [docNumber] = useState(() => Date.now().toString());
 
-  useEffect(() => {
-    const v = pairing[currentStep] ?? user?.[currentStep] ?? "";
-    setLocalVal(v);
-  }, [currentStep]);
-
-  useEffect(() => {
-    const diff = computeTimezoneDiff(pairing.departure, pairing.destinations);
-    upd("timezone", diff ?? 0);
-  }, [pairing.departure, JSON.stringify(pairing.destinations || [])]);
+  if (currentStep !== prevStep) {
+    setPrevStep(currentStep);
+    setLocalVal(pairing[currentStep] ?? user?.[currentStep] ?? "");
+  }
 
   const save = (v) => {
     upd(currentStep, v);
@@ -904,7 +878,11 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
 
       case "departure":
         return <TextInput label={t.step_route + " — " + "Departure"} value={localVal}
-          onChange={v => { setLocalVal(v); upd("departure", v); }}
+          onChange={v => {
+            setLocalVal(v);
+            upd("departure", v);
+            upd("timezone", computeTimezoneDiff(v, pairing.destinations) ?? 0);
+          }}
           placeholder="Montreal (YUL)" icon="🛫"/>;
 
       case "destination": {
@@ -914,6 +892,7 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
           const next = [...dests];
           next[i] = v;
           upd("destinations", next);
+          upd("timezone", computeTimezoneDiff(pairing.departure, next) ?? 0);
         };
         const tzDiff = computeTimezoneDiff(pairing.departure, dests);
         return (
@@ -1053,7 +1032,7 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
         </div>
         <div style={styles.passportMRZ}>
           <div style={styles.mrzLine}>{"P<NCR" + (pairing.name||"<<<<<<<<<").replace(/\s/g,"<").toUpperCase().padEnd(39,"<")}</div>
-          <div style={styles.mrzLine}>{"NCR" + Date.now().toString().slice(-9) + "<<<<<<<<<<<<<<<<<<<"}</div>
+          <div style={styles.mrzLine}>{"NCR" + docNumber.slice(-9) + "<<<<<<<<<<<<<<<<<<<"}</div>
         </div>
       </div>
 
@@ -1076,13 +1055,15 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
 }
 
 // ─── BOARDING PASS ────────────────────────────────────────────────
-function BoardingPassScreen({ t, user, pairing, lang, onGenerate, onBack, isPremiumNeeded }) {
+function BoardingPassScreen({ t, user, pairing, onGenerate, onBack, isPremiumNeeded }) {
   const mergedUser = { ...(user || {}), ...pairing };
   const dests = pairing.destinations || [];
   const dep = pairing.departure || "—";
   const dst = dests[0] || "—";
   const depCode = dep.match(/\(([A-Z]{3})\)/)?.[1] || dep.slice(0,3).toUpperCase();
   const dstCode = dst.match(/\(([A-Z]{3})\)/)?.[1] || dst.slice(0,3).toUpperCase();
+  const [ticketNumber] = useState(() => Date.now().toString());
+  const [barcodeHeights] = useState(() => Array.from({ length: 40 }, () => Math.random()*20+20));
 
   return (
     <div style={styles.boardingWrap}>
@@ -1135,11 +1116,11 @@ function BoardingPassScreen({ t, user, pairing, lang, onGenerate, onBack, isPrem
         {/* Barcode area */}
         <div style={styles.bpDividerDash}/>
         <div style={styles.bpBarcode}>
-          {[...Array(40)].map((_,i) => (
-            <div key={i} style={{...styles.bpBar, height: `${Math.random()*20+20}px`}}/>
+          {barcodeHeights.map((h,i) => (
+            <div key={i} style={{...styles.bpBar, height: `${h}px`}}/>
           ))}
         </div>
-        <div style={styles.bpBarcodeNum}>NCR{Date.now().toString().slice(-8)}</div>
+        <div style={styles.bpBarcodeNum}>NCR{ticketNumber.slice(-8)}</div>
 
         {isPremiumNeeded && (
           <div style={styles.premiumBanner}>⭐ Premium required for this pairing</div>

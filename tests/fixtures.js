@@ -1,0 +1,155 @@
+import { expect } from "@playwright/test";
+
+// Realistic /api/generate-plan response shape (matches DAY_SCHEMA / EXTRAS_SCHEMA
+// in nutricrew-backend/server.js) for a 1-day Montreal -> Paris pairing.
+export const MOCK_PLAN = {
+  summary: "A balanced one-day plan with extra hydration and lighter meals to ease jet lag.",
+  days: [
+    {
+      day: 1,
+      label: "Day 1 — Paris",
+      jetlagNote: "Eat meals on Paris time as soon as possible and get morning sunlight to reset your body clock.",
+      totalCalories: 1950,
+      meals: [
+        {
+          type: "Breakfast",
+          name: "Oatmeal with Berries",
+          description: "Hearty oatmeal topped with mixed berries and nuts.",
+          prep: "5 min, microwave",
+          calories: 450,
+          protein: 15,
+          carbs: 60,
+          fat: 12,
+          tags: ["vegetarian", "high-fiber"],
+          tip: "Pack overnight oats the night before departure.",
+          recyclingTip: "Rinse and recycle the oat container.",
+        },
+        {
+          type: "Lunch",
+          name: "Grilled Chicken Salad",
+          description: "Mixed greens with grilled chicken, avocado, and vinaigrette.",
+          prep: "10 min prep",
+          calories: 600,
+          protein: 40,
+          carbs: 30,
+          fat: 25,
+          tags: ["high-protein"],
+          tip: "Keep dressing separate until ready to eat.",
+          recyclingTip: "Compost the salad greens scraps.",
+        },
+        {
+          type: "Dinner",
+          name: "Baked Salmon with Quinoa",
+          description: "Baked salmon with quinoa and steamed broccoli.",
+          prep: "20 min",
+          calories: 700,
+          protein: 45,
+          carbs: 50,
+          fat: 28,
+          tags: ["omega-3"],
+          tip: "Prep quinoa in bulk for the week.",
+          recyclingTip: "Recycle the salmon packaging.",
+        },
+        {
+          type: "Snack",
+          name: "Greek Yogurt with Almonds",
+          description: "Plain Greek yogurt topped with almonds and honey.",
+          prep: "2 min",
+          calories: 200,
+          protein: 12,
+          carbs: 15,
+          fat: 8,
+          tags: ["protein-rich"],
+          tip: "Buy single-serving cups for travel.",
+          recyclingTip: "Rinse and recycle the yogurt cup.",
+        },
+      ],
+    },
+  ],
+  groceryList: {
+    produce: ["Bananas", "Spinach", "Broccoli"],
+    protein: ["Chicken breast", "Salmon", "Greek yogurt"],
+    pantry: ["Oats", "Quinoa", "Almonds"],
+    snacks: ["Honey"],
+    dairy: ["Greek yogurt"],
+  },
+  foodRestrictions: {
+    usa: "Not applicable — not traveling to the USA",
+    destination: "Some dairy and meat products face import restrictions when entering France.",
+    general: "Stay hydrated and avoid excess sodium while traveling.",
+  },
+  pairingCount: 1,
+  isPremium: false,
+};
+
+// Clears persisted app state so every test starts as a brand-new user on the splash screen.
+export async function gotoFresh(page) {
+  await page.addInitScript(() => localStorage.clear());
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "Begin Check-In" })).toBeVisible();
+}
+
+// Walks through all 13 check-in steps for a new user (Montreal -> Paris, 1-day pairing,
+// no kitchen access, no diet restrictions, "stay focused" goal, $50/day budget) and
+// lands on the boarding pass screen.
+export async function completeCheckIn(page, { name = "Alex Pilot", email = "alex.pilot@example.com" } = {}) {
+  const continueBtn = page.getByRole("button", { name: "Continue →" });
+
+  await page.getByRole("button", { name: "Begin Check-In" }).click();
+
+  // name
+  await page.getByPlaceholder("John Smith").fill(name);
+  await continueBtn.click();
+
+  // email
+  await page.getByPlaceholder("john@airline.com").fill(email);
+  await continueBtn.click();
+
+  // gender
+  await page.getByRole("button", { name: "Male", exact: true }).click();
+  await continueBtn.click();
+
+  // weight (defaults to kg, placeholder "70")
+  await page.getByPlaceholder("70").fill("75");
+  await continueBtn.click();
+
+  // position
+  await page.getByRole("button", { name: "Pilot" }).click();
+  await continueBtn.click();
+
+  // pairing length: 1 day
+  await page.getByRole("button", { name: "1 Days" }).click();
+  await continueBtn.click();
+
+  // departure
+  await page.getByPlaceholder("Montreal (YUL)").fill("Montreal (YUL)");
+  await continueBtn.click();
+
+  // destination (1 day -> single field)
+  await page.getByPlaceholder("Paris (CDG)").fill("Paris (CDG)");
+  await continueBtn.click();
+
+  // flying to the USA?
+  await page.getByRole("button", { name: "No", exact: false }).click();
+  await continueBtn.click();
+
+  // kitchen access
+  await page.getByRole("button", { name: "Hotel (No Kitchen)" }).click();
+  await continueBtn.click();
+
+  // diet
+  await page.getByRole("button", { name: "No Restrictions" }).click();
+  await continueBtn.click();
+
+  // goals
+  await page.getByRole("button", { name: "Stay Focused & Alert" }).click();
+  await continueBtn.click();
+
+  // budget
+  await page.getByRole("button", { name: "Per Day" }).click();
+  await page.getByPlaceholder("50").fill("50");
+  await continueBtn.click();
+
+  // boarding pass screen
+  await expect(page.getByRole("button", { name: "Generate My Plan" })).toBeVisible();
+}
