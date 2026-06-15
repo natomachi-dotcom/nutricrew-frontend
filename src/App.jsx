@@ -504,8 +504,9 @@ export default function NutriCrew() {
     }
   }, []);
 
+  const FREE_PAIRING_LIMIT = 3;
   const pairingCount = storage.get(PAIRING_COUNT_KEY) || 0;
-  const isPremiumNeeded = pairingCount >= 1;
+  const isPremiumNeeded = pairingCount >= FREE_PAIRING_LIMIT;
 
   // ── STEP DEFINITIONS (check-in flow) ──────────────────────────
   // If returning user, skip personal steps
@@ -554,9 +555,14 @@ export default function NutriCrew() {
       const result = await generatePlan(data, lang);
       setPlan(result);
       saveSavedPlan(cacheKey, data, result);
-      storage.set(PAIRING_COUNT_KEY, pairingCount + 1);
+      storage.set(PAIRING_COUNT_KEY, result.pairingCount ?? pairingCount + 1);
     } catch (e) {
-      setPlan({ error: true });
+      if (e.code === "premium_required") {
+        storage.set(PAIRING_COUNT_KEY, e.pairingCount ?? FREE_PAIRING_LIMIT);
+        setScreen("premium");
+      } else {
+        setPlan({ error: true });
+      }
     }
     setLoading(false);
   };
@@ -1677,7 +1683,13 @@ async function generatePlan(data, lang) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ data, lang })
   });
-  if (!res.ok) throw new Error("Failed to generate plan");
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    if (res.status === 403 && body?.error === "premium_required") {
+      throw Object.assign(new Error("premium_required"), { code: "premium_required", pairingCount: body.pairingCount });
+    }
+    throw new Error("Failed to generate plan");
+  }
   return await res.json();
 }
 
@@ -1713,7 +1725,7 @@ Respond in ${langName}. Return ONLY JSON:
   "calories": 650,
   "note": "Brief note about the calorie estimate accuracy"
 }
-"fits" must be exactly "yes", "no", or "partial".`;
+"fits" must be exactly "yes", "no", or "partial". For diets that depend on certification (e.g. halal, kosher) where the description does not confirm that certification, respond "partial" and explain in "dietNote" what would need to be confirmed — do not respond "yes" based on an assumption that the ingredients could be certified.`;
 
   const res = await fetch(`${API_BASE}/api/check-airplane-meal`, {
     method: "POST",
