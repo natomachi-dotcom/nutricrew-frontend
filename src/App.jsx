@@ -481,7 +481,7 @@ export default function NutriCrew() {
 
   const t = T[lang];
 
-  const FREE_PAIRING_LIMIT = 3;
+  const FREE_PAIRING_LIMIT = 1;
   const pairingCount = storage.get(PAIRING_COUNT_KEY) || 0;
   const isPremiumNeeded = pairingCount >= FREE_PAIRING_LIMIT;
 
