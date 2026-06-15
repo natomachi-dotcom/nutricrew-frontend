@@ -15,7 +15,7 @@ const C = {
   sky:     "#4A9ECC",
   skyLight:"#7BBFE0",
   green:   "#4CAF7D",
-  white:   "#F0F4FF",
+  white:   "#F8FAFF",
   muted:   "#7A8EAA",
   red:     "#E05555",
   bg:      "#07101E",
@@ -57,6 +57,7 @@ const T = {
     vegan: "Vegan", gluten_free: "Gluten-Free", halal: "Halal",
     kosher: "Kosher", low_carb: "Low-Carb / Keto",
     dairy_free: "Dairy-Free", mediterranean: "Mediterranean", carnivore: "Carnivore",
+    calorie_deficit: "Calorie Deficit ⭐",
     diet_other: "Other", diet_other_placeholder: "Tell us about your diet...",
     lose_weight: "Lose Weight", keep_weight: "Maintain Weight",
     stay_focused: "Stay Focused & Alert", no_bloating: "Avoid Bloating",
@@ -148,6 +149,7 @@ const T = {
     vegan: "Végétalien", gluten_free: "Sans Gluten", halal: "Halal",
     kosher: "Casher", low_carb: "Faible en Glucides",
     dairy_free: "Sans Produits Laitiers", mediterranean: "Méditerranéen", carnivore: "Carnivore",
+    calorie_deficit: "Déficit Calorique ⭐",
     diet_other: "Autre", diet_other_placeholder: "Décrivez votre alimentation...",
     lose_weight: "Perdre du Poids", keep_weight: "Maintenir le Poids",
     stay_focused: "Rester Concentré", no_bloating: "Éviter les Ballonnements",
@@ -239,6 +241,7 @@ const T = {
     vegan: "Vegano", gluten_free: "Sin Gluten", halal: "Halal",
     kosher: "Kosher", low_carb: "Bajo en Carbohidratos",
     dairy_free: "Sin Lácteos", mediterranean: "Mediterráneo", carnivore: "Carnívoro",
+    calorie_deficit: "Déficit Calórico ⭐",
     diet_other: "Otra", diet_other_placeholder: "Cuéntanos sobre tu dieta...",
     lose_weight: "Perder Peso", keep_weight: "Mantener Peso",
     stay_focused: "Mantener Concentración", no_bloating: "Evitar Hinchazón",
@@ -951,6 +954,7 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
                 {v:"dairy_free",l:t.dairy_free,icon:"🥛"},
                 {v:"mediterranean",l:t.mediterranean,icon:"🫒"},
                 {v:"carnivore",l:t.carnivore,icon:"🥩"},
+                {v:"calorie_deficit",l:t.calorie_deficit,icon:"🔥",premium:true},
                 {v:"other",l:t.diet_other,icon:"✏️"},
               ]}
               value={pairing.diet}
@@ -1362,7 +1366,7 @@ function PremiumScreen({ t, onBack }) {
       <div style={styles.premiumTitle}>{t.premium_title}</div>
       <div style={styles.premiumMsg}>{t.premium_msg}</div>
       <div style={styles.premiumFeatures}>
-        {["Daily meal plans for your full pairing","Jetlag-optimized meal timing","Country food rules","Grocery lists"].map(f => (
+        {["Daily meal plans for your full pairing","Jetlag-optimized meal timing","Country food rules","Grocery lists","Calorie deficit meal plans"].map(f => (
           <div key={f} style={styles.premiumFeature}>✓ {f}</div>
         ))}
       </div>
@@ -1624,6 +1628,7 @@ function RadioGroup({ label, options, value, onChange }) {
           <button key={o.v}
             style={{...styles.radioCard, ...(value===o.v?styles.radioCardActive:{})}}
             onClick={() => onChange(o.v)}>
+            {o.premium && <span style={styles.radioPremiumBadge}>👑</span>}
             {o.icon && <span style={styles.radioIcon}>{o.icon}</span>}
             <span style={styles.radioLabel}>{o.l}</span>
           </button>
@@ -1722,7 +1727,7 @@ const styles = {
   root: {
     background: C.bg,
     minHeight: "100vh",
-    fontFamily: "'Inter', system-ui, sans-serif",
+    fontFamily: "'Orbitron', 'Inter', system-ui, sans-serif",
     color: C.white,
     maxWidth: 440,
     margin: "0 auto",
@@ -1861,11 +1866,13 @@ const styles = {
     padding: "12px 10px", borderRadius: 10, border: `1px solid ${C.navyBorder}`,
     background: C.navyCard, color: C.muted, cursor: "pointer", fontFamily: "inherit",
     display: "flex", flexDirection: "column", alignItems: "center", gap: 6, textAlign: "center",
+    position: "relative",
   },
   radioCardActive: { border: `1px solid ${C.sky}`, color: C.white, background: `${C.sky}15` },
   radioCardActiveGreen: { border: `1px solid ${C.green}`, color: C.white, background: `${C.green}15` },
   radioIcon: { fontSize: 20 },
   radioLabel: { fontSize: 12 },
+  radioPremiumBadge: { position: "absolute", top: 6, right: 8, fontSize: 12, lineHeight: 1 },
   navRow: {
     display: "flex", gap: 10, marginTop: 16, paddingBottom: 8,
   },
