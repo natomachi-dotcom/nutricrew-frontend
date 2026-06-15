@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 // AI backend base URL. Empty in local dev (Vite proxies /api to localhost:3001);
 // set VITE_API_BASE_URL on Vercel to point at the deployed nutricrew-backend.
@@ -115,6 +115,19 @@ const T = {
     plan_loading: "Preparing your nutrition plan...",
     plan_error: "Could not generate plan. Please try again.",
     calorie_error: "Could not estimate calories. Please try again.",
+    step_calorie_target: "Calorie Target",
+    calorie_target_based_on: "Based on your weight: {weight}",
+    calorie_target_tdee: "Estimated maintenance calories: ~{tdee} kcal/day",
+    calorie_target_select: "Choose your deficit level:",
+    deficit_gentle: "Gentle (−250 kcal/day) — lose ~0.25 kg/week",
+    deficit_moderate: "Moderate (−500 kcal/day) — lose ~0.5 kg/week ⭐",
+    deficit_aggressive: "Aggressive (−750 kcal/day) — lose ~0.75 kg/week",
+    deficit_custom: "Custom target",
+    calorie_target_result: "Your daily target",
+    calorie_target_custom_label: "Daily calorie target (kcal)",
+    calorie_target_custom_error_low: "Minimum is 1,200 kcal/day for safety.",
+    calorie_target_custom_error_high: "Must be below your maintenance minus 100 kcal (max {max} kcal).",
+    calorie_target_disclaimer: "Estimates only. Consult a healthcare professional before starting a calorie deficit.",
   },
   fr: {
     tagline: "Alimentez Votre Vol",
@@ -207,6 +220,19 @@ const T = {
     plan_loading: "Préparation de votre plan nutritionnel...",
     plan_error: "Impossible de générer le plan. Veuillez réessayer.",
     calorie_error: "Impossible d'estimer les calories. Veuillez réessayer.",
+    step_calorie_target: "Objectif Calorique",
+    calorie_target_based_on: "Basé sur votre poids : {weight}",
+    calorie_target_tdee: "Calories d'entretien estimées : ~{tdee} kcal/jour",
+    calorie_target_select: "Choisissez votre niveau de déficit :",
+    deficit_gentle: "Doux (−250 kcal/jour) — perdre ~0,25 kg/semaine",
+    deficit_moderate: "Modéré (−500 kcal/jour) — perdre ~0,5 kg/semaine ⭐",
+    deficit_aggressive: "Intensif (−750 kcal/jour) — perdre ~0,75 kg/semaine",
+    deficit_custom: "Cible personnalisée",
+    calorie_target_result: "Votre objectif journalier",
+    calorie_target_custom_label: "Objectif calorique journalier (kcal)",
+    calorie_target_custom_error_low: "Le minimum est 1 200 kcal/jour pour votre sécurité.",
+    calorie_target_custom_error_high: "Doit être inférieur à votre entretien moins 100 kcal (max {max} kcal).",
+    calorie_target_disclaimer: "Estimations uniquement. Consultez un professionnel de santé avant de commencer un déficit calorique.",
   },
   es: {
     tagline: "Combustible Para Tu Vuelo",
@@ -299,6 +325,19 @@ const T = {
     plan_loading: "Preparando tu plan nutricional...",
     plan_error: "No se pudo generar el plan. Inténtalo de nuevo.",
     calorie_error: "No se pudieron estimar las calorías. Inténtalo de nuevo.",
+    step_calorie_target: "Objetivo Calórico",
+    calorie_target_based_on: "Basado en tu peso: {weight}",
+    calorie_target_tdee: "Calorías de mantenimiento estimadas: ~{tdee} kcal/día",
+    calorie_target_select: "Elige tu nivel de déficit:",
+    deficit_gentle: "Suave (−250 kcal/día) — perder ~0,25 kg/semana",
+    deficit_moderate: "Moderado (−500 kcal/día) — perder ~0,5 kg/semana ⭐",
+    deficit_aggressive: "Agresivo (−750 kcal/día) — perder ~0,75 kg/semana",
+    deficit_custom: "Objetivo personalizado",
+    calorie_target_result: "Tu objetivo diario",
+    calorie_target_custom_label: "Objetivo calórico diario (kcal)",
+    calorie_target_custom_error_low: "El mínimo es 1.200 kcal/día por seguridad.",
+    calorie_target_custom_error_high: "Debe ser inferior a tu mantenimiento menos 100 kcal (máx. {max} kcal).",
+    calorie_target_disclaimer: "Solo estimaciones. Consulta a un profesional de salud antes de comenzar un déficit calórico.",
   }
 };
 
@@ -489,11 +528,14 @@ export default function NutriCrew() {
   const isPremiumNeeded = pairingCount >= FREE_PAIRING_LIMIT;
 
   // ── STEP DEFINITIONS (check-in flow) ──────────────────────────
-  // If returning user, skip personal steps
+  // If returning user, skip personal steps.
+  // Calorie Deficit diet injects an extra step to collect the calorie target.
   const allSteps = [
     "name", "email", "gender", "weight", "position",
     "pairing_days", "departure", "destination", "going_usa",
-    "kitchen", "diet", "goals", "budget"
+    "kitchen", "diet",
+    ...(pairing.diet === "calorie_deficit" ? ["calorie_target"] : []),
+    "goals", "budget"
   ];
   const personalSteps = ["name","email","gender","weight","position"];
   const steps = returningUser
@@ -958,7 +1000,14 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
                 {v:"other",l:t.diet_other,icon:"✏️"},
               ]}
               value={pairing.diet}
-              onChange={v => upd("diet", v)}/>
+              onChange={v => {
+                upd("diet", v);
+                if (v !== "calorie_deficit") {
+                  upd("calorie_target", null);
+                  upd("calorie_deficit_amount", null);
+                  upd("calorie_deficit_preset", null);
+                }
+              }}/>
             {pairing.diet === "other" && (
               <div style={{marginTop:12}}>
                 <TextInput value={pairing.diet_other || ""}
@@ -968,6 +1017,9 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
             )}
           </div>
         );
+
+      case "calorie_target":
+        return <CalorieTargetStep t={t} pairing={pairing} user={user} upd={upd} />;
 
       case "goals":
         return <CheckGroup label={t.step_goals}
@@ -1615,6 +1667,132 @@ function TextInput({ label, value, onChange, placeholder, icon, type = "text" })
           onChange={e => onChange(e.target.value)}
           placeholder={placeholder}/>
       </div>
+    </div>
+  );
+}
+
+function CalorieTargetStep({ t, pairing, user, upd }) {
+  const weight = pairing.weight || user?.weight || "70kg";
+  const gender = pairing.gender || user?.gender || "female";
+
+  // Parse weight string (e.g. "65kg", "145lbs") into kg
+  const weightStr = String(weight);
+  const weightVal = parseFloat(weightStr) || 70;
+  const weightKg = /lb/i.test(weightStr) ? weightVal / 2.20462 : weightVal;
+
+  // Mifflin-St Jeor BMR (default height 170 cm, age 35) × 1.55 for active crew
+  const bmr = gender === "male"
+    ? (10 * weightKg) + (6.25 * 170) - (5 * 35) + 5
+    : (10 * weightKg) + (6.25 * 170) - (5 * 35) - 161;
+  const tdee = Math.round((bmr * 1.55) / 50) * 50;
+
+  const DEFICITS = { gentle: 250, moderate: 500, aggressive: 750 };
+
+  const [selected, setSelected] = useState(pairing.calorie_deficit_preset || "moderate");
+  const [customVal, setCustomVal] = useState(
+    pairing.calorie_deficit_preset === "custom" ? String(pairing.calorie_target || "") : ""
+  );
+  const [customError, setCustomError] = useState("");
+
+  // Seed the default moderate target on first mount if not already set
+  useEffect(() => {
+    if (!pairing.calorie_target) {
+      const defaultTarget = Math.max(tdee - 500, 1200);
+      upd("calorie_target", defaultTarget);
+      upd("calorie_deficit_amount", 500);
+      upd("calorie_deficit_preset", "moderate");
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const applyPreset = (preset) => {
+    setSelected(preset);
+    setCustomError("");
+    if (preset !== "custom") {
+      const target = Math.max(tdee - DEFICITS[preset], 1200);
+      upd("calorie_target", target);
+      upd("calorie_deficit_amount", DEFICITS[preset]);
+      upd("calorie_deficit_preset", preset);
+    } else {
+      upd("calorie_deficit_preset", "custom");
+      upd("calorie_target", null);
+    }
+  };
+
+  const validateCustom = (val) => {
+    setCustomVal(val);
+    const num = parseInt(val, 10);
+    const max = tdee - 100;
+    if (!val || isNaN(num) || num < 1200) {
+      setCustomError(t.calorie_target_custom_error_low);
+      upd("calorie_target", null);
+      return;
+    }
+    if (num > max) {
+      setCustomError((t.calorie_target_custom_error_high || "").replace("{max}", max));
+      upd("calorie_target", null);
+      return;
+    }
+    setCustomError("");
+    upd("calorie_target", num);
+    upd("calorie_deficit_amount", tdee - num);
+  };
+
+  const displayTarget = selected !== "custom"
+    ? Math.max(tdee - (DEFICITS[selected] || 500), 1200)
+    : pairing.calorie_target;
+
+  const options = [
+    { k: "gentle",     icon: "🌿", label: t.deficit_gentle },
+    { k: "moderate",   icon: "⭐", label: t.deficit_moderate },
+    { k: "aggressive", icon: "🔥", label: t.deficit_aggressive },
+    { k: "custom",     icon: "✏️", label: t.deficit_custom },
+  ];
+
+  return (
+    <div>
+      <div style={{...styles.calorieResult, marginBottom: 12, textAlign: "center"}}>
+        <div style={{fontSize: 13, color: C.muted, marginBottom: 4}}>
+          {(t.calorie_target_based_on || "").replace("{weight}", weight)}
+        </div>
+        <div style={{fontSize: 14, color: C.skyLight, fontWeight: 600}}>
+          {(t.calorie_target_tdee || "").replace("{tdee}", tdee.toLocaleString())}
+        </div>
+      </div>
+
+      <div style={styles.inputLabel}>{t.calorie_target_select}</div>
+
+      <div style={{display: "flex", flexDirection: "column", gap: 8, marginBottom: 12}}>
+        {options.map(({ k, icon, label }) => (
+          <button key={k}
+            style={{...styles.radioCard, ...(selected === k ? styles.radioCardActive : {}),
+              flexDirection: "row", alignItems: "center", textAlign: "left", gap: 10}}
+            onClick={() => applyPreset(k)}>
+            <span style={styles.radioIcon}>{icon}</span>
+            <span style={{...styles.radioLabel, fontSize: 13}}>{label}</span>
+          </button>
+        ))}
+      </div>
+
+      {selected === "custom" && (
+        <div style={{marginBottom: 12}}>
+          <TextInput label={t.calorie_target_custom_label} type="number"
+            value={customVal} onChange={validateCustom}
+            placeholder="e.g. 1600" icon="🎯"/>
+          {customError && <div style={{...styles.calorieError, marginTop: 8}}>{customError}</div>}
+        </div>
+      )}
+
+      {displayTarget && (
+        <div style={{...styles.calorieResult, marginBottom: 12, textAlign: "center"}}>
+          <div style={{fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 6}}>
+            {t.calorie_target_result}
+          </div>
+          <div style={styles.calResultTotal}>{displayTarget.toLocaleString()} kcal</div>
+          <div style={{fontSize: 11, color: C.muted, marginTop: -6}}>/ day</div>
+        </div>
+      )}
+
+      <div style={styles.calorieDisclaimer}>{t.calorie_target_disclaimer}</div>
     </div>
   );
 }
