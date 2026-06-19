@@ -32,6 +32,7 @@ const T = {
     step_email: "Email Address",
     step_gender: "Gender",
     step_weight: "Weight",
+    step_age: "Your Age",
     step_position: "Your Role",
     step_pairing: "Pairing Length",
     step_route: "Your Route",
@@ -147,6 +148,7 @@ const T = {
     step_email: "Adresse Email",
     step_gender: "Genre",
     step_weight: "Poids",
+    step_age: "Votre Âge",
     step_position: "Votre Rôle",
     step_pairing: "Durée du Pairing",
     step_route: "Votre Route",
@@ -261,6 +263,7 @@ const T = {
     step_email: "Correo Electrónico",
     step_gender: "Género",
     step_weight: "Peso",
+    step_age: "Tu Edad",
     step_position: "Tu Rol",
     step_pairing: "Duración del Pairing",
     step_route: "Tu Ruta",
@@ -568,13 +571,13 @@ export default function NutriCrew() {
   // If returning user, skip personal steps.
   // Calorie Deficit diet injects an extra step to collect the calorie target.
   const allSteps = [
-    "name", "email", "gender", "weight", "position",
+    "name", "email", "gender", "weight", "age", "position",
     "pairing_days", "departure", "destination", "going_usa",
     "kitchen", "diet",
-    ...(pairing.diet === "calorie_deficit" ? ["calorie_target"] : []),
+    ...((pairing.diets || []).includes("calorie_deficit") ? ["calorie_target"] : []),
     "goals", "budget"
   ];
-  const personalSteps = ["name","email","gender","weight","position"];
+  const personalSteps = ["name","email","gender","weight","age","position"];
   const steps = returningUser
     ? allSteps.filter(s => !personalSteps.includes(s))
     : allSteps;
@@ -656,7 +659,7 @@ export default function NutriCrew() {
     if (!airplaneMealText.trim()) return;
     setAirplaneMealLoading(true);
     try {
-      const r = await checkAirplaneMeal(airplaneMealText, pairing.diet, pairing.diet_other, lang);
+      const r = await checkAirplaneMeal(airplaneMealText, pairing.diets || (pairing.diet ? [pairing.diet] : []), pairing.diet_other, lang);
       setAirplaneMealResult(r);
     } catch { setAirplaneMealResult({ error: true }); }
     setAirplaneMealLoading(false);
@@ -904,7 +907,15 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
     const v = pairing[currentStep] ?? user?.[currentStep];
     if (!v) return false;
     if (currentStep === "goals" && (!pairing.goals || pairing.goals.length === 0)) return false;
-    if (currentStep === "diet" && pairing.diet === "other" && !pairing.diet_other?.trim()) return false;
+    if (currentStep === "diet") {
+      if (!pairing.diets || pairing.diets.length === 0) return false;
+      if (pairing.diets.includes("other") && !pairing.diet_other?.trim()) return false;
+      return true;
+    }
+    if (currentStep === "age") {
+      const age = parseInt(pairing.age ?? user?.age, 10);
+      return !!(age && age >= 16 && age <= 80);
+    }
     return true;
   };
 
@@ -927,6 +938,20 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
           options={[{v:"male",l:t.male},{v:"female",l:t.female},{v:"other",l:t.other}]}
           value={pairing.gender || user?.gender}
           onChange={v => { upd("gender",v); save(v); }}/>;
+
+      case "age":
+        return (
+          <div>
+            <div style={styles.inputLabel}>{t.step_age}</div>
+            <TextInput
+              value={String(pairing.age || user?.age || "")}
+              type="number"
+              onChange={v => { upd("age", v); save(v); }}
+              placeholder="e.g. 32"
+              icon="🎂"
+            />
+          </div>
+        );
 
       case "weight":
         return (
@@ -1038,7 +1063,7 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
       case "diet":
         return (
           <div>
-            <RadioGroup label={t.step_diet}
+            <CheckGroup label={t.step_diet}
               options={[
                 {v:"none",l:t.no_restrictions,icon:"🍽️"},
                 {v:"vegetarian",l:t.vegetarian,icon:"🥗"},
@@ -1053,16 +1078,22 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
                 {v:"calorie_deficit",l:t.calorie_deficit,icon:"🔥",premium:true},
                 {v:"other",l:t.diet_other,icon:"✏️"},
               ]}
-              value={pairing.diet}
+              values={pairing.diets || []}
               onChange={v => {
-                upd("diet", v);
-                if (v !== "calorie_deficit") {
+                let next = v;
+                if (v.includes("none") && !(pairing.diets || []).includes("none")) {
+                  next = ["none"];
+                } else if ((pairing.diets || []).includes("none") && v.length > 1) {
+                  next = v.filter(d => d !== "none");
+                }
+                upd("diets", next);
+                if (!next.includes("calorie_deficit")) {
                   upd("calorie_target", null);
                   upd("calorie_deficit_amount", null);
                   upd("calorie_deficit_preset", null);
                 }
               }}/>
-            {pairing.diet === "other" && (
+            {(pairing.diets || []).includes("other") && (
               <div style={{marginTop:12}}>
                 <TextInput value={pairing.diet_other || ""}
                   onChange={v => upd("diet_other", v)}
@@ -1167,6 +1198,10 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
 // ─── BOARDING PASS ────────────────────────────────────────────────
 function BoardingPassScreen({ t, user, pairing, onGenerate, onBack, isPremiumNeeded }) {
   const mergedUser = { ...(user || {}), ...pairing };
+  const allDiets = mergedUser.diets || (mergedUser.diet ? [mergedUser.diet] : []);
+  const filteredDiets = allDiets.filter(d => d && d !== "none");
+  const dietDisplay = filteredDiets.length === 0 ? "NONE"
+    : filteredDiets.map(d => d === "other" ? (mergedUser.diet_other || "OTHER").toUpperCase() : d.replace(/_/g," ").toUpperCase()).join(" + ");
   const dests = pairing.destinations || [];
   const dep = pairing.departure || "—";
   const dst = dests[0] || "—";
@@ -1212,7 +1247,7 @@ function BoardingPassScreen({ t, user, pairing, onGenerate, onBack, isPremiumNee
           {dests.length > 1 && (
             <BPField label="ITINERARY" value={dests.map(d => d || "—").join(" → ")}/>
           )}
-          <BPField label="DIET" value={mergedUser.diet==="other" ? (mergedUser.diet_other||"OTHER").toUpperCase() : (mergedUser.diet?.replace("_"," ").toUpperCase() || "NONE")}/>
+          <BPField label="DIET" value={dietDisplay}/>
           <BPField label="GOALS" value={(pairing.goals||[]).slice(0,2).join(", ").replace(/_/g," ").toUpperCase() || "—"}/>
           <BPField label="BUDGET" value={pairing.budget_amount ? `$${pairing.budget_amount}/${pairing.budget_type==="day"?"DAY":"TRIP"}` : "—"}/>
           {Math.abs(parseInt(pairing.timezone||0)) >= 4 && (
@@ -1361,6 +1396,7 @@ function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, 
 }
 
 function DayPlan({ day, t, favorites, onToggleFavorite, onOpenAirplaneMeal }) {
+  const [expandedIdx, setExpandedIdx] = useState(null);
   const mealColors = { Breakfast: C.gold, Lunch: C.sky, Dinner: C.green, Snack: C.muted };
   return (
     <div>
@@ -1371,41 +1407,49 @@ function DayPlan({ day, t, favorites, onToggleFavorite, onOpenAirplaneMeal }) {
       {day.meals?.map((meal, i) => {
         const mealId = `${meal.type}-${meal.name}`;
         const isFav = favorites?.some(f => f.id === mealId);
+        const isOpen = expandedIdx === i;
+        const color = mealColors[meal.type] || C.muted;
         return (
-          <div key={i} style={{...styles.mealCard, borderLeftColor: mealColors[meal.type] || C.muted}}>
-            <div style={styles.mealTop}>
-              <span style={{...styles.mealType, color: mealColors[meal.type] || C.muted}}>
-                <PlaneIcon size={11} color={mealColors[meal.type] || C.muted}/> {meal.type}
-              </span>
-              <div style={styles.mealTopRight}>
-                <span style={styles.mealCals}>🔥 {meal.calories} kcal</span>
-                <button style={styles.favoriteBtn} onClick={() => onOpenAirplaneMeal?.()} aria-label="check airplane meal" title={t.airplane_meal_title}>
-                  🍱
-                </button>
-                <button style={styles.favoriteBtn} onClick={() => onToggleFavorite?.(meal)} aria-label="favorite">
-                  {isFav ? "❤️" : "🤍"}
-                </button>
+          <div key={i} style={{...styles.mealCard, borderLeftColor: color, padding: 0, overflow: "hidden"}}>
+            {/* Collapsed header — tap to expand */}
+            <div style={styles.mealHeader} onClick={() => setExpandedIdx(isOpen ? null : i)}>
+              {meal.emoji && <span style={styles.mealEmoji}>{meal.emoji}</span>}
+              <div style={{flex: 1, minWidth: 0}}>
+                <div style={{...styles.mealType, color, marginBottom: 3}}>
+                  <PlaneIcon size={10} color={color}/> {meal.type}
+                </div>
+                <div style={styles.mealName}>{meal.name}</div>
+              </div>
+              <div style={styles.mealHeaderRight}>
+                <span style={styles.mealCals}>🔥 {meal.calories}</span>
+                <span style={{fontSize: 10, color: C.muted}}>{isOpen ? "▲" : "▼"}</span>
               </div>
             </div>
-            <div style={styles.mealName}>{meal.name}</div>
-            <div style={styles.mealDesc}>{meal.description}</div>
-            <div style={styles.mealPrep}>🍳 {meal.prep}</div>
-            <div style={styles.mealMacros}>
-              <span>P: {meal.protein}g</span>
-              <span>C: {meal.carbs}g</span>
-              <span>F: {meal.fat}g</span>
-            </div>
-            <div style={styles.tagRow}>
-              {meal.tags?.map(tag => <span key={tag} style={styles.tag}>{tag}</span>)}
-            </div>
-            {meal.tip && (
-              <div style={styles.postIt}>
-                <span style={styles.postItPin}>📌</span><span>{meal.tip}</span>
-              </div>
-            )}
-            {meal.recyclingTip && (
-              <div style={styles.postItGreen}>
-                <span style={styles.postItPin}>♻️</span><span>{meal.recyclingTip}</span>
+            {/* Expanded body */}
+            {isOpen && (
+              <div style={styles.mealBody}>
+                <div style={styles.mealDesc}>{meal.description}</div>
+                <div style={styles.mealPrep}>🍳 {meal.prep}</div>
+                <div style={styles.mealMacros}>
+                  <span>P: {meal.protein}g</span>
+                  <span>C: {meal.carbs}g</span>
+                  <span>F: {meal.fat}g</span>
+                  {meal.tags?.map(tag => <span key={tag} style={styles.tag}>{tag}</span>)}
+                </div>
+                {meal.tip && (
+                  <div style={styles.postIt}>
+                    <span style={styles.postItPin}>📌</span><span>{meal.tip}</span>
+                  </div>
+                )}
+                {meal.recyclingTip && (
+                  <div style={styles.postItGreen}>
+                    <span style={styles.postItPin}>♻️</span><span>{meal.recyclingTip}</span>
+                  </div>
+                )}
+                <div style={{display:"flex", gap:8, justifyContent:"flex-end", marginTop:8}}>
+                  <button style={styles.favoriteBtn} onClick={e => { e.stopPropagation(); onOpenAirplaneMeal?.(); }} aria-label="check airplane meal" title={t?.airplane_meal_title}>🍱</button>
+                  <button style={styles.favoriteBtn} onClick={e => { e.stopPropagation(); onToggleFavorite?.(meal); }} aria-label="favorite">{isFav ? "❤️" : "🤍"}</button>
+                </div>
               </div>
             )}
           </div>
@@ -1823,16 +1867,17 @@ function TextInput({ label, value, onChange, placeholder, icon, type = "text" })
 function CalorieTargetStep({ t, pairing, user, upd }) {
   const weight = pairing.weight || user?.weight || "70kg";
   const gender = pairing.gender || user?.gender || "female";
+  const age = parseInt(pairing.age || user?.age || 35, 10);
 
   // Parse weight string (e.g. "65kg", "145lbs") into kg
   const weightStr = String(weight);
   const weightVal = parseFloat(weightStr) || 70;
   const weightKg = /lb/i.test(weightStr) ? weightVal / 2.20462 : weightVal;
 
-  // Mifflin-St Jeor BMR (default height 170 cm, age 35) × 1.55 for active crew
+  // Mifflin-St Jeor BMR (default height 170 cm) × 1.55 for active crew
   const bmr = gender === "male"
-    ? (10 * weightKg) + (6.25 * 170) - (5 * 35) + 5
-    : (10 * weightKg) + (6.25 * 170) - (5 * 35) - 161;
+    ? (10 * weightKg) + (6.25 * 170) - (5 * age) + 5
+    : (10 * weightKg) + (6.25 * 170) - (5 * age) - 161;
   const tdee = Math.round((bmr * 1.55) / 50) * 50;
 
   const DEFICITS = { gentle: 250, moderate: 500, aggressive: 750 };
@@ -1978,6 +2023,7 @@ function CheckGroup({ label, options, values, onChange }) {
           <button key={o.v}
             style={{...styles.radioCard, ...(values.includes(o.v)?styles.radioCardActiveGreen:{})}}
             onClick={() => toggle(o.v)}>
+            {o.premium && <span style={styles.radioPremiumBadge}>👑</span>}
             {o.icon && <span style={styles.radioIcon}>{o.icon}</span>}
             <span style={styles.radioLabel}>{o.l}</span>
           </button>
@@ -2027,9 +2073,12 @@ async function estimateCalories(description, lang) {
   return await res.json();
 }
 
-async function checkAirplaneMeal(description, diet, dietOther, lang) {
+async function checkAirplaneMeal(description, diets, dietOther, lang) {
   const langName = lang === "fr" ? "French" : lang === "es" ? "Spanish" : "English";
-  const dietLabel = diet === "other" ? (dietOther || "no specific diet") : (diet || "no specific diet");
+  const dietArr = Array.isArray(diets) ? diets : (diets ? [diets] : []);
+  const filtered = dietArr.filter(d => d && d !== "none");
+  const dietLabel = filtered.length === 0 ? "no specific diet"
+    : filtered.map(d => d === "other" ? (dietOther || "custom") : d.replace(/_/g, " ")).join(" + ");
   const prompt = `A flight crew member follows this diet: "${dietLabel}". They were served this meal on the plane: "${description}".
 Respond in ${langName}. Return ONLY JSON:
 {
@@ -2330,10 +2379,17 @@ const styles = {
     marginBottom: 12,
   },
   mealCard: {
-    background: C.navyMid, borderRadius: 12, padding: "14px",
+    background: C.navyMid, borderRadius: 12,
     marginBottom: 10, borderLeft: "3px solid",
     border: `1px solid ${C.navyBorder}`,
   },
+  mealHeader: {
+    display: "flex", alignItems: "center", gap: 10, padding: "12px 14px",
+    cursor: "pointer", userSelect: "none",
+  },
+  mealEmoji: { fontSize: 30, lineHeight: 1, flexShrink: 0 },
+  mealHeaderRight: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 },
+  mealBody: { padding: "0 14px 14px", borderTop: `1px solid ${C.navyBorder}` },
   mealTop: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
   mealType: {
     fontSize: 11, fontWeight: 700, letterSpacing: "1.5px", textTransform: "uppercase",
@@ -2345,7 +2401,7 @@ const styles = {
     background: "transparent", border: "none", cursor: "pointer",
     fontSize: 17, lineHeight: 1, padding: 0,
   },
-  mealName: { fontSize: 16, fontWeight: 700, color: C.white, marginBottom: 4 },
+  mealName: { fontSize: 15, fontWeight: 700, color: C.white, marginBottom: 0 },
   mealDesc: { fontSize: 12, color: C.muted, marginBottom: 8 },
   mealPrep: { fontSize: 12, color: C.sky, marginBottom: 8 },
   mealMacros: {
