@@ -39,6 +39,10 @@ const T = {
     destination_label: "Destination",
     step_usa: "Flying to the USA?",
     step_kitchen: "Kitchen Access",
+    step_lunch_bag: "Lunch Bag Size",
+    bag_small: "Small  — fits 1–2 containers (~4L)",
+    bag_medium: "Medium — fits 2–3 containers (~6L)",
+    bag_large: "Large  — fits 3–4 containers + extras (~10L)",
     step_diet: "Your Diet",
     step_goals: "Your Goals",
     step_budget: "Your Budget",
@@ -155,6 +159,10 @@ const T = {
     destination_label: "Destination",
     step_usa: "Vol vers les États-Unis?",
     step_kitchen: "Accès Cuisine",
+    step_lunch_bag: "Taille du Sac Repas",
+    bag_small: "Petit  — 1–2 boîtes (~4L)",
+    bag_medium: "Moyen — 2–3 boîtes (~6L)",
+    bag_large: "Grand  — 3–4 boîtes + extras (~10L)",
     step_diet: "Votre Alimentation",
     step_goals: "Vos Objectifs",
     step_budget: "Votre Budget",
@@ -270,6 +278,10 @@ const T = {
     destination_label: "Destino",
     step_usa: "¿Vuelo a EE.UU.?",
     step_kitchen: "Acceso a Cocina",
+    step_lunch_bag: "Tamaño del Bolso",
+    bag_small: "Pequeño — 1–2 recipientes (~4L)",
+    bag_medium: "Mediano — 2–3 recipientes (~6L)",
+    bag_large: "Grande  — 3–4 recipientes + extras (~10L)",
     step_diet: "Tu Dieta",
     step_goals: "Tus Objetivos",
     step_budget: "Tu Presupuesto",
@@ -613,7 +625,7 @@ export default function NutriCrew() {
   const allSteps = [
     "name", "email", "gender", "weight", "dob", "position",
     "pairing_days", "departure", "destination", "going_usa",
-    "kitchen", "diet",
+    "kitchen", "lunch_bag", "diet",
     ...((pairing.diets || []).includes("calorie_deficit") ? ["calorie_target"] : []),
     "goals", "budget"
   ];
@@ -1306,6 +1318,16 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
           value={pairing.going_usa}
           onChange={v => upd("going_usa", v)}/>;
 
+      case "lunch_bag":
+        return <RadioGroup label={t.step_lunch_bag}
+          options={[
+            {v:"small",  l:t.bag_small,  icon:"👜"},
+            {v:"medium", l:t.bag_medium, icon:"🎒"},
+            {v:"large",  l:t.bag_large,  icon:"🧳"},
+          ]}
+          value={pairing.lunch_bag || user?.lunch_bag}
+          onChange={v => { upd("lunch_bag", v); save(v); }}/>;
+
       case "kitchen":
         return <CheckGroup label={t.step_kitchen}
           options={[
@@ -1688,6 +1710,11 @@ function DayPlan({ day, t, favorites, onToggleFavorite, onOpenAirplaneMeal }) {
               <div style={styles.mealBody}>
                 <div style={styles.mealDesc}>{meal.description}</div>
                 <div style={styles.mealPrep}>🍳 {meal.prep}</div>
+                {meal.container && (
+                  <div style={{fontSize:13, color:"#C9A84C", background:"rgba(201,168,76,0.1)", borderRadius:8, padding:"6px 10px", marginTop:6, display:"flex", alignItems:"center", gap:6}}>
+                    <span>📦</span><span>{meal.container}</span>
+                  </div>
+                )}
                 <div style={styles.mealMacros}>
                   <span>P: {meal.protein}g</span>
                   <span>C: {meal.carbs}g</span>
