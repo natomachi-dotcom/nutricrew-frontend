@@ -554,8 +554,6 @@ export default function NutriCrew() {
   const t = T[lang];
 
   const FREE_PAIRING_LIMIT = 1;
-  const pairingCount = storage.get(PAIRING_COUNT_KEY) || 0;
-  const isPremiumNeeded = premiumSuccess ? false : pairingCount >= FREE_PAIRING_LIMIT;
 
   // Detect successful Stripe return (?premium=true in URL)
   const [premiumSuccess] = useState(() => {
@@ -567,6 +565,9 @@ export default function NutriCrew() {
     }
     return false;
   });
+
+  const pairingCount = storage.get(PAIRING_COUNT_KEY) || 0;
+  const isPremiumNeeded = premiumSuccess ? false : pairingCount >= FREE_PAIRING_LIMIT;
 
   // ── STEP DEFINITIONS (check-in flow) ──────────────────────────
   // If returning user, skip personal steps.
