@@ -502,6 +502,7 @@ const PAIRING_COUNT_KEY = "nutricrew_pairing_count";
 const PENDING_PAIRING_KEY = "nutricrew_pending_pairing";
 const FAVORITES_KEY = "nutricrew_favorites";
 const USER_KEY = "nutricrew_user";
+const SESSION_KEY = "nutricrew_session";
 const SAVED_PLANS_KEY = "nutricrew_saved_plans";
 const MAX_SAVED_PLANS = 10;
 
@@ -533,8 +534,10 @@ export default function NutriCrew() {
   const [lang, setLang] = useState(() => user?.lang || "en");
   const [screen, setScreen] = useState(() => {
     const params = new URLSearchParams(window.location.search);
-    return params.get("premium") === "true" ? "premium" : "splash";
-  }); // splash | checkin | passport | boarding | plan | premium
+    if (params.get("premium") === "true") return "premium";
+    return storage.get(SESSION_KEY)?.token ? "loading" : "login";
+  }); // login | otp | loading | splash | checkin | boarding | plan | premium
+  const [pendingOtpEmail, setPendingOtpEmail] = useState("");
   const [step, setStep] = useState(0);
   const [pairing, setPairing] = useState(() => {
     const pending = storage.get(PENDING_PAIRING_KEY);
@@ -561,6 +564,30 @@ export default function NutriCrew() {
   const [showProfile, setShowProfile] = useState(false);
   const [favorites, setFavorites] = useState(() => storage.get(FAVORITES_KEY) || []);
   const [returningUser] = useState(() => !!user);
+
+  useEffect(() => {
+    const sess = storage.get(SESSION_KEY);
+    if (!sess?.token) { setScreen(s => s === "loading" ? "login" : s); return; }
+    fetch(`${API_BASE}/api/auth/verify-session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: sess.token }),
+    })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(data => {
+        setUser(prev => {
+          if (prev?.email) return prev;
+          const u = { email: data.email, name: data.name || "" };
+          storage.set(USER_KEY, u);
+          return u;
+        });
+        setScreen(s => s === "loading" ? "splash" : s);
+      })
+      .catch(() => {
+        storage.set(SESSION_KEY, null);
+        setScreen("login");
+      });
+  }, []); // eslint-disable-line
 
   const t = T[lang];
 
@@ -714,11 +741,38 @@ export default function NutriCrew() {
     setScreen("plan");
   };
 
+  const handleLoginSuccess = (sessionData) => {
+    storage.set(SESSION_KEY, { token: sessionData.token, email: sessionData.email });
+    setUser(prev => {
+      if (prev?.email) return prev;
+      const u = { email: sessionData.email, name: sessionData.name || "" };
+      storage.set(USER_KEY, u);
+      return u;
+    });
+    setScreen("splash");
+  };
+
   // ── RENDER ────────────────────────────────────────────────────
   return (
     <div style={styles.root}>
       {/* Background grid lines (aviation aesthetic) */}
       <div style={styles.gridOverlay}/>
+
+      {screen === "loading" && <LoadingScreen />}
+
+      {screen === "login" && (
+        <LoginScreen
+          onSent={(email) => { setPendingOtpEmail(email); setScreen("otp"); }}
+        />
+      )}
+
+      {screen === "otp" && (
+        <OTPScreen
+          email={pendingOtpEmail}
+          onSuccess={handleLoginSuccess}
+          onBack={() => setScreen("login")}
+        />
+      )}
 
       {screen === "splash" && (
         <SplashScreen t={t} lang={lang} setLang={setLang}
@@ -824,6 +878,187 @@ export default function NutriCrew() {
       )}
 
       <style>{globalCSS}</style>
+    </div>
+  );
+}
+
+// ─── LOADING SCREEN ───────────────────────────────────────────────
+function LoadingScreen() {
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ textAlign: "center" }}>
+        <div style={{ fontSize: 32, color: C.gold, letterSpacing: 4, fontWeight: "bold", marginBottom: 16 }}>✈ NUTRICREW</div>
+        <div style={{ width: 36, height: 36, border: `3px solid ${C.navyBorder}`, borderTop: `3px solid ${C.gold}`, borderRadius: "50%", animation: "spin 0.9s linear infinite", margin: "0 auto" }} />
+      </div>
+    </div>
+  );
+}
+
+// ─── LOGIN SCREEN ─────────────────────────────────────────────────
+function LoginScreen({ onSent }) {
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSend = async () => {
+    const e = email.trim().toLowerCase();
+    if (!e || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/send-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: e }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || "Failed to send code. Try again."); return; }
+      onSent(e);
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={styles.splash}>
+      <div style={{ ...styles.splashInner, maxWidth: 400 }}>
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
+          <div style={{ fontSize: 28, color: C.gold, letterSpacing: 4, fontWeight: "bold", marginBottom: 6 }}>✈ NUTRICREW</div>
+          <div style={{ fontSize: 13, color: C.muted, letterSpacing: 2 }}>CREW NUTRITION</div>
+        </div>
+
+        <div style={{ background: C.card, border: `1px solid ${C.navyBorder}`, borderRadius: 16, padding: "28px 24px" }}>
+          <div style={{ fontSize: 18, fontWeight: "bold", color: C.white, marginBottom: 6 }}>Sign in</div>
+          <div style={{ fontSize: 13, color: C.muted, marginBottom: 24 }}>Enter your email — we'll send you a verification code.</div>
+
+          <div style={styles.inputWrap}>
+            <span style={styles.inputIcon}>✉️</span>
+            <input
+              style={styles.input}
+              type="email"
+              placeholder="your@email.com"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleSend()}
+              autoFocus
+              autoComplete="email"
+            />
+          </div>
+
+          {error && <div style={{ color: "#F87171", fontSize: 13, marginTop: 8 }}>{error}</div>}
+
+          <button style={{ ...styles.primaryBtn, width: "100%", justifyContent: "center", marginTop: 16 }}
+            onClick={handleSend} disabled={loading}>
+            {loading ? "Sending…" : "Send Code"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── OTP SCREEN ───────────────────────────────────────────────────
+function OTPScreen({ email, onSuccess, onBack }) {
+  const [otp, setOtp] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [resendCooldown, setResendCooldown] = useState(60);
+
+  useEffect(() => {
+    const t = setInterval(() => setResendCooldown(s => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const handleVerify = async () => {
+    const code = otp.trim();
+    if (code.length !== 6 || !/^\d{6}$/.test(code)) {
+      setError("Please enter the 6-digit code from your email.");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/verify-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, otp: code }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || "Invalid code. Please try again."); return; }
+      onSuccess(data);
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    if (resendCooldown > 0) return;
+    setResendCooldown(60);
+    setError("");
+    try {
+      await fetch(`${API_BASE}/api/auth/send-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+    } catch { /* silent */ }
+  };
+
+  return (
+    <div style={styles.splash}>
+      <div style={{ ...styles.splashInner, maxWidth: 400 }}>
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
+          <div style={{ fontSize: 28, color: C.gold, letterSpacing: 4, fontWeight: "bold", marginBottom: 6 }}>✈ NUTRICREW</div>
+          <div style={{ fontSize: 13, color: C.muted, letterSpacing: 2 }}>CREW NUTRITION</div>
+        </div>
+
+        <div style={{ background: C.card, border: `1px solid ${C.navyBorder}`, borderRadius: 16, padding: "28px 24px" }}>
+          <div style={{ fontSize: 18, fontWeight: "bold", color: C.white, marginBottom: 6 }}>Check your email</div>
+          <div style={{ fontSize: 13, color: C.muted, marginBottom: 4 }}>We sent a 6-digit code to</div>
+          <div style={{ fontSize: 13, color: C.gold, fontWeight: "bold", marginBottom: 24 }}>{email}</div>
+
+          <div style={styles.inputWrap}>
+            <span style={styles.inputIcon}>🔑</span>
+            <input
+              style={{ ...styles.input, letterSpacing: 6, fontSize: 20, fontWeight: "bold" }}
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              placeholder="000000"
+              maxLength={6}
+              value={otp}
+              onChange={e => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              onKeyDown={e => e.key === "Enter" && handleVerify()}
+              autoFocus
+              autoComplete="one-time-code"
+            />
+          </div>
+
+          {error && <div style={{ color: "#F87171", fontSize: 13, marginTop: 8 }}>{error}</div>}
+
+          <button style={{ ...styles.primaryBtn, width: "100%", justifyContent: "center", marginTop: 16 }}
+            onClick={handleVerify} disabled={loading}>
+            {loading ? "Verifying…" : "Verify Code"}
+          </button>
+
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 16 }}>
+            <button style={{ background: "none", border: "none", color: C.muted, fontSize: 13, cursor: "pointer" }}
+              onClick={onBack}>← Change email</button>
+            <button
+              style={{ background: "none", border: "none", fontSize: 13, cursor: resendCooldown > 0 ? "default" : "pointer", color: resendCooldown > 0 ? C.muted : C.gold }}
+              onClick={handleResend} disabled={resendCooldown > 0}>
+              {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend code"}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -2609,4 +2844,5 @@ const globalCSS = `
   ::-webkit-scrollbar-thumb { background: ${C.navyBorder}; border-radius: 2px; }
   @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
   @keyframes pulse { from{opacity:0.3;transform:scale(0.8)} to{opacity:1;transform:scale(1.1)} }
+  @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
 `;
