@@ -499,6 +499,7 @@ const storage = {
 };
 
 const PAIRING_COUNT_KEY = "nutricrew_pairing_count";
+const PENDING_PAIRING_KEY = "nutricrew_pending_pairing";
 const FAVORITES_KEY = "nutricrew_favorites";
 const USER_KEY = "nutricrew_user";
 const SAVED_PLANS_KEY = "nutricrew_saved_plans";
@@ -530,9 +531,19 @@ function findSavedPlan(key) {
 export default function NutriCrew() {
   const [user, setUser] = useState(() => storage.get(USER_KEY));
   const [lang, setLang] = useState(() => user?.lang || "en");
-  const [screen, setScreen] = useState("splash"); // splash | checkin | passport | boarding | plan | premium
+  const [screen, setScreen] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("premium") === "true" ? "premium" : "splash";
+  }); // splash | checkin | passport | boarding | plan | premium
   const [step, setStep] = useState(0);
-  const [pairing, setPairing] = useState({});
+  const [pairing, setPairing] = useState(() => {
+    const pending = storage.get(PENDING_PAIRING_KEY);
+    if (pending) {
+      storage.set(PENDING_PAIRING_KEY, null);
+      return pending;
+    }
+    return {};
+  });
   const [plan, setPlan] = useState(null);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("plan");
@@ -592,6 +603,7 @@ export default function NutriCrew() {
   const handleUpgrade = async () => {
     const email = user?.email || pairing?.email;
     if (!email) return;
+    storage.set(PENDING_PAIRING_KEY, pairing);
     try {
       const res = await fetch(`${API_BASE}/api/create-checkout-session`, {
         method: "POST",
@@ -601,7 +613,7 @@ export default function NutriCrew() {
       const data = await res.json();
       if (data.url) window.location.href = data.url;
     } catch {
-      // silently fall through — button stays clickable
+      storage.set(PENDING_PAIRING_KEY, null);
     }
   };
 
