@@ -554,6 +554,16 @@ export default function NutriCrew() {
   const pairingCount = storage.get(PAIRING_COUNT_KEY) || 0;
   const isPremiumNeeded = pairingCount >= FREE_PAIRING_LIMIT;
 
+  // Detect successful Stripe return (?premium=true in URL)
+  const [premiumSuccess, setPremiumSuccess] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("premium") === "true") {
+      window.history.replaceState({}, "", window.location.pathname);
+      return true;
+    }
+    return false;
+  });
+
   // ── STEP DEFINITIONS (check-in flow) ──────────────────────────
   // If returning user, skip personal steps.
   // Calorie Deficit diet injects an extra step to collect the calorie target.
@@ -573,6 +583,22 @@ export default function NutriCrew() {
   const totalSteps = steps.length;
 
   const upd = (k, v) => setPairing(p => ({ ...p, [k]: v }));
+
+  const handleUpgrade = async () => {
+    const email = user?.email || pairing?.email;
+    if (!email) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/create-checkout-session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+    } catch {
+      // silently fall through — button stays clickable
+    }
+  };
 
   const handleContinue = () => {
     if (step < totalSteps - 1) {
@@ -718,7 +744,7 @@ export default function NutriCrew() {
       )}
 
       {screen === "premium" && (
-        <PremiumScreen t={t} onBack={() => setScreen("boarding")}/>
+        <PremiumScreen t={t} onBack={() => setScreen("boarding")} onUpgrade={handleUpgrade} premiumSuccess={premiumSuccess}/>
       )}
 
       {/* Floating calorie button */}
@@ -1507,18 +1533,45 @@ function NearbyPlaces({ t, pairing, user, isPremium }) {
 }
 
 // ─── PREMIUM SCREEN ───────────────────────────────────────────────
-function PremiumScreen({ t, onBack }) {
+function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess }) {
+  const [loading, setLoading] = useState(false);
+
+  const handleClick = async () => {
+    setLoading(true);
+    await onUpgrade();
+    setLoading(false);
+  };
+
+  if (premiumSuccess) {
+    return (
+      <div style={styles.premiumScreen}>
+        <div style={styles.premiumIcon}>🎉</div>
+        <div style={styles.premiumTitle}>Welcome to Premium!</div>
+        <div style={styles.premiumMsg}>Your account has been upgraded. Generate your next plan to unlock all premium features.</div>
+        <button style={styles.primaryBtn} onClick={onBack}>Start Planning</button>
+      </div>
+    );
+  }
+
   return (
     <div style={styles.premiumScreen}>
       <div style={styles.premiumIcon}>⭐</div>
       <div style={styles.premiumTitle}>{t.premium_title}</div>
       <div style={styles.premiumMsg}>{t.premium_msg}</div>
       <div style={styles.premiumFeatures}>
-        {["Daily meal plans for your full pairing","Jetlag-optimized meal timing","Country food rules","Grocery lists","Calorie deficit meal plans"].map(f => (
+        {[
+          "Unlimited meal plans",
+          "Jetlag-optimized meal timing",
+          "Country food rules",
+          "Calorie deficit plans",
+          "📍 Nearby stores & restaurants",
+        ].map(f => (
           <div key={f} style={styles.premiumFeature}>✓ {f}</div>
         ))}
       </div>
-      <button style={styles.primaryBtn}>{t.upgrade}</button>
+      <button style={styles.primaryBtn} onClick={handleClick} disabled={loading}>
+        {loading ? "…" : `${t.upgrade} — $9.99`}
+      </button>
       <button style={{...styles.backBtn, flex: "none"}} onClick={onBack}>{t.back}</button>
     </div>
   );
