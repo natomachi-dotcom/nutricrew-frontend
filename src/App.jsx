@@ -904,14 +904,14 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
       const dests = pairing.destinations || [];
       return dests.length >= numDays && dests.slice(0, numDays).every(d => d?.trim());
     }
-    const v = pairing[currentStep] ?? user?.[currentStep];
-    if (!v) return false;
-    if (currentStep === "goals" && (!pairing.goals || pairing.goals.length === 0)) return false;
     if (currentStep === "diet") {
       if (!pairing.diets || pairing.diets.length === 0) return false;
       if (pairing.diets.includes("other") && !pairing.diet_other?.trim()) return false;
       return true;
     }
+    const v = pairing[currentStep] ?? user?.[currentStep];
+    if (!v) return false;
+    if (currentStep === "goals" && (!pairing.goals || pairing.goals.length === 0)) return false;
     if (currentStep === "age") {
       const age = parseInt(pairing.age ?? user?.age, 10);
       return !!(age && age >= 16 && age <= 80);
