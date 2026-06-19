@@ -32,7 +32,7 @@ const T = {
     step_email: "Email Address",
     step_gender: "Gender",
     step_weight: "Weight",
-    step_age: "Your Age",
+    step_age: "Date of Birth",
     step_position: "Your Role",
     step_pairing: "Pairing Length",
     step_route: "Your Route",
@@ -148,7 +148,7 @@ const T = {
     step_email: "Adresse Email",
     step_gender: "Genre",
     step_weight: "Poids",
-    step_age: "Votre Âge",
+    step_age: "Date de Naissance",
     step_position: "Votre Rôle",
     step_pairing: "Durée du Pairing",
     step_route: "Votre Route",
@@ -263,7 +263,7 @@ const T = {
     step_email: "Correo Electrónico",
     step_gender: "Género",
     step_weight: "Peso",
-    step_age: "Tu Edad",
+    step_age: "Fecha de Nacimiento",
     step_position: "Tu Rol",
     step_pairing: "Duración del Pairing",
     step_route: "Tu Ruta",
@@ -563,7 +563,7 @@ export default function NutriCrew() {
   const [showSavedMeals, setShowSavedMeals] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [favorites, setFavorites] = useState(() => storage.get(FAVORITES_KEY) || []);
-  const [returningUser] = useState(() => !!user);
+  const [returningUser] = useState(() => !!(user?.gender && user?.weight && (user?.dob || user?.age) && user?.position));
 
   useEffect(() => {
     const sess = storage.get(SESSION_KEY);
@@ -611,13 +611,13 @@ export default function NutriCrew() {
   // If returning user, skip personal steps.
   // Calorie Deficit diet injects an extra step to collect the calorie target.
   const allSteps = [
-    "name", "email", "gender", "weight", "age", "position",
+    "name", "email", "gender", "weight", "dob", "position",
     "pairing_days", "departure", "destination", "going_usa",
     "kitchen", "diet",
     ...((pairing.diets || []).includes("calorie_deficit") ? ["calorie_target"] : []),
     "goals", "budget"
   ];
-  const personalSteps = ["name","email","gender","weight","age","position"];
+  const personalSteps = ["name","email","gender","weight","dob","position"];
   const steps = returningUser
     ? allSteps.filter(s => !personalSteps.includes(s))
     : allSteps;
@@ -1166,9 +1166,11 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
     const v = pairing[currentStep] ?? user?.[currentStep];
     if (!v) return false;
     if (currentStep === "goals" && (!pairing.goals || pairing.goals.length === 0)) return false;
-    if (currentStep === "age") {
-      const age = parseInt(pairing.age ?? user?.age, 10);
-      return !!(age && age >= 16 && age <= 80);
+    if (currentStep === "dob") {
+      const dob = pairing.dob ?? user?.dob;
+      if (!dob) return false;
+      const age = Math.floor((Date.now() - new Date(dob)) / (365.25 * 24 * 60 * 60 * 1000));
+      return age >= 16 && age <= 80;
     }
     return true;
   };
@@ -1193,16 +1195,17 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
           value={pairing.gender || user?.gender}
           onChange={v => { upd("gender",v); save(v); }}/>;
 
-      case "age":
+      case "dob":
         return (
           <div>
             <div style={styles.inputLabel}>{t.step_age}</div>
-            <TextInput
-              value={String(pairing.age || user?.age || "")}
-              type="number"
-              onChange={v => { upd("age", v); save(v); }}
-              placeholder="e.g. 32"
-              icon="🎂"
+            <input
+              type="date"
+              value={pairing.dob || user?.dob || ""}
+              max={new Date(Date.now() - 16 * 365.25 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)}
+              min={new Date(Date.now() - 80 * 365.25 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)}
+              onChange={e => { upd("dob", e.target.value); save(e.target.value); }}
+              style={{ width: "100%", padding: "14px 16px", fontSize: 16, borderRadius: 12, border: "1.5px solid rgba(201,168,76,0.4)", background: "rgba(255,255,255,0.06)", color: "#fff", outline: "none", boxSizing: "border-box", colorScheme: "dark" }}
             />
           </div>
         );
@@ -2122,7 +2125,10 @@ function TextInput({ label, value, onChange, placeholder, icon, type = "text" })
 function CalorieTargetStep({ t, pairing, user, upd }) {
   const weight = pairing.weight || user?.weight || "70kg";
   const gender = pairing.gender || user?.gender || "female";
-  const age = parseInt(pairing.age || user?.age || 35, 10);
+  const dob = pairing.dob || user?.dob;
+  const age = dob
+    ? Math.floor((Date.now() - new Date(dob)) / (365.25 * 24 * 60 * 60 * 1000))
+    : parseInt(pairing.age || user?.age || 35, 10);
 
   // Parse weight string (e.g. "65kg", "145lbs") into kg
   const weightStr = String(weight);
