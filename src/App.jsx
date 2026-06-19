@@ -555,13 +555,14 @@ export default function NutriCrew() {
 
   const FREE_PAIRING_LIMIT = 1;
   const pairingCount = storage.get(PAIRING_COUNT_KEY) || 0;
-  const isPremiumNeeded = pairingCount >= FREE_PAIRING_LIMIT;
+  const isPremiumNeeded = premiumSuccess ? false : pairingCount >= FREE_PAIRING_LIMIT;
 
   // Detect successful Stripe return (?premium=true in URL)
-  const [premiumSuccess, setPremiumSuccess] = useState(() => {
+  const [premiumSuccess] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("premium") === "true") {
       window.history.replaceState({}, "", window.location.pathname);
+      storage.set(PAIRING_COUNT_KEY, 0);
       return true;
     }
     return false;
@@ -747,7 +748,7 @@ export default function NutriCrew() {
       )}
 
       {screen === "premium" && (
-        <PremiumScreen t={t} onBack={() => setScreen("boarding")} onUpgrade={handleUpgrade} premiumSuccess={premiumSuccess}/>
+        <PremiumScreen t={t} onBack={() => setScreen("boarding")} onUpgrade={handleUpgrade} premiumSuccess={premiumSuccess} onGenerate={handleGenerate}/>
       )}
 
       {/* Floating calorie button */}
@@ -1577,7 +1578,7 @@ function NearbyPlaces({ t, pairing, user, isPremium }) {
 }
 
 // ─── PREMIUM SCREEN ───────────────────────────────────────────────
-function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess }) {
+function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess, onGenerate }) {
   const [loading, setLoading] = useState(false);
 
   const handleClick = async () => {
@@ -1591,8 +1592,8 @@ function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess }) {
       <div style={styles.premiumScreen}>
         <div style={styles.premiumIcon}>🎉</div>
         <div style={styles.premiumTitle}>Welcome to Premium!</div>
-        <div style={styles.premiumMsg}>Your account has been upgraded. Generate your next plan to unlock all premium features.</div>
-        <button style={styles.primaryBtn} onClick={onBack}>Start Planning</button>
+        <div style={styles.premiumMsg}>Your account is now active. Tap below to generate your plan.</div>
+        <button style={styles.primaryBtn} onClick={onGenerate}>Generate My Plan</button>
       </div>
     );
   }
