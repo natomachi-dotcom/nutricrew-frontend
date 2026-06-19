@@ -763,6 +763,7 @@ export default function NutriCrew() {
       {screen === "login" && (
         <LoginScreen
           onSent={(email) => { setPendingOtpEmail(email); setScreen("otp"); }}
+          onSuccess={handleLoginSuccess}
         />
       )}
 
@@ -895,7 +896,7 @@ function LoadingScreen() {
 }
 
 // ─── LOGIN SCREEN ─────────────────────────────────────────────────
-function LoginScreen({ onSent }) {
+function LoginScreen({ onSent, onSuccess }) {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -915,8 +916,12 @@ function LoginScreen({ onSent }) {
         body: JSON.stringify({ email: e }),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error || "Failed to send code. Try again."); return; }
-      onSent(e);
+      if (!res.ok) { setError(data.error || "Failed to sign in. Try again."); return; }
+      if (data.alreadyVerified) {
+        onSuccess(data); // Email already verified — log in immediately, no code needed
+      } else {
+        onSent(e); // First time — go to OTP screen
+      }
     } catch {
       setError("Network error. Please try again.");
     } finally {
@@ -934,7 +939,7 @@ function LoginScreen({ onSent }) {
 
         <div style={{ background: C.card, border: `1px solid ${C.navyBorder}`, borderRadius: 16, padding: "28px 24px" }}>
           <div style={{ fontSize: 18, fontWeight: "bold", color: C.white, marginBottom: 6 }}>Sign in</div>
-          <div style={{ fontSize: 13, color: C.muted, marginBottom: 24 }}>Enter your email — we'll send you a verification code.</div>
+          <div style={{ fontSize: 13, color: C.muted, marginBottom: 24 }}>Enter your email to continue. First-time users will receive a one-time verification code.</div>
 
           <div style={styles.inputWrap}>
             <span style={styles.inputIcon}>✉️</span>
@@ -954,7 +959,7 @@ function LoginScreen({ onSent }) {
 
           <button style={{ ...styles.primaryBtn, width: "100%", justifyContent: "center", marginTop: 16 }}
             onClick={handleSend} disabled={loading}>
-            {loading ? "Sending…" : "Send Code"}
+            {loading ? "Signing in…" : "Continue"}
           </button>
         </div>
       </div>
