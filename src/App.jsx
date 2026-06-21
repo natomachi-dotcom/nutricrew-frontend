@@ -142,6 +142,10 @@ const T = {
     calorie_target_custom_error_low: "Minimum is 1,200 kcal/day for safety.",
     calorie_target_custom_error_high: "Must be below your maintenance minus 100 kcal (max {max} kcal).",
     calorie_target_disclaimer: "Estimates only. Consult a healthcare professional before starting a calorie deficit.",
+    step_airplane_meal: "What Will You Eat on the Plane?",
+    airplane_meal_plan_placeholder: "e.g. chicken with rice and salad, bread roll, juice, chocolate cake...",
+    airplane_meal_plan_skip: "Skip — I'll decide on the flight",
+    airplane_meal_plan_hint: "Tell us what's on the menu so the AI can plan around it. Optional.",
   },
   fr: {
     tagline: "Alimentez Votre Vol",
@@ -261,6 +265,10 @@ const T = {
     calorie_target_custom_error_low: "Le minimum est 1 200 kcal/jour pour votre sécurité.",
     calorie_target_custom_error_high: "Doit être inférieur à votre entretien moins 100 kcal (max {max} kcal).",
     calorie_target_disclaimer: "Estimations uniquement. Consultez un professionnel de santé avant de commencer un déficit calorique.",
+    step_airplane_meal: "Que Mangerez-Vous Dans l'Avion?",
+    airplane_meal_plan_placeholder: "ex. poulet avec riz et salade, petit pain, jus, gâteau au chocolat...",
+    airplane_meal_plan_skip: "Passer — Je déciderai dans l'avion",
+    airplane_meal_plan_hint: "Dites-nous ce qu'il y a au menu pour que l'IA puisse planifier en conséquence. Optionnel.",
   },
   es: {
     tagline: "Combustible Para Tu Vuelo",
@@ -380,6 +388,10 @@ const T = {
     calorie_target_custom_error_low: "El mínimo es 1.200 kcal/día por seguridad.",
     calorie_target_custom_error_high: "Debe ser inferior a tu mantenimiento menos 100 kcal (máx. {max} kcal).",
     calorie_target_disclaimer: "Solo estimaciones. Consulta a un profesional de salud antes de comenzar un déficit calórico.",
+    step_airplane_meal: "¿Qué Comerás en el Avión?",
+    airplane_meal_plan_placeholder: "ej. pollo con arroz y ensalada, panecillo, jugo, pastel de chocolate...",
+    airplane_meal_plan_skip: "Omitir — Lo decidiré en el vuelo",
+    airplane_meal_plan_hint: "Dinos qué hay en el menú para que la IA planifique mejor. Opcional.",
   }
 };
 
@@ -625,7 +637,9 @@ export default function NutriCrew() {
   const allSteps = [
     "name", "email", "gender", "weight", "dob", "position",
     "pairing_days", "departure", "destination", "going_usa",
-    "kitchen", "lunch_bag", "diet",
+    "kitchen",
+    ...((pairing.kitchen || []).includes("airplane_food") ? ["airplane_meal_plan"] : []),
+    "lunch_bag", "diet",
     ...((pairing.diets || []).includes("calorie_deficit") ? ["calorie_target"] : []),
     "goals", "budget"
   ];
@@ -1338,6 +1352,35 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
           ]}
           values={pairing.kitchen || []}
           onChange={v => upd("kitchen", v)}/>;
+
+      case "airplane_meal_plan":
+        return (
+          <div>
+            <div style={{ color: C.gold, fontWeight: 700, fontSize: 15, marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>✈️ {t.step_airplane_meal}</div>
+            <div style={{ color: C.muted, fontSize: 13, marginBottom: 14 }}>{t.airplane_meal_plan_hint}</div>
+            <textarea
+              value={pairing.airplane_meal_description || ""}
+              onChange={e => upd("airplane_meal_description", e.target.value)}
+              placeholder={t.airplane_meal_plan_placeholder}
+              rows={5}
+              style={{
+                width: "100%", boxSizing: "border-box",
+                background: C.navyMid, border: `1px solid ${C.navyBorder}`,
+                borderRadius: 10, color: C.white, padding: "12px 14px",
+                fontSize: 14, resize: "vertical", outline: "none",
+                fontFamily: "inherit",
+              }}
+            />
+            <button
+              onClick={() => { upd("airplane_meal_description", ""); handleContinue(); }}
+              style={{
+                marginTop: 12, width: "100%", padding: "11px 0",
+                background: "transparent", border: `1px solid ${C.navyBorder}`,
+                borderRadius: 10, color: C.muted, fontSize: 13, cursor: "pointer",
+              }}
+            >{t.airplane_meal_plan_skip}</button>
+          </div>
+        );
 
       case "diet":
         return (
