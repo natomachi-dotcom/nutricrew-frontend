@@ -146,6 +146,22 @@ const T = {
     airplane_meal_plan_placeholder: "e.g. chicken with rice and salad, bread roll, juice, chocolate cake...",
     airplane_meal_plan_skip: "Skip — I'll decide on the flight",
     airplane_meal_plan_hint: "Tell us what's on the menu so the AI can plan around it. Optional.",
+    roster_btn: "Monthly Roster",
+    roster_title: "Upload Your Roster",
+    roster_hint: "Take 1–2 screenshots of your monthly roster. The AI reads the schedule and generates a meal plan before each pairing automatically.",
+    roster_upload_btn: "Choose Photos",
+    roster_parsing: "Reading your roster…",
+    roster_confirm_title: "Pairings Found",
+    roster_confirm_hint: "Check the pairings below and confirm to schedule your plans.",
+    roster_confirm_btn: "Schedule All Plans",
+    roster_saving: "Saving pairings…",
+    roster_done_title: "You're All Set!",
+    roster_done_msg: "You'll receive an email 24h before each pairing asking for your kitchen setup. Tap once and your meal plan is ready.",
+    roster_done_btn: "Done",
+    roster_no_pairings: "No upcoming pairings found. Make sure the photo shows future dates.",
+    roster_error: "Could not read the roster. Please try a clearer photo.",
+    roster_home_base: "Your Home Base City",
+    roster_home_base_placeholder: "e.g. Miami, London, Paris…",
   },
   fr: {
     tagline: "Alimentez Votre Vol",
@@ -269,6 +285,22 @@ const T = {
     airplane_meal_plan_placeholder: "ex. poulet avec riz et salade, petit pain, jus, gâteau au chocolat...",
     airplane_meal_plan_skip: "Passer — Je déciderai dans l'avion",
     airplane_meal_plan_hint: "Dites-nous ce qu'il y a au menu pour que l'IA puisse planifier en conséquence. Optionnel.",
+    roster_btn: "Planning Mensuel",
+    roster_title: "Importer Votre Planning",
+    roster_hint: "Prenez 1–2 captures d'écran de votre planning mensuel. L'IA lit le programme et génère un plan repas avant chaque pairing automatiquement.",
+    roster_upload_btn: "Choisir des Photos",
+    roster_parsing: "Lecture du planning…",
+    roster_confirm_title: "Pairings Trouvés",
+    roster_confirm_hint: "Vérifiez les pairings ci-dessous et confirmez pour planifier vos repas.",
+    roster_confirm_btn: "Planifier Tous les Repas",
+    roster_saving: "Enregistrement…",
+    roster_done_title: "C'est Prêt!",
+    roster_done_msg: "Vous recevrez un email 24h avant chaque pairing pour confirmer votre cuisine. Un clic et votre plan est prêt.",
+    roster_done_btn: "Terminé",
+    roster_no_pairings: "Aucun pairing à venir trouvé. Assurez-vous que la photo montre des dates futures.",
+    roster_error: "Impossible de lire le planning. Essayez une photo plus nette.",
+    roster_home_base: "Ville de Base",
+    roster_home_base_placeholder: "ex. Miami, Londres, Paris…",
   },
   es: {
     tagline: "Combustible Para Tu Vuelo",
@@ -392,6 +424,22 @@ const T = {
     airplane_meal_plan_placeholder: "ej. pollo con arroz y ensalada, panecillo, jugo, pastel de chocolate...",
     airplane_meal_plan_skip: "Omitir — Lo decidiré en el vuelo",
     airplane_meal_plan_hint: "Dinos qué hay en el menú para que la IA planifique mejor. Opcional.",
+    roster_btn: "Roster Mensual",
+    roster_title: "Subir Tu Roster",
+    roster_hint: "Toma 1–2 capturas de tu roster mensual. La IA lee el horario y genera un plan de comidas antes de cada pairing automáticamente.",
+    roster_upload_btn: "Elegir Fotos",
+    roster_parsing: "Leyendo tu roster…",
+    roster_confirm_title: "Pairings Encontrados",
+    roster_confirm_hint: "Revisa los pairings a continuación y confirma para programar tus planes.",
+    roster_confirm_btn: "Programar Todos los Planes",
+    roster_saving: "Guardando…",
+    roster_done_title: "¡Listo!",
+    roster_done_msg: "Recibirás un email 24h antes de cada pairing para confirmar tu cocina. Un toque y tu plan estará listo.",
+    roster_done_btn: "Hecho",
+    roster_no_pairings: "No se encontraron pairings futuros. Asegúrate de que la foto muestre fechas futuras.",
+    roster_error: "No se pudo leer el roster. Intenta con una foto más clara.",
+    roster_home_base: "Tu Ciudad Base",
+    roster_home_base_placeholder: "ej. Miami, Londres, París…",
   }
 };
 
@@ -590,6 +638,7 @@ export default function NutriCrew() {
   const [showProfile, setShowProfile] = useState(false);
   const [favorites, setFavorites] = useState(() => storage.get(FAVORITES_KEY) || []);
   const [returningUser] = useState(() => !!(user?.gender && user?.weight && (user?.dob || user?.age) && user?.position));
+  const [showRoster, setShowRoster] = useState(false);
 
   useEffect(() => {
     const sess = storage.get(SESSION_KEY);
@@ -813,7 +862,12 @@ export default function NutriCrew() {
           onViewLastPlan={viewLastPlan}
           onOpenSavedMeals={() => setShowSavedMeals(true)}
           onOpenProfile={() => setShowProfile(true)}
+          onOpenRoster={() => setShowRoster(true)}
         />
+      )}
+
+      {showRoster && (
+        <RosterModal t={t} user={user} onClose={() => setShowRoster(false)} />
       )}
 
       {screen === "checkin" && (
@@ -1098,7 +1152,7 @@ function OTPScreen({ email, onSuccess, onBack }) {
 }
 
 // ─── SPLASH SCREEN ────────────────────────────────────────────────
-function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onStart, onNewPairing, onViewLastPlan, onOpenSavedMeals, onOpenProfile }) {
+function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onStart, onNewPairing, onViewLastPlan, onOpenSavedMeals, onOpenProfile, onOpenRoster }) {
   return (
     <div style={styles.splash}>
       {returningUser && user && (
@@ -1144,6 +1198,9 @@ function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onS
             )}
             <button style={styles.secondaryBtn} onClick={onOpenSavedMeals}>
               {t.saved_meals_title}
+            </button>
+            <button style={styles.secondaryBtn} onClick={onOpenRoster}>
+              📅 {t.roster_btn}
             </button>
           </div>
         ) : (
@@ -1948,6 +2005,162 @@ function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess, onGenerate }) {
         {loading ? "…" : `${t.upgrade} — $9.99`}
       </button>
       <button style={{...styles.backBtn, flex: "none"}} onClick={onBack}>{t.back}</button>
+    </div>
+  );
+}
+
+// ─── ROSTER MODAL ─────────────────────────────────────────────────
+function RosterModal({ t, user, onClose }) {
+  const [phase, setPhase] = useState("upload"); // upload | parsing | confirm | saving | done | error
+  const [images, setImages] = useState([]);
+  const [homeBase, setHomeBase] = useState(user?.departure || "");
+  const [pairings, setPairings] = useState([]);
+  const [errMsg, setErrMsg] = useState("");
+
+  const handleFiles = (e) => {
+    const files = Array.from(e.target.files).slice(0, 4);
+    setImages(files);
+  };
+
+  const handleParse = async () => {
+    if (images.length === 0) return;
+    setPhase("parsing");
+    try {
+      const encoded = await Promise.all(images.map(f => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve({ data: reader.result.split(",")[1], mediaType: f.type || "image/jpeg" });
+        reader.onerror = reject;
+        reader.readAsDataURL(f);
+      })));
+      const res = await fetch(`${API_BASE}/api/roster/parse`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ images: encoded, homeBase, lang: user?.lang || "en" }),
+      });
+      const data = await res.json();
+      if (!res.ok || !Array.isArray(data.pairings)) throw new Error(data.error || "parse failed");
+      if (data.pairings.length === 0) { setErrMsg(t.roster_no_pairings); setPhase("error"); return; }
+      setPairings(data.pairings);
+      setPhase("confirm");
+    } catch (e) {
+      setErrMsg(t.roster_error);
+      setPhase("error");
+    }
+  };
+
+  const handleConfirm = async () => {
+    setPhase("saving");
+    try {
+      const profile = {
+        name: user?.name || "", gender: user?.gender || "", weight: user?.weight || "",
+        dob: user?.dob || "", position: user?.position || "cabin",
+        diets: user?.diets || ["none"], goals: user?.goals || ["energy"],
+        budgetAmount: user?.budget_amount || "30", budgetType: user?.budget_type || "day",
+        lang: user?.lang || "en", lunchBag: user?.lunch_bag || null,
+      };
+      const res = await fetch(`${API_BASE}/api/roster/store-pairings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: user?.email, pairings, profile }),
+      });
+      if (!res.ok) throw new Error("save failed");
+      setPhase("done");
+    } catch {
+      setErrMsg(t.roster_error);
+      setPhase("error");
+    }
+  };
+
+  const overlay = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 };
+  const card = { background: C.navyMid, borderRadius: 20, padding: "28px 24px", width: "100%", maxWidth: 480, maxHeight: "85vh", overflowY: "auto", position: "relative" };
+
+  return (
+    <div style={overlay} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={card}>
+        <button onClick={onClose} style={{ position: "absolute", top: 16, right: 16, background: "none", border: "none", color: C.muted, fontSize: 22, cursor: "pointer" }}>✕</button>
+
+        {phase === "upload" && (
+          <div>
+            <div style={{ color: C.gold, fontWeight: 700, fontSize: 17, marginBottom: 8 }}>📅 {t.roster_title}</div>
+            <div style={{ color: C.muted, fontSize: 13, marginBottom: 20, lineHeight: 1.6 }}>{t.roster_hint}</div>
+
+            <div style={{ color: C.white, fontSize: 13, fontWeight: 600, marginBottom: 6 }}>{t.roster_home_base}</div>
+            <input
+              value={homeBase}
+              onChange={e => setHomeBase(e.target.value)}
+              placeholder={t.roster_home_base_placeholder}
+              style={{ width: "100%", boxSizing: "border-box", background: C.navy, border: `1px solid ${C.navyBorder}`, borderRadius: 10, color: C.white, padding: "11px 14px", fontSize: 14, outline: "none", marginBottom: 16, fontFamily: "inherit" }}
+            />
+
+            <label style={{ display: "block", padding: "16px", background: C.navy, border: `2px dashed ${C.navyBorder}`, borderRadius: 12, textAlign: "center", cursor: "pointer", marginBottom: 16 }}>
+              <input type="file" accept="image/*" multiple onChange={handleFiles} style={{ display: "none" }} />
+              <div style={{ fontSize: 32, marginBottom: 8 }}>📷</div>
+              <div style={{ color: C.gold, fontWeight: 600, marginBottom: 4 }}>{t.roster_upload_btn}</div>
+              <div style={{ color: C.muted, fontSize: 12 }}>Up to 4 photos</div>
+            </label>
+
+            {images.length > 0 && (
+              <div style={{ color: C.green, fontSize: 13, marginBottom: 16 }}>✓ {images.length} photo{images.length > 1 ? "s" : ""} selected: {images.map(f => f.name).join(", ")}</div>
+            )}
+
+            <button
+              onClick={handleParse}
+              disabled={images.length === 0}
+              style={{ width: "100%", padding: "14px", background: images.length > 0 ? C.gold : C.navyBorder, color: images.length > 0 ? C.navy : C.muted, border: "none", borderRadius: 12, fontWeight: 700, fontSize: 15, cursor: images.length > 0 ? "pointer" : "default" }}
+            >
+              {t.roster_upload_btn} →
+            </button>
+          </div>
+        )}
+
+        {phase === "parsing" && (
+          <div style={{ textAlign: "center", padding: "40px 0" }}>
+            <div style={{ fontSize: 40, marginBottom: 16 }}>🔍</div>
+            <div style={{ color: C.gold, fontWeight: 600, fontSize: 16 }}>{t.roster_parsing}</div>
+            <div style={{ color: C.muted, fontSize: 13, marginTop: 8 }}>This takes about 5 seconds…</div>
+          </div>
+        )}
+
+        {phase === "confirm" && (
+          <div>
+            <div style={{ color: C.gold, fontWeight: 700, fontSize: 16, marginBottom: 4 }}>✈️ {t.roster_confirm_title}</div>
+            <div style={{ color: C.muted, fontSize: 13, marginBottom: 16 }}>{t.roster_confirm_hint}</div>
+            {pairings.map((p, i) => (
+              <div key={i} style={{ background: C.navy, borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
+                <div style={{ color: C.white, fontWeight: 600, fontSize: 14 }}>{p.pairingDate} → {p.returnDate || "?"}</div>
+                <div style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>{p.departure} → {(p.destinations || []).join(" → ")} · {p.pairingDays} day{p.pairingDays > 1 ? "s" : ""}{p.goingUsa === "yes" ? " · 🇺🇸 USA" : ""}</div>
+              </div>
+            ))}
+            <button onClick={handleConfirm} style={{ width: "100%", padding: "14px", background: C.gold, color: C.navy, border: "none", borderRadius: 12, fontWeight: 700, fontSize: 15, cursor: "pointer", marginTop: 8 }}>
+              {t.roster_confirm_btn}
+            </button>
+          </div>
+        )}
+
+        {phase === "saving" && (
+          <div style={{ textAlign: "center", padding: "40px 0" }}>
+            <div style={{ fontSize: 40, marginBottom: 16 }}>💾</div>
+            <div style={{ color: C.gold, fontWeight: 600 }}>{t.roster_saving}</div>
+          </div>
+        )}
+
+        {phase === "done" && (
+          <div style={{ textAlign: "center", padding: "16px 0" }}>
+            <div style={{ fontSize: 52, marginBottom: 16 }}>🎉</div>
+            <div style={{ color: C.gold, fontWeight: 700, fontSize: 18, marginBottom: 12 }}>{t.roster_done_title}</div>
+            <div style={{ color: C.muted, fontSize: 14, lineHeight: 1.7, marginBottom: 24 }}>{t.roster_done_msg}</div>
+            <button onClick={onClose} style={{ padding: "13px 40px", background: C.gold, color: C.navy, border: "none", borderRadius: 12, fontWeight: 700, fontSize: 15, cursor: "pointer" }}>{t.roster_done_btn}</button>
+          </div>
+        )}
+
+        {phase === "error" && (
+          <div style={{ textAlign: "center", padding: "24px 0" }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>⚠️</div>
+            <div style={{ color: C.red, fontWeight: 600, marginBottom: 20 }}>{errMsg}</div>
+            <button onClick={() => setPhase("upload")} style={{ padding: "12px 32px", background: C.navy, border: `1px solid ${C.navyBorder}`, color: C.white, borderRadius: 12, cursor: "pointer" }}>Try Again</button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
