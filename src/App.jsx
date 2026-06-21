@@ -568,6 +568,14 @@ const ProfileIcon = () => (
 );
 
 // ─── HELPERS ──────────────────────────────────────────────────────
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
 const storage = {
   get: (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
   set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage unavailable */ } },
@@ -642,6 +650,33 @@ export default function NutriCrew() {
   const [favorites, setFavorites] = useState(() => storage.get(FAVORITES_KEY) || []);
   const [returningUser] = useState(() => !!(user?.gender && user?.weight && (user?.dob || user?.age) && user?.position));
   const [showRoster, setShowRoster] = useState(false);
+
+  // Register push notifications when user is logged in
+  useEffect(() => {
+    if (!user?.email) return;
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+    if (!vapidKey) return;
+    (async () => {
+      try {
+        const reg = await navigator.serviceWorker.register('/sw.js');
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') return;
+        const existing = await reg.pushManager.getSubscription();
+        const sub = existing || await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidKey),
+        });
+        await fetch(`${API_BASE}/api/push/subscribe`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: user.email, subscription: sub.toJSON() }),
+        });
+      } catch (e) {
+        console.warn('Push registration failed:', e.message);
+      }
+    })();
+  }, [user?.email]); // eslint-disable-line
 
   useEffect(() => {
     const sess = storage.get(SESSION_KEY);
