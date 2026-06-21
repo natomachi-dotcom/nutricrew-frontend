@@ -155,8 +155,9 @@ const T = {
     roster_confirm_hint: "Check the pairings below and confirm to schedule your plans.",
     roster_confirm_btn: "Schedule All Plans",
     roster_saving: "Saving pairings…",
-    roster_done_title: "You're All Set!",
-    roster_done_msg: "You'll receive an email 24h before each pairing asking for your kitchen setup. Tap once and your meal plan is ready.",
+    roster_done_title: "Your Month is Scheduled!",
+    roster_done_subtitle: "Here's what's coming for you:",
+    roster_done_flow: "24h before → Tap your kitchen → Meal plan arrives",
     roster_done_btn: "Done",
     roster_no_pairings: "No upcoming pairings found. Make sure the photo shows future dates.",
     roster_error: "Could not read the roster. Please try a clearer photo.",
@@ -294,8 +295,9 @@ const T = {
     roster_confirm_hint: "Vérifiez les pairings ci-dessous et confirmez pour planifier vos repas.",
     roster_confirm_btn: "Planifier Tous les Repas",
     roster_saving: "Enregistrement…",
-    roster_done_title: "C'est Prêt!",
-    roster_done_msg: "Vous recevrez un email 24h avant chaque pairing pour confirmer votre cuisine. Un clic et votre plan est prêt.",
+    roster_done_title: "Votre Mois est Planifié!",
+    roster_done_subtitle: "Voici ce qui vous attend:",
+    roster_done_flow: "24h avant → Choisissez votre cuisine → Plan repas prêt",
     roster_done_btn: "Terminé",
     roster_no_pairings: "Aucun pairing à venir trouvé. Assurez-vous que la photo montre des dates futures.",
     roster_error: "Impossible de lire le planning. Essayez une photo plus nette.",
@@ -433,8 +435,9 @@ const T = {
     roster_confirm_hint: "Revisa los pairings a continuación y confirma para programar tus planes.",
     roster_confirm_btn: "Programar Todos los Planes",
     roster_saving: "Guardando…",
-    roster_done_title: "¡Listo!",
-    roster_done_msg: "Recibirás un email 24h antes de cada pairing para confirmar tu cocina. Un toque y tu plan estará listo.",
+    roster_done_title: "¡Tu Mes está Programado!",
+    roster_done_subtitle: "Esto es lo que te espera:",
+    roster_done_flow: "24h antes → Elige tu cocina → Plan de comidas listo",
     roster_done_btn: "Hecho",
     roster_no_pairings: "No se encontraron pairings futuros. Asegúrate de que la foto muestre fechas futuras.",
     roster_error: "No se pudo leer el roster. Intenta con una foto más clara.",
@@ -2145,11 +2148,55 @@ function RosterModal({ t, user, onClose }) {
         )}
 
         {phase === "done" && (
-          <div style={{ textAlign: "center", padding: "16px 0" }}>
-            <div style={{ fontSize: 52, marginBottom: 16 }}>🎉</div>
-            <div style={{ color: C.gold, fontWeight: 700, fontSize: 18, marginBottom: 12 }}>{t.roster_done_title}</div>
-            <div style={{ color: C.muted, fontSize: 14, lineHeight: 1.7, marginBottom: 24 }}>{t.roster_done_msg}</div>
-            <button onClick={onClose} style={{ padding: "13px 40px", background: C.gold, color: C.navy, border: "none", borderRadius: 12, fontWeight: 700, fontSize: 15, cursor: "pointer" }}>{t.roster_done_btn}</button>
+          <div style={{ padding: "8px 0" }}>
+            <div style={{ textAlign: "center", marginBottom: 20 }}>
+              <div style={{ fontSize: 44, marginBottom: 10 }}>🗓️</div>
+              <div style={{ color: C.gold, fontWeight: 700, fontSize: 18, marginBottom: 4 }}>{t.roster_done_title}</div>
+              <div style={{ color: C.muted, fontSize: 13 }}>{t.roster_done_subtitle}</div>
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              {pairings.map((p, i) => {
+                const dateStr = p.pairingDate ? new Date(p.pairingDate).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : p.pairingDate;
+                const retStr = p.returnDate ? new Date(p.returnDate).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "?";
+                const route = [p.departure, ...(p.destinations || [])].join(" → ");
+                return (
+                  <div key={i} style={{ background: C.navy, borderRadius: 12, padding: "14px 16px", marginBottom: 10, borderLeft: `3px solid ${C.gold}` }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+                      <div style={{ color: C.white, fontWeight: 700, fontSize: 14 }}>
+                        {dateStr} – {retStr}
+                      </div>
+                      <div style={{ background: "rgba(255,213,79,0.15)", color: C.gold, fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 6 }}>
+                        {p.pairingDays} day{p.pairingDays > 1 ? "s" : ""}
+                      </div>
+                    </div>
+                    <div style={{ color: C.muted, fontSize: 12, marginBottom: 10 }}>
+                      ✈️ {route}{p.goingUsa === "yes" ? " 🇺🇸" : ""}
+                    </div>
+                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                      {[
+                        { icon: "📧", label: "Reminder email" },
+                        { icon: "👆", label: "Tap kitchen" },
+                        { icon: "🍽️", label: "Plan arrives" },
+                      ].map((step, si) => (
+                        <div key={si} style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 11, color: C.muted }}>
+                          {si > 0 && <span style={{ color: C.navyBorder, marginRight: 1 }}>→</span>}
+                          <span>{step.icon}</span>
+                          <span style={{ color: "#a8b5c8" }}>{step.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div style={{ background: "rgba(255,213,79,0.08)", border: `1px solid rgba(255,213,79,0.2)`, borderRadius: 10, padding: "12px 14px", marginBottom: 20, textAlign: "center" }}>
+              <div style={{ color: C.gold, fontSize: 12, fontWeight: 600, marginBottom: 2 }}>How it works</div>
+              <div style={{ color: C.muted, fontSize: 12, lineHeight: 1.6 }}>{t.roster_done_flow}</div>
+            </div>
+
+            <button onClick={onClose} style={{ width: "100%", padding: "14px", background: C.gold, color: C.navy, border: "none", borderRadius: 12, fontWeight: 700, fontSize: 15, cursor: "pointer" }}>{t.roster_done_btn}</button>
           </div>
         )}
 
