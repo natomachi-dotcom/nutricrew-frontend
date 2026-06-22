@@ -2350,33 +2350,42 @@ function GymPlanModal({ t, user, pairings, onClose }) {
                   </div>
 
                   {hasWorkout && (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
                       {(day.workout.exercises || []).map((ex, ei) => {
-                        const thumbUrl = ex.vid ? `https://img.youtube.com/vi/${ex.vid}/mqdefault.jpg` : null;
-                        const watchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(ex.name + " exercise tutorial proper form")}`;
+                        const thumbUrl = ex.vid ? `https://img.youtube.com/vi/${ex.vid}/hqdefault.jpg` : null;
+                        const watchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(ex.name + " exercise proper form")}`;
                         const muscleColor = MUSCLE_COLORS[ex.muscle] || C.gold;
                         const isActive = activeEx === `${wi}-${di}-${ei}`;
                         return (
-                          <div key={ei} style={{ width: "calc(50% - 4px)", background: "#0A1628", borderRadius: 10, overflow: "hidden", border: `1px solid ${isActive ? muscleColor : C.navyBorder}`, cursor: "pointer" }}
+                          <div key={ei} style={{ background: "#0A1628", borderRadius: 8, overflow: "hidden", border: `1px solid ${isActive ? muscleColor : C.navyBorder}`, cursor: "pointer" }}
                             onClick={() => setActiveEx(isActive ? null : `${wi}-${di}-${ei}`)}>
                             {thumbUrl && (
                               <div style={{ position: "relative" }}>
-                                <img src={thumbUrl} alt={ex.name} style={{ width: "100%", display: "block", aspectRatio: "16/9", objectFit: "cover" }}
+                                <img src={thumbUrl} alt={ex.name}
+                                  style={{ width: "100%", display: "block", height: 70, objectFit: "cover", objectPosition: "center" }}
                                   onError={e => { e.target.style.display = "none"; }} />
                                 <a href={watchUrl} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
-                                  style={{ position: "absolute", bottom: 6, right: 6, background: "rgba(0,0,0,0.75)", color: "#fff", fontSize: 10, fontWeight: 700, padding: "3px 7px", borderRadius: 4, textDecoration: "none" }}>
-                                  ▶ {t.gym_plan_watch}
+                                  style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.25)", color: "#fff", fontSize: 18, textDecoration: "none", opacity: 0 }}
+                                  onMouseEnter={e => e.currentTarget.style.opacity = 1}
+                                  onMouseLeave={e => e.currentTarget.style.opacity = 0}>
+                                  ▶
                                 </a>
                               </div>
                             )}
-                            <div style={{ padding: "8px 10px" }}>
-                              <div style={{ color: C.white, fontSize: 12, fontWeight: 600, marginBottom: 2 }}>{ex.name}</div>
-                              <div style={{ color: C.muted, fontSize: 11 }}>{ex.sets} × {ex.reps}</div>
-                              {isActive && ex.notes && (
-                                <div style={{ color: C.gold, fontSize: 11, marginTop: 4, lineHeight: 1.4 }}>{ex.notes}</div>
+                            <div style={{ padding: "6px 7px" }}>
+                              <div style={{ color: C.white, fontSize: 10, fontWeight: 700, lineHeight: 1.3, marginBottom: 2 }}>{ex.name}</div>
+                              <div style={{ color: C.muted, fontSize: 10 }}>{ex.sets}×{ex.reps}</div>
+                              {isActive && (
+                                <>
+                                  {ex.notes && <div style={{ color: C.gold, fontSize: 10, marginTop: 3, lineHeight: 1.4 }}>{ex.notes}</div>}
+                                  <a href={watchUrl} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
+                                    style={{ display: "inline-block", marginTop: 4, fontSize: 10, color: "#4A9ECC", textDecoration: "none", fontWeight: 600 }}>
+                                    ▶ {t.gym_plan_watch}
+                                  </a>
+                                </>
                               )}
-                              <div style={{ marginTop: 4 }}>
-                                <span style={{ fontSize: 10, color: muscleColor, background: `${muscleColor}22`, padding: "2px 6px", borderRadius: 4, fontWeight: 600 }}>{ex.muscle}</span>
+                              <div style={{ marginTop: 3 }}>
+                                <span style={{ fontSize: 9, color: muscleColor, fontWeight: 700 }}>{ex.muscle}</span>
                               </div>
                             </div>
                           </div>
