@@ -663,6 +663,32 @@ export default function NutriCrew() {
   const [returningUser] = useState(() => !!(user?.gender && user?.weight && (user?.dob || user?.age) && user?.position));
   const [showRoster, setShowRoster] = useState(false);
   const [premiumReturnScreen, setPremiumReturnScreen] = useState("boarding");
+  const [latestPlanReady, setLatestPlanReady] = useState(null);
+
+  // Check for a plan generated via roster automation (no app session involved)
+  // so the app — not the notification email — is where it's actually seen.
+  useEffect(() => {
+    if (!user?.email) return;
+    fetch(`${API_BASE}/api/roster/latest-plan?email=${encodeURIComponent(user.email)}`)
+      .then(r => r.json())
+      .then(d => { if (d.found && !d.viewedAt) setLatestPlanReady(d); })
+      .catch(() => {});
+  }, [user?.email]);
+
+  const viewLatestPlan = () => {
+    if (!latestPlanReady) return;
+    setPlan(latestPlanReady.plan);
+    setPairing(prev => ({ ...prev, ...latestPlanReady.pairing }));
+    setActiveTab("plan");
+    setActiveDay(0);
+    setScreen("plan");
+    fetch(`${API_BASE}/api/roster/mark-plan-viewed`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirmToken: latestPlanReady.confirmToken }),
+    }).catch(() => {});
+    setLatestPlanReady(null);
+  };
 
   // Register push notifications when user is logged in
   useEffect(() => {
@@ -921,6 +947,8 @@ export default function NutriCrew() {
           onOpenSavedMeals={() => setShowSavedMeals(true)}
           onOpenProfile={() => setShowProfile(true)}
           onOpenRoster={() => { if (!isPremium) { setPremiumReturnScreen("splash"); setScreen("premium"); return; } setShowRoster(true); }}
+          latestPlanReady={latestPlanReady}
+          onViewLatestPlan={viewLatestPlan}
         />
       )}
 
@@ -1214,7 +1242,7 @@ function OTPScreen({ email, onSuccess, onBack }) {
 }
 
 // ─── SPLASH SCREEN ────────────────────────────────────────────────
-function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onStart, onNewPairing, onViewLastPlan, onOpenSavedMeals, onOpenProfile, onOpenRoster, isPremium }) {
+function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onStart, onNewPairing, onViewLastPlan, onOpenSavedMeals, onOpenProfile, onOpenRoster, isPremium, latestPlanReady, onViewLatestPlan }) {
   return (
     <div style={styles.splash}>
       {returningUser && user && (
@@ -1250,6 +1278,21 @@ function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onS
         {returningUser && user ? (
           <div style={styles.welcomeBack}>
             <div style={styles.wbTitle}>{t.welcome_back}, {user.name?.split(" ")[0]}!</div>
+            {latestPlanReady && (
+              <button
+                onClick={onViewLatestPlan}
+                style={{
+                  width: "100%", display: "block", textAlign: "left", cursor: "pointer",
+                  background: "linear-gradient(135deg, #152850, #1E3A6E)", border: `1.5px solid ${C.gold}`,
+                  borderRadius: 14, padding: "16px 18px", marginBottom: 14, color: C.white,
+                }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 700, color: C.gold, marginBottom: 4 }}>🍽️ Your plan is ready!</div>
+                <div style={{ fontSize: 14, color: "#B8D4F0" }}>
+                  {(latestPlanReady.pairing?.destinations || []).join(" → ") || "Your trip"} — tap to view
+                </div>
+              </button>
+            )}
             <button style={styles.primaryBtn} onClick={onNewPairing}>
               <PlaneIcon size={16} color={C.navy}/> {t.new_pairing}
             </button>
