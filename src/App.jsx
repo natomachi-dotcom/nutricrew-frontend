@@ -1482,7 +1482,7 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
               }}
             />
             <button
-              onClick={() => { upd("airplane_meal_description", ""); handleContinue(); }}
+              onClick={() => { upd("airplane_meal_description", ""); onContinue(); }}
               style={{
                 marginTop: 12, width: "100%", padding: "11px 0",
                 background: "transparent", border: `1px solid ${C.navyBorder}`,
