@@ -662,6 +662,7 @@ export default function NutriCrew() {
   const [favorites, setFavorites] = useState(() => storage.get(FAVORITES_KEY) || []);
   const [returningUser] = useState(() => !!(user?.gender && user?.weight && (user?.dob || user?.age) && user?.position));
   const [showRoster, setShowRoster] = useState(false);
+  const [premiumReturnScreen, setPremiumReturnScreen] = useState("boarding");
 
   // Register push notifications when user is logged in
   useEffect(() => {
@@ -702,8 +703,9 @@ export default function NutriCrew() {
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(data => {
         setUser(prev => {
-          if (prev?.email) return prev;
-          const u = { email: data.email, name: data.name || "" };
+          const u = prev?.email
+            ? { ...prev, isPremium: !!data.isPremium }
+            : { email: data.email, name: data.name || "", isPremium: !!data.isPremium };
           storage.set(USER_KEY, u);
           return u;
         });
@@ -732,6 +734,9 @@ export default function NutriCrew() {
 
   const pairingCount = storage.get(PAIRING_COUNT_KEY) || 0;
   const isPremiumNeeded = premiumSuccess ? false : pairingCount >= FREE_PAIRING_LIMIT;
+  // Real subscription status (server-authoritative) — true right after Stripe
+  // checkout returns, or once verify-session/login confirms it from the DB.
+  const isPremium = premiumSuccess || !!user?.isPremium;
 
   // ── STEP DEFINITIONS (check-in flow) ──────────────────────────
   // If returning user, skip personal steps.
@@ -785,8 +790,10 @@ export default function NutriCrew() {
     if (step > 0) setStep(s => s - 1);
   };
 
+  const needsPremiumForDiet = (pairing.diets || []).includes("calorie_deficit") && !isPremium;
+
   const handleGenerate = async () => {
-    if (isPremiumNeeded) { setScreen("premium"); return; }
+    if (isPremiumNeeded || needsPremiumForDiet) { setScreen("premium"); return; }
     setScreen("plan");
 
     const data = { ...user, ...pairing };
@@ -872,8 +879,9 @@ export default function NutriCrew() {
   const handleLoginSuccess = (sessionData) => {
     storage.set(SESSION_KEY, { token: sessionData.token, email: sessionData.email });
     setUser(prev => {
-      if (prev?.email) return prev;
-      const u = { email: sessionData.email, name: sessionData.name || "" };
+      const u = prev?.email
+        ? { ...prev, isPremium: !!sessionData.isPremium }
+        : { email: sessionData.email, name: sessionData.name || "", isPremium: !!sessionData.isPremium };
       storage.set(USER_KEY, u);
       return u;
     });
@@ -905,19 +913,19 @@ export default function NutriCrew() {
 
       {screen === "splash" && (
         <SplashScreen t={t} lang={lang} setLang={setLang}
-          returningUser={returningUser} user={user}
+          returningUser={returningUser} user={user} isPremium={isPremium}
           hasSavedPlan={getSavedPlans().length > 0}
           onStart={() => setScreen("checkin")}
           onNewPairing={startNewPairing}
           onViewLastPlan={viewLastPlan}
           onOpenSavedMeals={() => setShowSavedMeals(true)}
           onOpenProfile={() => setShowProfile(true)}
-          onOpenRoster={() => setShowRoster(true)}
+          onOpenRoster={() => { if (!isPremium) { setPremiumReturnScreen("splash"); setScreen("premium"); return; } setShowRoster(true); }}
         />
       )}
 
       {showRoster && (
-        <RosterModal t={t} user={user} onClose={() => setShowRoster(false)} />
+        <RosterModal t={t} user={user} onClose={() => setShowRoster(false)} onRequirePremium={() => { setShowRoster(false); setPremiumReturnScreen("splash"); setScreen("premium"); }} />
       )}
 
       {screen === "checkin" && (
@@ -949,7 +957,7 @@ export default function NutriCrew() {
       )}
 
       {screen === "premium" && (
-        <PremiumScreen t={t} onBack={() => setScreen("boarding")} onUpgrade={handleUpgrade} premiumSuccess={premiumSuccess} onGenerate={handleGenerate}/>
+        <PremiumScreen t={t} onBack={() => setScreen(premiumReturnScreen)} onUpgrade={handleUpgrade} premiumSuccess={premiumSuccess} onGenerate={handleGenerate} returnScreen={premiumReturnScreen}/>
       )}
 
       {/* Floating calorie button */}
@@ -973,8 +981,12 @@ export default function NutriCrew() {
           {showJetlag && (
             <JetlagModal
               t={t}
+              lang={lang}
               pairing={pairing}
+              user={user}
+              isPremium={isPremium}
               onClose={() => setShowJetlag(false)}
+              onRequirePremium={() => { setShowJetlag(false); setPremiumReturnScreen("plan"); setScreen("premium"); }}
             />
           )}
           <button style={styles.floatBtnSaved} onClick={() => setShowSavedMeals(true)} aria-label="saved meals">
@@ -1202,7 +1214,7 @@ function OTPScreen({ email, onSuccess, onBack }) {
 }
 
 // ─── SPLASH SCREEN ────────────────────────────────────────────────
-function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onStart, onNewPairing, onViewLastPlan, onOpenSavedMeals, onOpenProfile, onOpenRoster }) {
+function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onStart, onNewPairing, onViewLastPlan, onOpenSavedMeals, onOpenProfile, onOpenRoster, isPremium }) {
   return (
     <div style={styles.splash}>
       {returningUser && user && (
@@ -1250,7 +1262,7 @@ function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onS
               {t.saved_meals_title}
             </button>
             <button style={styles.secondaryBtn} onClick={onOpenRoster}>
-              📅 {t.roster_btn}
+              📅 {t.roster_btn} {!isPremium && <span style={{...styles.premiumLockBadge, fontSize: 14}}>👑</span>}
             </button>
           </div>
         ) : (
@@ -1985,16 +1997,16 @@ function NearbyPlaces({ t, pairing, user, isPremium }) {
   if (error) return <div style={styles.nearbyLoading}>{t.nearby_error}</div>;
   if (!data) return null;
 
-  const PlaceCard = ({ place }) => (
+  const PlaceCard = ({ place, typeIcon }) => (
     <div style={styles.placeCard}>
-      <div style={styles.placeName}>{place.name}</div>
+      <div style={styles.placeName}>{typeIcon} {place.name}</div>
       {place.rating != null && (
-        <div style={styles.placeRating}>{"★".repeat(Math.round(place.rating))}{"☆".repeat(5 - Math.round(place.rating))} {place.rating.toFixed(1)}</div>
+        <div style={styles.placeRating}>⭐ {"★".repeat(Math.round(place.rating))}{"☆".repeat(5 - Math.round(place.rating))} {place.rating.toFixed(1)}</div>
       )}
-      <div style={styles.placeAddress}>{place.address}</div>
+      <div style={styles.placeAddress}>📍 {place.address}</div>
       {place.open_now != null && (
-        <div style={{...styles.placeStatus, color: place.open_now ? C.green : C.muted}}>
-          {place.open_now ? t.nearby_open : t.nearby_closed}
+        <div style={{...styles.placeStatus, color: place.open_now ? C.green : C.red}}>
+          {place.open_now ? `🟢 ${t.nearby_open}` : `🔴 ${t.nearby_closed}`}
         </div>
       )}
     </div>
@@ -2004,18 +2016,18 @@ function NearbyPlaces({ t, pairing, user, isPremium }) {
     <div>
       <div style={styles.nearbySection}>
         <div style={styles.nearbySectionTitle}>🛒 {t.nearby_groceries}</div>
-        {data.groceries?.length ? data.groceries.map((p, i) => <PlaceCard key={i} place={p}/>) : <div style={styles.placeAddress}>No results found.</div>}
+        {data.groceries?.length ? data.groceries.map((p, i) => <PlaceCard key={i} place={p} typeIcon="🏪"/>) : <div style={styles.placeAddress}>No results found.</div>}
       </div>
       <div style={styles.nearbySection}>
-        <div style={styles.nearbySectionTitle}>🥗 {t.nearby_restaurants}</div>
-        {data.restaurants?.length ? data.restaurants.map((p, i) => <PlaceCard key={i} place={p}/>) : <div style={styles.placeAddress}>No results found.</div>}
+        <div style={styles.nearbySectionTitle}>🍽️ {t.nearby_restaurants}</div>
+        {data.restaurants?.length ? data.restaurants.map((p, i) => <PlaceCard key={i} place={p} typeIcon="🍴"/>) : <div style={styles.placeAddress}>No results found.</div>}
       </div>
     </div>
   );
 }
 
 // ─── PREMIUM SCREEN ───────────────────────────────────────────────
-function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess, onGenerate }) {
+function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess, onGenerate, returnScreen }) {
   const [loading, setLoading] = useState(false);
 
   const handleClick = async () => {
@@ -2025,12 +2037,19 @@ function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess, onGenerate }) {
   };
 
   if (premiumSuccess) {
+    const ctaBack = returnScreen === "splash" || returnScreen === "plan";
     return (
       <div style={styles.premiumScreen}>
         <div style={styles.premiumIcon}>🎉</div>
         <div style={styles.premiumTitle}>Welcome to Premium!</div>
-        <div style={styles.premiumMsg}>Your account is now active. Tap below to generate your plan.</div>
-        <button style={styles.primaryBtn} onClick={onGenerate}>Generate My Plan</button>
+        <div style={styles.premiumMsg}>
+          {ctaBack
+            ? "Your account is now active. Gym Plans, Roster Automation, Calorie Deficit plans, Jetlag Meal Plans, and Nearby Places are all unlocked."
+            : "Your account is now active. Tap below to generate your plan."}
+        </div>
+        <button style={styles.primaryBtn} onClick={ctaBack ? onBack : onGenerate}>
+          {ctaBack ? "Continue" : "Generate My Plan"}
+        </button>
       </div>
     );
   }
@@ -2043,9 +2062,10 @@ function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess, onGenerate }) {
       <div style={styles.premiumFeatures}>
         {[
           "Unlimited meal plans",
-          "Jetlag-optimized meal timing",
-          "Country food rules",
-          "Calorie deficit plans",
+          "💪 Personalized monthly gym plans",
+          "📅 Roster upload & auto plan delivery",
+          "🔥 Calorie deficit plans",
+          "🌍 Jetlag meal-timing plan",
           "📍 Nearby stores & restaurants",
         ].map(f => (
           <div key={f} style={styles.premiumFeature}>✓ {f}</div>
@@ -2060,7 +2080,7 @@ function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess, onGenerate }) {
 }
 
 // ─── ROSTER MODAL ─────────────────────────────────────────────────
-function RosterModal({ t, user, onClose }) {
+function RosterModal({ t, user, onClose, onRequirePremium }) {
   const [phase, setPhase] = useState("upload"); // upload | parsing | confirm | saving | done | error
   const [images, setImages] = useState([]);
   const [homeBase, setHomeBase] = useState(user?.departure || "");
@@ -2086,9 +2106,10 @@ function RosterModal({ t, user, onClose }) {
       const res = await fetch(`${API_BASE}/api/roster/parse`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images: encoded, homeBase, lang: user?.lang || "en" }),
+        body: JSON.stringify({ images: encoded, homeBase, lang: user?.lang || "en", email: user?.email }),
       });
       const data = await res.json();
+      if (res.status === 403 && data.error === "premium_required") { onRequirePremium?.(); return; }
       if (!res.ok || !Array.isArray(data.pairings)) throw new Error(data.error || "parse failed");
       if (data.pairings.length === 0) { setErrMsg(t.roster_no_pairings); setPhase("error"); return; }
       setPairings(data.pairings);
@@ -2114,6 +2135,8 @@ function RosterModal({ t, user, onClose }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: user?.email, pairings, profile }),
       });
+      const saveData = await res.json().catch(() => ({}));
+      if (res.status === 403 && saveData.error === "premium_required") { onRequirePremium?.(); return; }
       if (!res.ok) throw new Error("save failed");
       // Fire gym plan generation in background (don't block the done screen)
       fetch(`${API_BASE}/api/gym-plan/generate`, {
@@ -2473,10 +2496,34 @@ function AirplaneMealModal({ t, text, setText, result, loading, onCheck, onClose
   );
 }
 
-function JetlagModal({ t, pairing, onClose }) {
+function JetlagModal({ t, pairing, user, lang, isPremium, onClose, onRequirePremium }) {
   const tz = parseInt(pairing.timezone || 0, 10);
   const hasJetlag = Math.abs(tz) >= 4;
   const tips = [t.jetlag_tip_1, t.jetlag_tip_2, t.jetlag_tip_3, t.jetlag_tip_4, t.jetlag_tip_5];
+  const destination = (pairing.destinations || [])[0];
+
+  const [mealPlan, setMealPlan] = useState(null);
+  const [loadingPlan, setLoadingPlan] = useState(false);
+  const [planError, setPlanError] = useState(false);
+
+  useEffect(() => {
+    if (!hasJetlag || !isPremium || !user?.email || !destination) return;
+    setLoadingPlan(true);
+    setPlanError(false);
+    fetch(`${API_BASE}/api/jetlag-plan`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: user.email, departure: pairing.departure, destination,
+        timezone: tz, diets: pairing.diets || [], lang: lang || "en",
+      }),
+    })
+      .then(r => r.json())
+      .then(d => { if (d.error) throw new Error(d.error); setMealPlan(d); })
+      .catch(() => setPlanError(true))
+      .finally(() => setLoadingPlan(false));
+  }, [hasJetlag, isPremium, user?.email, pairing.departure, destination, tz]); // eslint-disable-line
+
   return (
     <div style={styles.modalOverlay}>
       <div style={styles.modal}>
@@ -2495,6 +2542,37 @@ function JetlagModal({ t, pairing, onClose }) {
               <div style={styles.restrictTitle}>{tz > 0 ? t.jetlag_eastward_title : t.jetlag_westward_title}</div>
               <div style={styles.restrictText}>{tz > 0 ? t.jetlag_eastward_text : t.jetlag_westward_text}</div>
             </div>
+
+            {isPremium ? (
+              <div style={styles.restrictCard}>
+                <div style={styles.restrictTitle}>🌍 Your Personalized Meal-Timing Plan</div>
+                {loadingPlan && <div style={styles.restrictText}>Building your plan…</div>}
+                {planError && <div style={styles.restrictText}>Could not load your personalized plan. Try again later.</div>}
+                {mealPlan && (
+                  <>
+                    <div style={{...styles.restrictText, marginBottom: 10}}>{mealPlan.summary}</div>
+                    {mealPlan.schedule?.map((entry, i) => (
+                      <div key={i} style={{marginBottom: 10}}>
+                        <div style={{color: C.gold, fontWeight: 600, fontSize: 13, marginBottom: 4}}>{entry.label}</div>
+                        {entry.actions?.map((a, ai) => (
+                          <div key={ai} style={styles.jetlagTipRow}>
+                            <span style={{color:C.gold}}>•</span>
+                            <span style={styles.restrictText}>{a}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+            ) : (
+              <div style={styles.nearbyLock}>
+                <div style={{fontSize: 32, marginBottom: 8}}>👑</div>
+                <div style={styles.nearbyLockTitle}>Personalized Jetlag Meal Plan</div>
+                <div style={styles.nearbyLockMsg}>Upgrade to Premium for a meal-timing plan built specifically for this {Math.abs(tz)}-hour time difference.</div>
+                <button style={{...styles.primaryBtn, marginTop: 12}} onClick={onRequirePremium}>Upgrade</button>
+              </div>
+            )}
           </>
         ) : (
           <div style={styles.restrictCard}>
