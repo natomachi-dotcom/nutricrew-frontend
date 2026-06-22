@@ -159,6 +159,10 @@ const T = {
     roster_done_subtitle: "Here's what's coming for you:",
     roster_done_flow: "24h before → Tap your kitchen → Meal plan arrives",
     roster_done_btn: "Done",
+    gym_plan_btn: "View My Gym Plan",
+    gym_plan_title: "Monthly Gym Plan",
+    gym_plan_rest: "Rest Day",
+    gym_plan_watch: "Watch",
     roster_no_pairings: "No upcoming pairings found. Make sure the photo shows future dates.",
     roster_error: "Could not read the roster. Please try a clearer photo.",
     roster_home_base: "Your Home Base City",
@@ -299,6 +303,10 @@ const T = {
     roster_done_subtitle: "Voici ce qui vous attend:",
     roster_done_flow: "24h avant → Choisissez votre cuisine → Plan repas prêt",
     roster_done_btn: "Terminé",
+    gym_plan_btn: "Voir Mon Plan Gym",
+    gym_plan_title: "Plan Gym du Mois",
+    gym_plan_rest: "Repos",
+    gym_plan_watch: "Voir",
     roster_no_pairings: "Aucun pairing à venir trouvé. Assurez-vous que la photo montre des dates futures.",
     roster_error: "Impossible de lire le planning. Essayez une photo plus nette.",
     roster_home_base: "Ville de Base",
@@ -439,6 +447,10 @@ const T = {
     roster_done_subtitle: "Esto es lo que te espera:",
     roster_done_flow: "24h antes → Elige tu cocina → Plan de comidas listo",
     roster_done_btn: "Hecho",
+    gym_plan_btn: "Ver Mi Plan de Gym",
+    gym_plan_title: "Plan de Gym del Mes",
+    gym_plan_rest: "Descanso",
+    gym_plan_watch: "Ver",
     roster_no_pairings: "No se encontraron pairings futuros. Asegúrate de que la foto muestre fechas futuras.",
     roster_error: "No se pudo leer el roster. Intenta con una foto más clara.",
     roster_home_base: "Tu Ciudad Base",
@@ -2054,6 +2066,7 @@ function RosterModal({ t, user, onClose }) {
   const [homeBase, setHomeBase] = useState(user?.departure || "");
   const [pairings, setPairings] = useState([]);
   const [errMsg, setErrMsg] = useState("");
+  const [showGymPlan, setShowGymPlan] = useState(false);
 
   const handleFiles = (e) => {
     const files = Array.from(e.target.files).slice(0, 4);
@@ -2102,6 +2115,12 @@ function RosterModal({ t, user, onClose }) {
         body: JSON.stringify({ email: user?.email, pairings, profile }),
       });
       if (!res.ok) throw new Error("save failed");
+      // Fire gym plan generation in background (don't block the done screen)
+      fetch(`${API_BASE}/api/gym-plan/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: user?.email, pairings, profile }),
+      }).catch(() => {});
       setPhase("done");
     } catch {
       setErrMsg(t.roster_error);
@@ -2231,7 +2250,16 @@ function RosterModal({ t, user, onClose }) {
               <div style={{ color: C.muted, fontSize: 12, lineHeight: 1.6 }}>{t.roster_done_flow}</div>
             </div>
 
-            <button onClick={onClose} style={{ width: "100%", padding: "14px", background: C.gold, color: C.navy, border: "none", borderRadius: 12, fontWeight: 700, fontSize: 15, cursor: "pointer" }}>{t.roster_done_btn}</button>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setShowGymPlan(true)} style={{ flex: 1, padding: "14px", background: "#1E3A6E", color: C.gold, border: `1px solid ${C.gold}`, borderRadius: 12, fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
+                💪 {t.gym_plan_btn}
+              </button>
+              <button onClick={onClose} style={{ flex: 1, padding: "14px", background: C.gold, color: C.navy, border: "none", borderRadius: 12, fontWeight: 700, fontSize: 14, cursor: "pointer" }}>{t.roster_done_btn}</button>
+            </div>
+
+            {showGymPlan && (
+              <GymPlanModal t={t} user={user} pairings={pairings} onClose={() => setShowGymPlan(false)} />
+            )}
           </div>
         )}
 
@@ -2242,6 +2270,125 @@ function RosterModal({ t, user, onClose }) {
             <button onClick={() => setPhase("upload")} style={{ padding: "12px 32px", background: C.navy, border: `1px solid ${C.navyBorder}`, color: C.white, borderRadius: 12, cursor: "pointer" }}>Try Again</button>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ─── GYM PLAN MODAL ───────────────────────────────────────────────
+
+const MUSCLE_COLORS = {
+  Chest: "#E8804A", Triceps: "#C96A6A", Shoulders: "#9B7ED9",
+  Legs: "#4A9ECC", Glutes: "#CC7EB8", Calves: "#4ABCCC",
+  Core: "#E8C96A", Back: "#4ACC8E", Biceps: "#7EB8CC",
+  Cardio: "#E84A4A", Flexibility: "#4ACC6E",
+};
+
+const DAY_TYPE_LABELS = {
+  off:      { emoji: "🏋️", label: "Full Workout",   color: "#4A9ECC" },
+  layover:  { emoji: "🏨", label: "Hotel Circuit",  color: "#E8C96A" },
+  pairing:  { emoji: "✈️",  label: "Stretch Only",  color: "#7A8EAA" },
+  rest:     { emoji: "😴",  label: "Rest",           color: "#4ACC8E" },
+};
+
+function GymPlanModal({ t, user, pairings, onClose }) {
+  const [plan, setPlan] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [activeEx, setActiveEx] = useState(null);
+
+  useEffect(() => {
+    if (!user?.email || !pairings?.length) return;
+    const month = new Date(pairings[0].pairingDate).toISOString().slice(0, 7);
+    fetch(`${API_BASE}/api/gym-plan/get?email=${encodeURIComponent(user.email)}&month=${month}`)
+      .then(r => r.json())
+      .then(d => { if (d.found && d.plan) setPlan(d.plan); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [user?.email]); // eslint-disable-line
+
+  const overlay = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.92)", zIndex: 300, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 16, overflowY: "auto" };
+  const card = { background: C.navyMid, borderRadius: 20, padding: "24px 20px", width: "100%", maxWidth: 480, margin: "20px 0", position: "relative" };
+
+  return (
+    <div style={overlay} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={card}>
+        <button onClick={onClose} style={{ position: "absolute", top: 16, right: 16, background: "none", border: "none", color: C.muted, fontSize: 22, cursor: "pointer" }}>✕</button>
+        <div style={{ color: C.gold, fontWeight: 700, fontSize: 17, marginBottom: 4 }}>💪 {t.gym_plan_title}</div>
+        <div style={{ color: C.muted, fontSize: 12, marginBottom: 20 }}>Tailored to your roster schedule</div>
+
+        {loading && <div style={{ textAlign: "center", padding: "40px 0", color: C.muted }}>Loading your plan…</div>}
+
+        {!loading && !plan && (
+          <div style={{ textAlign: "center", padding: "40px 0" }}>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>⏳</div>
+            <div style={{ color: C.muted, fontSize: 14 }}>Your gym plan is being generated. Check back in a moment.</div>
+          </div>
+        )}
+
+        {plan && (plan.weeks || []).map((week, wi) => (
+          <div key={wi} style={{ marginBottom: 24 }}>
+            <div style={{ color: "#7A8EAA", fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", marginBottom: 10 }}>
+              Week of {new Date(week.weekStart).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+            </div>
+            {(week.days || []).map((day, di) => {
+              const meta = DAY_TYPE_LABELS[day.type] || DAY_TYPE_LABELS.rest;
+              const hasWorkout = day.workout && day.workout.exercises?.length > 0;
+              return (
+                <div key={di} style={{ background: C.navy, borderRadius: 12, padding: "14px", marginBottom: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: hasWorkout ? 12 : 0 }}>
+                    <div>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: C.white }}>
+                        {new Date(day.date).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
+                      </span>
+                      <span style={{ marginLeft: 8, fontSize: 11, color: meta.color, fontWeight: 600 }}>
+                        {meta.emoji} {day.workout?.title || t.gym_plan_rest}
+                      </span>
+                    </div>
+                    {hasWorkout && (
+                      <span style={{ fontSize: 11, color: C.muted }}>{day.workout.duration}</span>
+                    )}
+                  </div>
+
+                  {hasWorkout && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      {(day.workout.exercises || []).map((ex, ei) => {
+                        const thumbUrl = ex.vid ? `https://img.youtube.com/vi/${ex.vid}/mqdefault.jpg` : null;
+                        const watchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(ex.name + " exercise tutorial proper form")}`;
+                        const muscleColor = MUSCLE_COLORS[ex.muscle] || C.gold;
+                        const isActive = activeEx === `${wi}-${di}-${ei}`;
+                        return (
+                          <div key={ei} style={{ width: "calc(50% - 4px)", background: "#0A1628", borderRadius: 10, overflow: "hidden", border: `1px solid ${isActive ? muscleColor : C.navyBorder}`, cursor: "pointer" }}
+                            onClick={() => setActiveEx(isActive ? null : `${wi}-${di}-${ei}`)}>
+                            {thumbUrl && (
+                              <div style={{ position: "relative" }}>
+                                <img src={thumbUrl} alt={ex.name} style={{ width: "100%", display: "block", aspectRatio: "16/9", objectFit: "cover" }}
+                                  onError={e => { e.target.style.display = "none"; }} />
+                                <a href={watchUrl} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
+                                  style={{ position: "absolute", bottom: 6, right: 6, background: "rgba(0,0,0,0.75)", color: "#fff", fontSize: 10, fontWeight: 700, padding: "3px 7px", borderRadius: 4, textDecoration: "none" }}>
+                                  ▶ {t.gym_plan_watch}
+                                </a>
+                              </div>
+                            )}
+                            <div style={{ padding: "8px 10px" }}>
+                              <div style={{ color: C.white, fontSize: 12, fontWeight: 600, marginBottom: 2 }}>{ex.name}</div>
+                              <div style={{ color: C.muted, fontSize: 11 }}>{ex.sets} × {ex.reps}</div>
+                              {isActive && ex.notes && (
+                                <div style={{ color: C.gold, fontSize: 11, marginTop: 4, lineHeight: 1.4 }}>{ex.notes}</div>
+                              )}
+                              <div style={{ marginTop: 4 }}>
+                                <span style={{ fontSize: 10, color: muscleColor, background: `${muscleColor}22`, padding: "2px 6px", borderRadius: 4, fontWeight: 600 }}>{ex.muscle}</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ))}
       </div>
     </div>
   );
