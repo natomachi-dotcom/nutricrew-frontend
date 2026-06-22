@@ -760,7 +760,7 @@ export default function NutriCrew() {
 
   const upd = (k, v) => setPairing(p => ({ ...p, [k]: v }));
 
-  const handleUpgrade = async () => {
+  const handleUpgrade = async (plan = "monthly") => {
     const email = user?.email || pairing?.email;
     if (!email) return;
     storage.set(PENDING_PAIRING_KEY, pairing);
@@ -768,7 +768,7 @@ export default function NutriCrew() {
       const res = await fetch(`${API_BASE}/api/create-checkout-session`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, plan }),
       });
       const data = await res.json();
       if (data.url) window.location.href = data.url;
@@ -2029,10 +2029,11 @@ function NearbyPlaces({ t, pairing, user, isPremium }) {
 // ─── PREMIUM SCREEN ───────────────────────────────────────────────
 function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess, onGenerate, returnScreen }) {
   const [loading, setLoading] = useState(false);
+  const [billing, setBilling] = useState("monthly"); // monthly | annual
 
   const handleClick = async () => {
     setLoading(true);
-    await onUpgrade();
+    await onUpgrade(billing);
     setLoading(false);
   };
 
@@ -2071,8 +2072,37 @@ function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess, onGenerate, retur
           <div key={f} style={styles.premiumFeature}>✓ {f}</div>
         ))}
       </div>
+
+      <div style={{ display: "flex", gap: 8, width: "100%", maxWidth: 320, margin: "8px 0 16px" }}>
+        <button
+          onClick={() => setBilling("monthly")}
+          style={{
+            flex: 1, padding: "10px 12px", borderRadius: 12, cursor: "pointer", textAlign: "center",
+            background: billing === "monthly" ? C.gold : "transparent",
+            color: billing === "monthly" ? C.navy : C.muted,
+            border: `1.5px solid ${billing === "monthly" ? C.gold : C.navyBorder}`,
+            fontWeight: 700, fontSize: 14,
+          }}
+        >
+          Monthly<br/><span style={{fontWeight: 400, fontSize: 12}}>$7.99/mo</span>
+        </button>
+        <button
+          onClick={() => setBilling("annual")}
+          style={{
+            flex: 1, padding: "10px 12px", borderRadius: 12, cursor: "pointer", textAlign: "center", position: "relative",
+            background: billing === "annual" ? C.gold : "transparent",
+            color: billing === "annual" ? C.navy : C.muted,
+            border: `1.5px solid ${billing === "annual" ? C.gold : C.navyBorder}`,
+            fontWeight: 700, fontSize: 14,
+          }}
+        >
+          <span style={{ position: "absolute", top: -10, right: -6, background: C.green, color: "#fff", fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 8 }}>SAVE 35%</span>
+          Annual<br/><span style={{fontWeight: 400, fontSize: 12}}>$62.32/yr</span>
+        </button>
+      </div>
+
       <button style={styles.primaryBtn} onClick={handleClick} disabled={loading}>
-        {loading ? "…" : `${t.upgrade} — $9.99`}
+        {loading ? "…" : billing === "annual" ? `${t.upgrade} — $62.32/year` : `${t.upgrade} — $7.99/month`}
       </button>
       <button style={{...styles.backBtn, flex: "none"}} onClick={onBack}>{t.back}</button>
     </div>
