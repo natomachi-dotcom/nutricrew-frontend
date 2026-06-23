@@ -89,6 +89,7 @@ const T = {
     jetlag_tip_3: "Use caffeine strategically to stay alert during destination daytime — avoid it close to bedtime.",
     jetlag_tip_4: "Short naps (20-30 minutes) can help, but avoid long naps that disrupt nighttime sleep.",
     jetlag_tip_5: "Eat meals aligned with your destination's local time as soon as possible.",
+    jetlag_fab: "Jet Lag",
     premium_title: "Premium Feature",
     premium_msg: "You've used your free pairing. Upgrade to continue.",
     upgrade: "Upgrade to Premium",
@@ -147,6 +148,7 @@ const T = {
     airplane_meal_plan_skip: "Skip — I'll decide on the flight",
     airplane_meal_plan_hint: "Tell us what's on the menu so the AI can plan around it. Optional.",
     roster_btn: "Monthly Roster",
+    roster_fab: "Roster",
     roster_title: "Upload Your Roster",
     roster_hint: "Take 1–2 screenshots of your monthly roster. The AI reads the schedule and generates a meal plan before each pairing automatically.",
     roster_upload_btn: "Choose Photos",
@@ -233,6 +235,7 @@ const T = {
     jetlag_tip_3: "Utilisez la caféine stratégiquement pour rester alerte pendant la journée à destination — évitez-la avant de dormir.",
     jetlag_tip_4: "De courtes siestes (20-30 minutes) peuvent aider, mais évitez les longues siestes qui perturbent le sommeil nocturne.",
     jetlag_tip_5: "Mangez selon l'heure locale de votre destination dès que possible.",
+    jetlag_fab: "Décalage",
     premium_title: "Fonctionnalité Premium",
     premium_msg: "Vous avez utilisé votre pairing gratuit. Passez au Premium.",
     upgrade: "Passer au Premium",
@@ -291,6 +294,7 @@ const T = {
     airplane_meal_plan_skip: "Passer — Je déciderai dans l'avion",
     airplane_meal_plan_hint: "Dites-nous ce qu'il y a au menu pour que l'IA puisse planifier en conséquence. Optionnel.",
     roster_btn: "Planning Mensuel",
+    roster_fab: "Planning",
     roster_title: "Importer Votre Planning",
     roster_hint: "Prenez 1–2 captures d'écran de votre planning mensuel. L'IA lit le programme et génère un plan repas avant chaque pairing automatiquement.",
     roster_upload_btn: "Choisir des Photos",
@@ -377,6 +381,7 @@ const T = {
     jetlag_tip_3: "Usa la cafeína estratégicamente para mantenerte alerta durante el día en tu destino — evítala antes de dormir.",
     jetlag_tip_4: "Las siestas cortas (20-30 minutos) pueden ayudar, pero evita siestas largas que alteren el sueño nocturno.",
     jetlag_tip_5: "Come según la hora local de tu destino lo antes posible.",
+    jetlag_fab: "Jet Lag",
     premium_title: "Función Premium",
     premium_msg: "Usaste tu pairing gratuito. Actualiza para continuar.",
     upgrade: "Actualizar a Premium",
@@ -435,6 +440,7 @@ const T = {
     airplane_meal_plan_skip: "Omitir — Lo decidiré en el vuelo",
     airplane_meal_plan_hint: "Dinos qué hay en el menú para que la IA planifique mejor. Opcional.",
     roster_btn: "Roster Mensual",
+    roster_fab: "Roster",
     roster_title: "Subir Tu Roster",
     roster_hint: "Toma 1–2 capturas de tu roster mensual. La IA lee el horario y genera un plan de comidas antes de cada pairing automáticamente.",
     roster_upload_btn: "Elegir Fotos",
@@ -660,9 +666,18 @@ export default function NutriCrew() {
   const [showSavedMeals, setShowSavedMeals] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [favorites, setFavorites] = useState(() => storage.get(FAVORITES_KEY) || []);
-  const [returningUser] = useState(() => !!(user?.gender && user?.weight && (user?.dob || user?.age) && user?.position));
+  // Reactive, not frozen at mount — a user who completes their profile this
+  // session (first-time signup) must immediately count as returning so the
+  // splash screen's Roster/Gym Plan entry point appears without a reload.
+  const returningUser = !!(user?.gender && user?.weight && (user?.dob || user?.age) && user?.position);
   const [showRoster, setShowRoster] = useState(false);
   const [premiumReturnScreen, setPremiumReturnScreen] = useState("boarding");
+
+  const openRoster = (fromScreen) => {
+    setPremiumReturnScreen(fromScreen);
+    if (!isPremium) { setScreen("premium"); return; }
+    setShowRoster(true);
+  };
 
   // The "your plan is ready" email/push links land here with ?plan=1 — that's
   // an explicit request to see the plan, so it must win even if a previous
@@ -954,12 +969,12 @@ export default function NutriCrew() {
           onViewLastPlan={viewLastPlan}
           onOpenSavedMeals={() => setShowSavedMeals(true)}
           onOpenProfile={() => setShowProfile(true)}
-          onOpenRoster={() => { if (!isPremium) { setPremiumReturnScreen("splash"); setScreen("premium"); return; } setShowRoster(true); }}
+          onOpenRoster={() => openRoster("splash")}
         />
       )}
 
       {showRoster && (
-        <RosterModal t={t} user={user} onClose={() => setShowRoster(false)} onRequirePremium={() => { setShowRoster(false); setPremiumReturnScreen("splash"); setScreen("premium"); }} />
+        <RosterModal t={t} user={user} onClose={() => setShowRoster(false)} onRequirePremium={() => { setShowRoster(false); setScreen("premium"); }} />
       )}
 
       {screen === "checkin" && (
@@ -1009,9 +1024,11 @@ export default function NutriCrew() {
               onClose={() => { setShowCalorie(false); setCalorieResult(null); setCalorieText(""); }}
             />
           )}
+          <span style={styles.floatLabelJetlag}>{t.jetlag_fab}</span>
           <button style={styles.floatBtnJetlag} onClick={() => setShowJetlag(true)} aria-label="jet lag info">
             <JetlagIcon/>
           </button>
+          <span style={styles.floatBtnJetlagBadge} aria-hidden="true">✈️</span>
           {showJetlag && (
             <JetlagModal
               t={t}
@@ -1026,6 +1043,11 @@ export default function NutriCrew() {
           <button style={styles.floatBtnSaved} onClick={() => setShowSavedMeals(true)} aria-label="saved meals">
             <SavedMealsIcon/>
           </button>
+          <span style={styles.floatLabelRoster}>{t.roster_fab}</span>
+          <button style={styles.floatBtnRoster} onClick={() => openRoster("plan")} aria-label="roster upload">
+            📅
+          </button>
+          {!isPremium && <span style={styles.floatBtnRosterCrown} aria-hidden="true">👑</span>}
         </>
       )}
 
@@ -3433,6 +3455,32 @@ const styles = {
     border: `1.5px solid ${C.gold}`, cursor: "pointer",
     display: "flex", alignItems: "center", justifyContent: "center",
     boxShadow: `0 4px 16px ${C.gold}33`, zIndex: 100,
+  },
+  floatBtnRoster: {
+    position: "fixed", bottom: 216, right: 20,
+    width: 52, height: 52, borderRadius: "50%", fontSize: 22,
+    background: `linear-gradient(135deg, ${C.navyCard}, ${C.navyMid})`,
+    border: `1.5px solid ${C.gold}`, cursor: "pointer",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    boxShadow: `0 4px 16px ${C.gold}33`, zIndex: 100,
+  },
+  floatBtnRosterCrown: {
+    position: "fixed", bottom: 258, right: 16, fontSize: 15, zIndex: 101,
+    filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.6))",
+  },
+  floatLabelRoster: {
+    position: "fixed", bottom: 232, right: 78, zIndex: 100,
+    background: C.navyCard, color: C.gold, fontSize: 11, fontWeight: 700,
+    padding: "4px 10px", borderRadius: 12, border: `1px solid ${C.gold}`, whiteSpace: "nowrap",
+  },
+  floatBtnJetlagBadge: {
+    position: "fixed", bottom: 84, right: 16, fontSize: 15, zIndex: 101,
+    filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.6))",
+  },
+  floatLabelJetlag: {
+    position: "fixed", bottom: 104, right: 78, zIndex: 100,
+    background: C.navyCard, color: C.gold, fontSize: 11, fontWeight: 700,
+    padding: "4px 10px", borderRadius: 12, border: `1px solid ${C.gold}`, whiteSpace: "nowrap",
   },
   profileBtn: {
     position: "fixed", top: 16, right: 16,
