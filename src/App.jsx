@@ -164,6 +164,8 @@ const T = {
     roster_done_flow: "24h before → Tap your kitchen → Meal plan arrives",
     roster_done_btn: "Done",
     gym_plan_btn: "View My Gym Plan",
+    gym_plan_fab: "Gym Plan",
+    gym_plan_none_msg: "No gym plan for this month yet. Upload your roster to generate one.",
     gym_plan_title: "Monthly Gym Plan",
     gym_plan_rest: "Rest Day",
     gym_plan_watch: "Watch",
@@ -312,6 +314,8 @@ const T = {
     roster_done_flow: "24h avant → Choisissez votre cuisine → Plan repas prêt",
     roster_done_btn: "Terminé",
     gym_plan_btn: "Voir Mon Plan Gym",
+    gym_plan_fab: "Plan Gym",
+    gym_plan_none_msg: "Pas encore de plan gym ce mois-ci. Importez votre planning pour en générer un.",
     gym_plan_title: "Plan Gym du Mois",
     gym_plan_rest: "Repos",
     gym_plan_watch: "Voir",
@@ -460,6 +464,8 @@ const T = {
     roster_done_flow: "24h antes → Elige tu cocina → Plan de comidas listo",
     roster_done_btn: "Hecho",
     gym_plan_btn: "Ver Mi Plan de Gym",
+    gym_plan_fab: "Plan Gym",
+    gym_plan_none_msg: "Aún no hay plan de gym este mes. Sube tu roster para generar uno.",
     gym_plan_title: "Plan de Gym del Mes",
     gym_plan_rest: "Descanso",
     gym_plan_watch: "Ver",
@@ -685,12 +691,19 @@ export default function NutriCrew() {
   // still answering it, skipping kitchen/diet/goals/budget on a first run.
   const [checkinReturning, setCheckinReturning] = useState(returningUser);
   const [showRoster, setShowRoster] = useState(false);
+  const [showGymPlan, setShowGymPlan] = useState(false);
   const [premiumReturnScreen, setPremiumReturnScreen] = useState("boarding");
 
   const openRoster = (fromScreen) => {
     setPremiumReturnScreen(fromScreen);
     if (!isPremium) { setScreen("premium"); return; }
     setShowRoster(true);
+  };
+
+  const openGymPlan = (fromScreen) => {
+    setPremiumReturnScreen(fromScreen);
+    if (!isPremium) { setScreen("premium"); return; }
+    setShowGymPlan(true);
   };
 
   // The "your plan is ready" email/push links land here with ?plan=1 — that's
@@ -1081,7 +1094,17 @@ export default function NutriCrew() {
             📅
           </button>
           {!isPremium && <span style={styles.floatBtnRosterCrown} aria-hidden="true">👑</span>}
+          <span style={styles.floatLabelGymPlan}>{t.gym_plan_fab}</span>
+          <button style={styles.floatBtnGymPlan} onClick={() => openGymPlan("plan")} aria-label="gym plan">
+            💪
+          </button>
+          {!isPremium && <span style={styles.floatBtnGymPlanCrown} aria-hidden="true">👑</span>}
         </>
+      )}
+
+      {showGymPlan && (
+        <GymPlanModal t={t} user={user} onClose={() => setShowGymPlan(false)}
+          onUploadRoster={() => { setShowGymPlan(false); openRoster("plan"); }} />
       )}
 
       {showAirplaneMeal && (
@@ -2410,7 +2433,7 @@ function RosterModal({ t, user, onClose, onRequirePremium }) {
             </div>
 
             {showGymPlan && (
-              <GymPlanModal t={t} user={user} pairings={pairings} onClose={() => setShowGymPlan(false)} />
+              <GymPlanModal t={t} user={user} month={pairings[0] ? new Date(pairings[0].pairingDate).toISOString().slice(0, 7) : null} onClose={() => setShowGymPlan(false)} />
             )}
           </div>
         )}
@@ -2443,20 +2466,22 @@ const DAY_TYPE_LABELS = {
   rest:     { emoji: "😴",  label: "Rest",           color: "#4ACC8E" },
 };
 
-function GymPlanModal({ t, user, pairings, onClose }) {
+function GymPlanModal({ t, user, month, onClose, onUploadRoster }) {
   const [plan, setPlan] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeEx, setActiveEx] = useState(null);
+  // Defaults to the current calendar month so the plan is reachable directly
+  // (e.g. from a FAB) without re-uploading a roster just to look it up again.
+  const resolvedMonth = month || new Date().toISOString().slice(0, 7);
 
   useEffect(() => {
-    if (!user?.email || !pairings?.length) return;
-    const month = new Date(pairings[0].pairingDate).toISOString().slice(0, 7);
-    fetch(`${API_BASE}/api/gym-plan/get?email=${encodeURIComponent(user.email)}&month=${month}`)
+    if (!user?.email) return;
+    fetch(`${API_BASE}/api/gym-plan/get?email=${encodeURIComponent(user.email)}&month=${resolvedMonth}`)
       .then(r => r.json())
       .then(d => { if (d.found && d.plan) setPlan(d.plan); })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [user?.email]); // eslint-disable-line
+  }, [user?.email, resolvedMonth]);
 
   const overlay = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.92)", zIndex: 300, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 16, overflowY: "auto" };
   const card = { background: C.navyMid, borderRadius: 20, padding: "24px 20px", width: "100%", maxWidth: 480, margin: "20px 0", position: "relative" };
@@ -2472,8 +2497,17 @@ function GymPlanModal({ t, user, pairings, onClose }) {
 
         {!loading && !plan && (
           <div style={{ textAlign: "center", padding: "40px 0" }}>
-            <div style={{ fontSize: 36, marginBottom: 12 }}>⏳</div>
-            <div style={{ color: C.muted, fontSize: 14 }}>Your gym plan is being generated. Check back in a moment.</div>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>{onUploadRoster ? "💪" : "⏳"}</div>
+            <div style={{ color: C.muted, fontSize: 14, marginBottom: onUploadRoster ? 16 : 0 }}>
+              {onUploadRoster
+                ? t.gym_plan_none_msg
+                : "Your gym plan is being generated. Check back in a moment."}
+            </div>
+            {onUploadRoster && (
+              <button onClick={onUploadRoster} style={{ padding: "12px 24px", background: C.gold, color: C.navy, border: "none", borderRadius: 12, fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
+                {t.roster_upload_btn}
+              </button>
+            )}
           </div>
         )}
 
@@ -3624,6 +3658,23 @@ const styles = {
   },
   floatLabelRoster: {
     position: "fixed", bottom: 232, right: 78, zIndex: 100,
+    background: C.navyCard, color: C.gold, fontSize: 11, fontWeight: 700,
+    padding: "4px 10px", borderRadius: 12, border: `1px solid ${C.gold}`, whiteSpace: "nowrap",
+  },
+  floatBtnGymPlan: {
+    position: "fixed", bottom: 280, right: 20,
+    width: 52, height: 52, borderRadius: "50%", fontSize: 22,
+    background: `linear-gradient(135deg, ${C.navyCard}, ${C.navyMid})`,
+    border: `1.5px solid ${C.gold}`, cursor: "pointer",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    boxShadow: `0 4px 16px ${C.gold}33`, zIndex: 100,
+  },
+  floatBtnGymPlanCrown: {
+    position: "fixed", bottom: 322, right: 16, fontSize: 15, zIndex: 101,
+    filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.6))",
+  },
+  floatLabelGymPlan: {
+    position: "fixed", bottom: 296, right: 78, zIndex: 100,
     background: C.navyCard, color: C.gold, fontSize: 11, fontWeight: 700,
     padding: "4px 10px", borderRadius: 12, border: `1px solid ${C.gold}`, whiteSpace: "nowrap",
   },
