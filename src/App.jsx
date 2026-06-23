@@ -632,7 +632,7 @@ export default function NutriCrew() {
     if (params.get("premium") === "true") return "premium";
     if (storage.get(SESSION_KEY)?.token) return "loading";
     if (storage.get(USER_KEY)?.email) return "login"; // returning user, session expired
-    return "checkin"; // first time — go straight to profile creation
+    return "splash"; // first time — show the welcome screen before check-in
   }); // login | otp | loading | splash | checkin | boarding | plan | premium
   const [pendingOtpEmail, setPendingOtpEmail] = useState("");
   const [step, setStep] = useState(0);
@@ -719,7 +719,7 @@ export default function NutriCrew() {
   useEffect(() => {
     const sess = storage.get(SESSION_KEY);
     const hasProfile = !!storage.get(USER_KEY)?.email;
-    if (!sess?.token) { setScreen(s => s === "loading" ? (hasProfile ? "login" : "checkin") : s); return; }
+    if (!sess?.token) { setScreen(s => s === "loading" ? (hasProfile ? "login" : "splash") : s); return; }
     fetch(`${API_BASE}/api/auth/verify-session`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -738,7 +738,7 @@ export default function NutriCrew() {
       })
       .catch(() => {
         storage.set(SESSION_KEY, null);
-        setScreen(storage.get(USER_KEY)?.email ? "login" : "checkin");
+        setScreen(storage.get(USER_KEY)?.email ? "login" : "splash");
       });
   }, []); // eslint-disable-line
 
