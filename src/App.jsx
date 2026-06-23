@@ -1089,6 +1089,14 @@ export default function NutriCrew() {
           <button style={styles.floatBtnSaved} onClick={() => setShowSavedMeals(true)} aria-label="saved meals">
             <SavedMealsIcon/>
           </button>
+        </>
+      )}
+
+      {/* Roster/Gym Plan sit higher in the FAB stack, which collides with
+          the boarding-pass screen's full-width "Generate My Plan" button —
+          only show them once an actual plan is on screen. */}
+      {screen === "plan" && (
+        <>
           <span style={styles.floatLabelRoster}>{t.roster_fab}</span>
           <button style={styles.floatBtnRoster} onClick={() => openRoster("plan")} aria-label="roster upload">
             📅
