@@ -664,6 +664,15 @@ export default function NutriCrew() {
   const [showRoster, setShowRoster] = useState(false);
   const [premiumReturnScreen, setPremiumReturnScreen] = useState("boarding");
 
+  // The "your plan is ready" email/push links land here with ?plan=1 — that's
+  // an explicit request to see the plan, so it must win even if a previous
+  // open already marked the plan viewed (e.g. a push notification got there
+  // first). Without forcePlanOpen, only show it once (normal splash landing).
+  const [forcePlanOpen] = useState(() => new URLSearchParams(window.location.search).get("plan") === "1");
+  useEffect(() => {
+    if (forcePlanOpen) window.history.replaceState({}, "", window.location.pathname);
+  }, [forcePlanOpen]);
+
   // A roster-automation plan was generated with no app session involved, so
   // there's no in-app state pointing at it yet. As soon as routing settles on
   // splash (profile + auth already resolved), jump straight into it — the
@@ -674,7 +683,7 @@ export default function NutriCrew() {
     fetch(`${API_BASE}/api/roster/latest-plan?email=${encodeURIComponent(user.email)}`)
       .then(r => r.json())
       .then(d => {
-        if (!d.found || d.viewedAt) return;
+        if (!d.found || (d.viewedAt && !forcePlanOpen)) return;
         setPlan(d.plan);
         setPairing(prev => ({ ...prev, ...d.pairing }));
         setActiveTab("plan");
@@ -687,7 +696,7 @@ export default function NutriCrew() {
         }).catch(() => {});
       })
       .catch(() => {});
-  }, [screen, user?.email]);
+  }, [screen, user?.email, forcePlanOpen]);
 
   // Register push notifications when user is logged in
   useEffect(() => {
