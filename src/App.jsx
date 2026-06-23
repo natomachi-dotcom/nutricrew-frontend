@@ -569,14 +569,14 @@ const PassportIcon = () => (
 );
 
 const CalorieIcon = () => (
-  <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+  <svg width="28" height="28" viewBox="0 0 22 22" fill="none">
     <path d="M11 2C6.5 2 3 5.5 3 10c0 5 8 12 8 12s8-7 8-12c0-4.5-3.5-8-8-8z" stroke={C.gold} strokeWidth="1.5" fill="none"/>
     <path d="M11 7v4l3 3" stroke={C.gold} strokeWidth="1.5" strokeLinecap="round"/>
   </svg>
 );
 
 const JetlagIcon = () => (
-  <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+  <svg width="28" height="28" viewBox="0 0 22 22" fill="none">
     <circle cx="11" cy="11" r="8" stroke={C.gold} strokeWidth="1.5" fill="none"/>
     <path d="M11 6.5v4.5l3 2" stroke={C.gold} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
     <path d="M11 2v1.5M11 19.5V21M2 11h1.5M18.5 11H20" stroke={C.gold} strokeWidth="1.5" strokeLinecap="round"/>
@@ -586,7 +586,7 @@ const JetlagIcon = () => (
 // Bookmark, not a heart — a heart here would be confused with the per-meal
 // favorite toggle inside each meal card, which is a separate action.
 const SavedMealsIcon = () => (
-  <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+  <svg width="28" height="28" viewBox="0 0 22 22" fill="none">
     <path d="M6 3.5h10a1 1 0 0 1 1 1V19l-6-3.5L5 19V4.5a1 1 0 0 1 1-1z" stroke={C.gold} strokeWidth="1.5" fill="none" strokeLinejoin="round"/>
   </svg>
 );
@@ -618,6 +618,7 @@ const PENDING_PAIRING_KEY = "nutricrew_pending_pairing";
 const FAVORITES_KEY = "nutricrew_favorites";
 const USER_KEY = "nutricrew_user";
 const SESSION_KEY = "nutricrew_session";
+const PASSWORD_PROMPT_DISMISSED_KEY = "nutricrew_password_prompt_dismissed";
 const SAVED_PLANS_KEY = "nutricrew_saved_plans";
 const MAX_SAVED_PLANS = 10;
 
@@ -653,7 +654,7 @@ export default function NutriCrew() {
     if (storage.get(SESSION_KEY)?.token) return "loading";
     if (storage.get(USER_KEY)?.email) return "login"; // returning user, session expired
     return "splash"; // first time — show the welcome screen before check-in
-  }); // login | otp | loading | splash | checkin | boarding | plan | premium
+  }); // login | otp | set-password | loading | splash | checkin | boarding | plan | premium
   const [pendingOtpEmail, setPendingOtpEmail] = useState("");
   const [step, setStep] = useState(0);
   const [pairing, setPairing] = useState(() => {
@@ -972,14 +973,21 @@ export default function NutriCrew() {
 
   const handleLoginSuccess = (sessionData) => {
     storage.set(SESSION_KEY, { token: sessionData.token, email: sessionData.email });
+    const hasPassword = sessionData.hasPassword !== false;
     setUser(prev => {
       const u = prev?.email
-        ? { ...prev, isPremium: !!sessionData.isPremium }
-        : { email: sessionData.email, name: sessionData.name || "", isPremium: !!sessionData.isPremium };
+        ? { ...prev, isPremium: !!sessionData.isPremium, hasPassword }
+        : { email: sessionData.email, name: sessionData.name || "", isPremium: !!sessionData.isPremium, hasPassword };
       storage.set(USER_KEY, u);
       return u;
     });
-    setScreen("splash");
+    // Prompt once to set a password (skippable, and skipping is remembered)
+    // so logging in doesn't always depend on waiting for an email code.
+    if (!hasPassword && !storage.get(PASSWORD_PROMPT_DISMISSED_KEY)) {
+      setScreen("set-password");
+    } else {
+      setScreen("splash");
+    }
   };
 
   // ── RENDER ────────────────────────────────────────────────────
@@ -1002,6 +1010,14 @@ export default function NutriCrew() {
           email={pendingOtpEmail}
           onSuccess={handleLoginSuccess}
           onBack={() => setScreen("login")}
+        />
+      )}
+
+      {screen === "set-password" && (
+        <SetPasswordScreen
+          email={user?.email}
+          onDone={() => { updateProfile({ hasPassword: true }); setScreen("splash"); }}
+          onSkip={() => { storage.set(PASSWORD_PROMPT_DISMISSED_KEY, true); setScreen("splash"); }}
         />
       )}
 
@@ -1163,8 +1179,25 @@ function LoadingScreen() {
 // ─── LOGIN SCREEN ─────────────────────────────────────────────────
 function LoginScreen({ onSent, onSuccess }) {
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
+
+  const sendCode = async (e) => {
+    const res = await fetch(`${API_BASE}/api/auth/send-otp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: e }),
+    });
+    const data = await res.json();
+    if (!res.ok) { setError(data.error || "Failed to sign in. Try again."); return; }
+    if (data.alreadyVerified) {
+      onSuccess(data); // Email already verified — log in immediately, no code needed
+    } else {
+      onSent(e); // First time — go to OTP screen
+    }
+  };
 
   const handleSend = async () => {
     const e = email.trim().toLowerCase();
@@ -1174,19 +1207,26 @@ function LoginScreen({ onSent, onSuccess }) {
     }
     setLoading(true);
     setError("");
+    setInfo("");
     try {
-      const res = await fetch(`${API_BASE}/api/auth/send-otp`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: e }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error || "Failed to sign in. Try again."); return; }
-      if (data.alreadyVerified) {
-        onSuccess(data); // Email already verified — log in immediately, no code needed
-      } else {
-        onSent(e); // First time — go to OTP screen
+      if (password) {
+        const res = await fetch(`${API_BASE}/api/auth/login-password`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: e, password }),
+        });
+        const data = await res.json();
+        if (res.ok) { onSuccess(data); return; }
+        if (data.error === "no_password") {
+          // No password set yet for this account — fall back to the email code silently.
+          setInfo("No password set yet — sending you a one-time code instead.");
+          await sendCode(e);
+          return;
+        }
+        setError(data.error || "Incorrect password.");
+        return;
       }
+      await sendCode(e);
     } catch {
       setError("Network error. Please try again.");
     } finally {
@@ -1204,7 +1244,7 @@ function LoginScreen({ onSent, onSuccess }) {
 
         <div style={{ background: C.card, border: `1px solid ${C.navyBorder}`, borderRadius: 16, padding: "28px 24px" }}>
           <div style={{ fontSize: 18, fontWeight: "bold", color: C.white, marginBottom: 6 }}>Sign in</div>
-          <div style={{ fontSize: 13, color: C.muted, marginBottom: 24 }}>Enter your email to continue. First-time users will receive a one-time verification code.</div>
+          <div style={{ fontSize: 13, color: C.muted, marginBottom: 24 }}>Enter your email and password. No password yet? Leave it blank and we'll email you a one-time code.</div>
 
           <div style={styles.inputWrap}>
             <span style={styles.inputIcon}>✉️</span>
@@ -1220,11 +1260,108 @@ function LoginScreen({ onSent, onSuccess }) {
             />
           </div>
 
+          <div style={{ ...styles.inputWrap, marginTop: 12 }}>
+            <span style={styles.inputIcon}>🔒</span>
+            <input
+              style={styles.input}
+              type="password"
+              placeholder="Password (optional)"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleSend()}
+              autoComplete="current-password"
+            />
+          </div>
+
+          {info && <div style={{ color: C.gold, fontSize: 13, marginTop: 8 }}>{info}</div>}
           {error && <div style={{ color: "#F87171", fontSize: 13, marginTop: 8 }}>{error}</div>}
 
           <button style={{ ...styles.primaryBtn, width: "100%", justifyContent: "center", marginTop: 16 }}
             onClick={handleSend} disabled={loading}>
             {loading ? "Signing in…" : "Continue"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── SET PASSWORD SCREEN ──────────────────────────────────────────
+function SetPasswordScreen({ email, onDone, onSkip }) {
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async () => {
+    if (password.length < 8) { setError("Password must be at least 8 characters."); return; }
+    if (password !== confirm) { setError("Passwords don't match."); return; }
+    setLoading(true);
+    setError("");
+    try {
+      const sess = storage.get(SESSION_KEY);
+      const res = await fetch(`${API_BASE}/api/auth/set-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, token: sess?.token }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || "Failed to set password."); return; }
+      onDone();
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={styles.splash}>
+      <div style={{ ...styles.splashInner, maxWidth: 400 }}>
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
+          <div style={{ fontSize: 28, color: C.gold, letterSpacing: 4, fontWeight: "bold", marginBottom: 6 }}>✈ NUTRICREW</div>
+          <div style={{ fontSize: 13, color: C.muted, letterSpacing: 2 }}>CREW NUTRITION</div>
+        </div>
+
+        <div style={{ background: C.card, border: `1px solid ${C.navyBorder}`, borderRadius: 16, padding: "28px 24px" }}>
+          <div style={{ fontSize: 18, fontWeight: "bold", color: C.white, marginBottom: 6 }}>Set a password</div>
+          <div style={{ fontSize: 13, color: C.muted, marginBottom: 24 }}>Skip the email code next time — add a password to your account now.</div>
+
+          <div style={styles.inputWrap}>
+            <span style={styles.inputIcon}>🔒</span>
+            <input
+              style={styles.input}
+              type="password"
+              placeholder="New password (8+ characters)"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              autoFocus
+              autoComplete="new-password"
+            />
+          </div>
+
+          <div style={{ ...styles.inputWrap, marginTop: 12 }}>
+            <span style={styles.inputIcon}>🔒</span>
+            <input
+              style={styles.input}
+              type="password"
+              placeholder="Confirm password"
+              value={confirm}
+              onChange={e => setConfirm(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleSubmit()}
+              autoComplete="new-password"
+            />
+          </div>
+
+          {error && <div style={{ color: "#F87171", fontSize: 13, marginTop: 8 }}>{error}</div>}
+
+          <button style={{ ...styles.primaryBtn, width: "100%", justifyContent: "center", marginTop: 16 }}
+            onClick={handleSubmit} disabled={loading}>
+            {loading ? "Saving…" : "Set Password"}
+          </button>
+          <button style={{ ...styles.secondaryBtn, width: "100%", justifyContent: "center", marginTop: 10 }}
+            onClick={onSkip} disabled={loading}>
+            Skip for now
           </button>
         </div>
       </div>
@@ -2827,6 +2964,38 @@ function ProfileModal({ t, user, onSave, onClose }) {
   const [goals, setGoals] = useState(user?.goals || []);
   const [budgetType, setBudgetType] = useState(user?.budget_type || "day");
   const [budgetAmount, setBudgetAmount] = useState(user?.budget_amount || "");
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [pwError, setPwError] = useState("");
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwSuccess, setPwSuccess] = useState(false);
+
+  const handleSetPassword = async () => {
+    if (newPassword.length < 8) { setPwError("Password must be at least 8 characters."); return; }
+    if (newPassword !== confirmPassword) { setPwError("Passwords don't match."); return; }
+    setPwSaving(true);
+    setPwError("");
+    try {
+      const sess = storage.get(SESSION_KEY);
+      const res = await fetch(`${API_BASE}/api/auth/set-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: user?.email, password: newPassword, token: sess?.token }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setPwError(data.error || "Failed to set password."); return; }
+      setPwSuccess(true);
+      setNewPassword("");
+      setConfirmPassword("");
+      storage.set(PASSWORD_PROMPT_DISMISSED_KEY, true);
+      onSave({ hasPassword: true });
+    } catch {
+      setPwError("Network error. Please try again.");
+    } finally {
+      setPwSaving(false);
+    }
+  };
 
   const onDietsChange = (v) => {
     let next = v;
@@ -2864,6 +3033,38 @@ function ProfileModal({ t, user, onSave, onClose }) {
           <div style={styles.restrictTitle}>{user?.name}</div>
           <div style={styles.restrictText}>{user?.email}</div>
           <div style={{...styles.restrictText, marginTop: 6, fontSize: 11}}>{t.profile_locked_note}</div>
+        </div>
+
+        <div>
+          <div style={styles.inputLabel}>Password</div>
+          {!showPasswordForm ? (
+            <button style={styles.secondaryBtn} onClick={() => { setShowPasswordForm(true); setPwSuccess(false); }}>
+              {user?.hasPassword ? "Change Password" : "Set a Password"}
+            </button>
+          ) : (
+            <div>
+              <div style={styles.inputWrap}>
+                <span style={styles.inputIcon}>🔒</span>
+                <input style={styles.input} type="password" placeholder="New password (8+ characters)"
+                  value={newPassword} onChange={e => setNewPassword(e.target.value)} autoComplete="new-password"/>
+              </div>
+              <div style={{...styles.inputWrap, marginTop: 10}}>
+                <span style={styles.inputIcon}>🔒</span>
+                <input style={styles.input} type="password" placeholder="Confirm password"
+                  value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} autoComplete="new-password"/>
+              </div>
+              {pwError && <div style={{ color: "#F87171", fontSize: 13, marginTop: 8 }}>{pwError}</div>}
+              {pwSuccess && <div style={{ color: C.gold, fontSize: 13, marginTop: 8 }}>Password saved.</div>}
+              <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+                <button style={{...styles.primaryBtn, flex: 1, justifyContent: "center"}} onClick={handleSetPassword} disabled={pwSaving}>
+                  {pwSaving ? "Saving…" : "Save"}
+                </button>
+                <button style={{...styles.secondaryBtn, flex: 1, justifyContent: "center"}} onClick={() => { setShowPasswordForm(false); setPwError(""); setNewPassword(""); setConfirmPassword(""); }}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         <RadioGroup label={t.step_gender}
@@ -3625,75 +3826,75 @@ const styles = {
   // FLOAT
   floatBtn: {
     position: "fixed", bottom: 24, right: 20,
-    width: 52, height: 52, borderRadius: "50%",
+    width: 58, height: 58, borderRadius: "50%",
     background: `linear-gradient(135deg, ${C.navyCard}, ${C.navyMid})`,
     border: `1.5px solid ${C.gold}`, cursor: "pointer",
     display: "flex", alignItems: "center", justifyContent: "center",
     boxShadow: `0 4px 16px ${C.gold}33`, zIndex: 100,
   },
   floatBtnJetlag: {
-    position: "fixed", bottom: 88, right: 20,
-    width: 52, height: 52, borderRadius: "50%",
+    position: "fixed", bottom: 90, right: 20,
+    width: 58, height: 58, borderRadius: "50%",
     background: `linear-gradient(135deg, ${C.navyCard}, ${C.navyMid})`,
     border: `1.5px solid ${C.gold}`, cursor: "pointer",
     display: "flex", alignItems: "center", justifyContent: "center",
     boxShadow: `0 4px 16px ${C.gold}33`, zIndex: 100,
   },
   floatBtnSaved: {
-    position: "fixed", bottom: 152, right: 20,
-    width: 52, height: 52, borderRadius: "50%",
+    position: "fixed", bottom: 156, right: 20,
+    width: 58, height: 58, borderRadius: "50%",
     background: `linear-gradient(135deg, ${C.navyCard}, ${C.navyMid})`,
     border: `1.5px solid ${C.gold}`, cursor: "pointer",
     display: "flex", alignItems: "center", justifyContent: "center",
     boxShadow: `0 4px 16px ${C.gold}33`, zIndex: 100,
   },
   floatLabelSaved: {
-    position: "fixed", bottom: 168, right: 78, zIndex: 100,
-    background: C.navyCard, color: C.gold, fontSize: 11, fontWeight: 700,
-    padding: "4px 10px", borderRadius: 12, border: `1px solid ${C.gold}`, whiteSpace: "nowrap",
+    position: "fixed", bottom: 176, right: 84, zIndex: 100,
+    background: C.navyCard, color: C.gold, fontSize: 14, fontWeight: 700,
+    padding: "5px 12px", borderRadius: 12, border: `1px solid ${C.gold}`, whiteSpace: "nowrap",
   },
   floatBtnRoster: {
-    position: "fixed", bottom: 216, right: 20,
-    width: 52, height: 52, borderRadius: "50%", fontSize: 22,
+    position: "fixed", bottom: 224, right: 20,
+    width: 58, height: 58, borderRadius: "50%", fontSize: 28,
     background: `linear-gradient(135deg, ${C.navyCard}, ${C.navyMid})`,
     border: `1.5px solid ${C.gold}`, cursor: "pointer",
     display: "flex", alignItems: "center", justifyContent: "center",
     boxShadow: `0 4px 16px ${C.gold}33`, zIndex: 100,
   },
   floatBtnRosterCrown: {
-    position: "fixed", bottom: 258, right: 16, fontSize: 15, zIndex: 101,
+    position: "fixed", bottom: 270, right: 16, fontSize: 18, zIndex: 101,
     filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.6))",
   },
   floatLabelRoster: {
-    position: "fixed", bottom: 232, right: 78, zIndex: 100,
-    background: C.navyCard, color: C.gold, fontSize: 11, fontWeight: 700,
-    padding: "4px 10px", borderRadius: 12, border: `1px solid ${C.gold}`, whiteSpace: "nowrap",
+    position: "fixed", bottom: 244, right: 84, zIndex: 100,
+    background: C.navyCard, color: C.gold, fontSize: 14, fontWeight: 700,
+    padding: "5px 12px", borderRadius: 12, border: `1px solid ${C.gold}`, whiteSpace: "nowrap",
   },
   floatBtnGymPlan: {
-    position: "fixed", bottom: 280, right: 20,
-    width: 52, height: 52, borderRadius: "50%", fontSize: 22,
+    position: "fixed", bottom: 292, right: 20,
+    width: 58, height: 58, borderRadius: "50%", fontSize: 28,
     background: `linear-gradient(135deg, ${C.navyCard}, ${C.navyMid})`,
     border: `1.5px solid ${C.gold}`, cursor: "pointer",
     display: "flex", alignItems: "center", justifyContent: "center",
     boxShadow: `0 4px 16px ${C.gold}33`, zIndex: 100,
   },
   floatBtnGymPlanCrown: {
-    position: "fixed", bottom: 322, right: 16, fontSize: 15, zIndex: 101,
+    position: "fixed", bottom: 338, right: 16, fontSize: 18, zIndex: 101,
     filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.6))",
   },
   floatLabelGymPlan: {
-    position: "fixed", bottom: 296, right: 78, zIndex: 100,
-    background: C.navyCard, color: C.gold, fontSize: 11, fontWeight: 700,
-    padding: "4px 10px", borderRadius: 12, border: `1px solid ${C.gold}`, whiteSpace: "nowrap",
+    position: "fixed", bottom: 312, right: 84, zIndex: 100,
+    background: C.navyCard, color: C.gold, fontSize: 14, fontWeight: 700,
+    padding: "5px 12px", borderRadius: 12, border: `1px solid ${C.gold}`, whiteSpace: "nowrap",
   },
   floatBtnJetlagBadge: {
-    position: "fixed", bottom: 84, right: 16, fontSize: 15, zIndex: 101,
+    position: "fixed", bottom: 86, right: 14, fontSize: 18, zIndex: 101,
     filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.6))",
   },
   floatLabelJetlag: {
-    position: "fixed", bottom: 104, right: 78, zIndex: 100,
-    background: C.navyCard, color: C.gold, fontSize: 11, fontWeight: 700,
-    padding: "4px 10px", borderRadius: 12, border: `1px solid ${C.gold}`, whiteSpace: "nowrap",
+    position: "fixed", bottom: 110, right: 84, zIndex: 100,
+    background: C.navyCard, color: C.gold, fontSize: 14, fontWeight: 700,
+    padding: "5px 12px", borderRadius: 12, border: `1px solid ${C.gold}`, whiteSpace: "nowrap",
   },
   profileBtn: {
     position: "fixed", top: 16, right: 16,
