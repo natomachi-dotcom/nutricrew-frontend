@@ -57,7 +57,8 @@ const T = {
     ground: "Ground Staff", atc: "Air Traffic Control", dispatch: "Dispatcher", other_role: "Other",
     yes: "Yes", no: "No",
     full_kitchen: "Full Kitchen at Home", hotel_no_kitchen: "Hotel (No Kitchen)",
-    microwave: "Microwave Only", airplane_food: "Airplane Meals Provided",
+    microwave: "Microwave Only", fridge: "Fridge, No Stove", airplane_food: "Airplane Meals Provided",
+    step_cooking_pref: "Cooking Preference", cooking_enjoy: "I Enjoy Cooking", cooking_simple: "I Need Simple Recipes",
     no_restrictions: "No Restrictions", vegetarian: "Vegetarian",
     vegan: "Vegan", gluten_free: "Gluten-Free", halal: "Halal",
     kosher: "Kosher", low_carb: "Low-Carb / Keto",
@@ -119,6 +120,7 @@ const T = {
     new_pairing: "New Pairing",
     view_last_plan: "View Last Plan",
     saved_meals_title: "Saved Meals",
+    saved_fab: "Saved",
     saved_meals_empty: "No saved meals yet. Tap the heart on any meal to save it here.",
     welcome_back: "Welcome back",
     profile_title: "Edit Profile",
@@ -203,7 +205,8 @@ const T = {
     ground: "Personnel Au Sol", atc: "Contrôleur Aérien", dispatch: "Répartiteur", other_role: "Autre",
     yes: "Oui", no: "Non",
     full_kitchen: "Cuisine Complète", hotel_no_kitchen: "Hôtel (Sans Cuisine)",
-    microwave: "Micro-ondes Seulement", airplane_food: "Repas Avion Fournis",
+    microwave: "Micro-ondes Seulement", fridge: "Frigo, Sans Cuisinière", airplane_food: "Repas Avion Fournis",
+    step_cooking_pref: "Préférence de Cuisine", cooking_enjoy: "J'aime Cuisiner", cooking_simple: "Je Veux des Recettes Simples",
     no_restrictions: "Sans Restrictions", vegetarian: "Végétarien",
     vegan: "Végétalien", gluten_free: "Sans Gluten", halal: "Halal",
     kosher: "Casher", low_carb: "Faible en Glucides",
@@ -265,6 +268,7 @@ const T = {
     new_pairing: "Nouveau Pairing",
     view_last_plan: "Voir le Dernier Plan",
     saved_meals_title: "Repas Enregistrés",
+    saved_fab: "Sauvés",
     saved_meals_empty: "Aucun repas enregistré. Touchez le cœur sur un repas pour l'enregistrer ici.",
     welcome_back: "Bon retour",
     profile_title: "Modifier le Profil",
@@ -349,7 +353,8 @@ const T = {
     ground: "Personal de Tierra", atc: "Control de Tráfico Aéreo", dispatch: "Despachador", other_role: "Otro",
     yes: "Sí", no: "No",
     full_kitchen: "Cocina Completa en Casa", hotel_no_kitchen: "Hotel (Sin Cocina)",
-    microwave: "Solo Microondas", airplane_food: "Comida de Avión Incluida",
+    microwave: "Solo Microondas", fridge: "Refrigerador, Sin Estufa", airplane_food: "Comida de Avión Incluida",
+    step_cooking_pref: "Preferencia de Cocina", cooking_enjoy: "Me Gusta Cocinar", cooking_simple: "Necesito Recetas Simples",
     no_restrictions: "Sin Restricciones", vegetarian: "Vegetariano",
     vegan: "Vegano", gluten_free: "Sin Gluten", halal: "Halal",
     kosher: "Kosher", low_carb: "Bajo en Carbohidratos",
@@ -411,6 +416,7 @@ const T = {
     new_pairing: "Nuevo Pairing",
     view_last_plan: "Ver Último Plan",
     saved_meals_title: "Comidas Guardadas",
+    saved_fab: "Guardados",
     saved_meals_empty: "Aún no hay comidas guardadas. Toca el corazón en cualquier comida para guardarla aquí.",
     welcome_back: "Bienvenido de vuelta",
     profile_title: "Editar Perfil",
@@ -571,9 +577,11 @@ const JetlagIcon = () => (
   </svg>
 );
 
+// Bookmark, not a heart — a heart here would be confused with the per-meal
+// favorite toggle inside each meal card, which is a separate action.
 const SavedMealsIcon = () => (
   <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-    <path d="M11 19s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 18 9c0 5.6-7 10-7 10z" stroke={C.gold} strokeWidth="1.5" fill="none" strokeLinejoin="round"/>
+    <path d="M6 3.5h10a1 1 0 0 1 1 1V19l-6-3.5L5 19V4.5a1 1 0 0 1 1-1z" stroke={C.gold} strokeWidth="1.5" fill="none" strokeLinejoin="round"/>
   </svg>
 );
 
@@ -670,6 +678,12 @@ export default function NutriCrew() {
   // session (first-time signup) must immediately count as returning so the
   // splash screen's Roster/Gym Plan entry point appears without a reload.
   const returningUser = !!(user?.gender && user?.weight && (user?.dob || user?.age) && user?.position);
+  // Separate from returningUser above: that one is live so the splash screen
+  // updates immediately. This one is a snapshot taken when the checkin flow
+  // starts — without it, finishing the profile questions mid-flow would flip
+  // returningUser to true and yank the step list shorter while the user is
+  // still answering it, skipping kitchen/diet/goals/budget on a first run.
+  const [checkinReturning, setCheckinReturning] = useState(returningUser);
   const [showRoster, setShowRoster] = useState(false);
   const [premiumReturnScreen, setPremiumReturnScreen] = useState("boarding");
 
@@ -790,24 +804,41 @@ export default function NutriCrew() {
   // ── STEP DEFINITIONS (check-in flow) ──────────────────────────
   // If returning user, skip personal steps.
   // Calorie Deficit diet injects an extra step to collect the calorie target.
+  // Profile questions (name through budget) describe the person, not the
+  // trip — answered once, then only editable via the profile icon. Only
+  // pairing_days onward (plus the airplane meal description, which depends
+  // on what catering THIS specific flight has) varies trip to trip.
   const allSteps = [
     "name", "email", "gender", "weight", "dob", "position",
+    "kitchen", "lunch_bag", "cooking_pref", "diet",
+    ...((pairing.diets || user?.diets || []).includes("calorie_deficit") ? ["calorie_target"] : []),
+    "goals", "budget",
     "pairing_days", "departure", "destination", "going_usa",
-    "kitchen",
-    ...((pairing.kitchen || []).includes("airplane_food") ? ["airplane_meal_plan"] : []),
-    "lunch_bag", "diet",
-    ...((pairing.diets || []).includes("calorie_deficit") ? ["calorie_target"] : []),
-    "goals", "budget"
+    ...((pairing.kitchen || user?.kitchen || []).includes("airplane_food") ? ["airplane_meal_plan"] : []),
   ];
-  const personalSteps = ["name","email","gender","weight","dob","position"];
-  const steps = returningUser
+  const personalSteps = ["name","email","gender","weight","dob","position","kitchen","lunch_bag","cooking_pref","diet","calorie_target","goals","budget"];
+  const steps = checkinReturning
     ? allSteps.filter(s => !personalSteps.includes(s))
     : allSteps;
 
   const currentStep = steps[step];
   const totalSteps = steps.length;
 
-  const upd = (k, v) => setPairing(p => ({ ...p, [k]: v }));
+  // Kitchen, lunch_bag, cooking_pref, diets/diet_other, calorie target, goals,
+  // and budget are profile data — mirror them into the user profile as soon
+  // as they're set so they're never re-asked once known. Pairing-specific
+  // fields (departure, destinations, etc.) stay pairing-only.
+  const PROFILE_FIELDS = ["kitchen", "lunch_bag", "cooking_pref", "diets", "diet_other", "calorie_target", "calorie_deficit_amount", "calorie_deficit_preset", "goals", "budget_type", "budget_amount"];
+  const upd = (k, v) => {
+    setPairing(p => ({ ...p, [k]: v }));
+    if (PROFILE_FIELDS.includes(k)) {
+      setUser(prev => {
+        const updated = { ...(prev || {}), [k]: v };
+        storage.set(USER_KEY, updated);
+        return updated;
+      });
+    }
+  };
 
   const handleUpgrade = async (plan = "monthly") => {
     const email = user?.email || pairing?.email;
@@ -912,6 +943,7 @@ export default function NutriCrew() {
     setStep(0);
     setActiveTab("plan");
     setActiveDay(0);
+    setCheckinReturning(returningUser);
     setScreen("checkin");
   };
 
@@ -964,7 +996,7 @@ export default function NutriCrew() {
         <SplashScreen t={t} lang={lang} setLang={setLang}
           returningUser={returningUser} user={user} isPremium={isPremium}
           hasSavedPlan={getSavedPlans().length > 0}
-          onStart={() => setScreen("checkin")}
+          onStart={() => { setCheckinReturning(returningUser); setScreen("checkin"); }}
           onNewPairing={startNewPairing}
           onViewLastPlan={viewLastPlan}
           onOpenSavedMeals={() => setShowSavedMeals(true)}
@@ -1040,6 +1072,7 @@ export default function NutriCrew() {
               onRequirePremium={() => { setShowJetlag(false); setPremiumReturnScreen("plan"); setScreen("premium"); }}
             />
           )}
+          <span style={styles.floatLabelSaved}>{t.saved_fab}</span>
           <button style={styles.floatBtnSaved} onClick={() => setShowSavedMeals(true)} aria-label="saved meals">
             <SavedMealsIcon/>
           </button>
@@ -1525,11 +1558,21 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
           options={[
             {v:"full_kitchen",l:t.full_kitchen,icon:"🏠"},
             {v:"hotel",l:t.hotel_no_kitchen,icon:"🏨"},
+            {v:"fridge",l:t.fridge,icon:"🧊"},
             {v:"microwave",l:t.microwave,icon:"📦"},
             {v:"airplane_food",l:t.airplane_food,icon:"✈️"},
           ]}
           values={pairing.kitchen || []}
           onChange={v => upd("kitchen", v)}/>;
+
+      case "cooking_pref":
+        return <RadioGroup label={t.step_cooking_pref}
+          options={[
+            {v:"enjoys_cooking",l:t.cooking_enjoy,icon:"👨‍🍳"},
+            {v:"simple_recipes",l:t.cooking_simple,icon:"⏱️"},
+          ]}
+          value={pairing.cooking_pref || user?.cooking_pref}
+          onChange={v => upd("cooking_pref", v)}/>;
 
       case "airplane_meal_plan":
         return (
@@ -2734,12 +2777,35 @@ function ProfileModal({ t, user, onSave, onClose }) {
   const [weightVal, setWeightVal] = useState(initialWeight ? String(initialWeight) : "");
   const [weightUnit, setWeightUnit] = useState(initialUnit);
   const [position, setPosition] = useState(user?.position || "");
+  const [kitchen, setKitchen] = useState(user?.kitchen || []);
+  const [lunchBag, setLunchBag] = useState(user?.lunch_bag || "");
+  const [cookingPref, setCookingPref] = useState(user?.cooking_pref || "");
+  const [diets, setDiets] = useState(user?.diets || []);
+  const [dietOther, setDietOther] = useState(user?.diet_other || "");
+  const [goals, setGoals] = useState(user?.goals || []);
+  const [budgetType, setBudgetType] = useState(user?.budget_type || "day");
+  const [budgetAmount, setBudgetAmount] = useState(user?.budget_amount || "");
+
+  const onDietsChange = (v) => {
+    let next = v;
+    if (v.includes("none") && !diets.includes("none")) next = ["none"];
+    else if (diets.includes("none") && v.length > 1) next = v.filter(d => d !== "none");
+    setDiets(next);
+  };
 
   const handleSave = () => {
     onSave({
       gender,
       weight: weightVal ? `${weightVal}${weightUnit}` : user?.weight,
       position,
+      kitchen,
+      lunch_bag: lunchBag,
+      cooking_pref: cookingPref,
+      diets,
+      diet_other: dietOther,
+      goals,
+      budget_type: budgetType,
+      budget_amount: budgetAmount,
     });
     onClose();
   };
@@ -2788,6 +2854,89 @@ function ProfileModal({ t, user, onSave, onClose }) {
           ]}
           value={position}
           onChange={setPosition}/>
+
+        <CheckGroup label={t.step_kitchen}
+          options={[
+            {v:"full_kitchen",l:t.full_kitchen,icon:"🏠"},
+            {v:"hotel",l:t.hotel_no_kitchen,icon:"🏨"},
+            {v:"fridge",l:t.fridge,icon:"🧊"},
+            {v:"microwave",l:t.microwave,icon:"📦"},
+            {v:"airplane_food",l:t.airplane_food,icon:"✈️"},
+          ]}
+          values={kitchen}
+          onChange={setKitchen}/>
+
+        <RadioGroup label={t.step_lunch_bag}
+          options={[
+            {v:"small",  l:t.bag_small,  icon:"👜"},
+            {v:"medium", l:t.bag_medium, icon:"🎒"},
+            {v:"large",  l:t.bag_large,  icon:"🧳"},
+          ]}
+          value={lunchBag}
+          onChange={setLunchBag}/>
+
+        <RadioGroup label={t.step_cooking_pref}
+          options={[
+            {v:"enjoys_cooking",l:t.cooking_enjoy,icon:"👨‍🍳"},
+            {v:"simple_recipes",l:t.cooking_simple,icon:"⏱️"},
+          ]}
+          value={cookingPref}
+          onChange={setCookingPref}/>
+
+        {/* calorie_deficit isn't editable here — it needs the TDEE-based
+            CalorieTargetStep sub-flow, not just a checkbox, to set a target */}
+        <CheckGroup label={t.step_diet}
+          options={[
+            {v:"none",l:t.no_restrictions,icon:"🍽️"},
+            {v:"vegetarian",l:t.vegetarian,icon:"🥗"},
+            {v:"vegan",l:t.vegan,icon:"🌱"},
+            {v:"gluten_free",l:t.gluten_free,icon:"🌾"},
+            {v:"halal",l:t.halal,icon:"☪️"},
+            {v:"kosher",l:t.kosher,icon:"✡️"},
+            {v:"low_carb",l:t.low_carb,icon:"🥑"},
+            {v:"dairy_free",l:t.dairy_free,icon:"🥛"},
+            {v:"mediterranean",l:t.mediterranean,icon:"🫒"},
+            {v:"carnivore",l:t.carnivore,icon:"🥩"},
+            {v:"other",l:t.diet_other,icon:"✏️"},
+          ]}
+          values={diets}
+          onChange={onDietsChange}/>
+        {diets.includes("other") && (
+          <div style={{marginTop:12}}>
+            <TextInput value={dietOther} onChange={setDietOther}
+              placeholder={t.diet_other_placeholder} icon="✏️"/>
+          </div>
+        )}
+
+        <CheckGroup label={t.step_goals}
+          options={[
+            {v:"lose_weight",l:t.lose_weight,icon:"⚖️"},
+            {v:"keep_weight",l:t.keep_weight,icon:"🎯"},
+            {v:"gain_weight",l:t.gain_weight,icon:"📈"},
+            {v:"stay_focused",l:t.stay_focused,icon:"🧠"},
+            {v:"no_bloating",l:t.no_bloating,icon:"💨"},
+            {v:"energy",l:t.energy,icon:"⚡"},
+            {v:"muscle",l:t.muscle,icon:"💪"},
+            {v:"sleep",l:t.sleep,icon:"😴"},
+          ]}
+          values={goals}
+          onChange={setGoals}/>
+
+        <div>
+          <div style={styles.inputLabel}>{t.step_budget}</div>
+          <div style={styles.unitToggle}>
+            {["day","total"].map(u => (
+              <button key={u}
+                style={{...styles.unitBtn, ...(budgetType===u?styles.unitBtnActive:{})}}
+                onClick={() => setBudgetType(u)}>
+                {u === "day" ? t.budget_day : t.budget_total}
+              </button>
+            ))}
+          </div>
+          <TextInput value={budgetAmount} type="number"
+            onChange={setBudgetAmount}
+            placeholder="50" icon="💰"/>
+        </div>
 
         <button style={styles.primaryBtn} onClick={handleSave}>{t.save_profile}</button>
       </div>
@@ -3455,6 +3604,11 @@ const styles = {
     border: `1.5px solid ${C.gold}`, cursor: "pointer",
     display: "flex", alignItems: "center", justifyContent: "center",
     boxShadow: `0 4px 16px ${C.gold}33`, zIndex: 100,
+  },
+  floatLabelSaved: {
+    position: "fixed", bottom: 168, right: 78, zIndex: 100,
+    background: C.navyCard, color: C.gold, fontSize: 11, fontWeight: 700,
+    padding: "4px 10px", borderRadius: 12, border: `1px solid ${C.gold}`, whiteSpace: "nowrap",
   },
   floatBtnRoster: {
     position: "fixed", bottom: 216, right: 20,
