@@ -1474,7 +1474,7 @@ function OTPScreen({ email, onSuccess, onBack }) {
 function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onStart, onNewPairing, onViewLastPlan, onOpenSavedMeals, onOpenProfile, onOpenRoster, isPremium }) {
   return (
     <div style={styles.splash}>
-      {returningUser && user && (
+      {user && (
         <button style={styles.profileBtn} onClick={onOpenProfile} aria-label="profile">
           <ProfileIcon/>
         </button>
