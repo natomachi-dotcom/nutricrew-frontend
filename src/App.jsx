@@ -1706,10 +1706,36 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
       }
 
       case "going_usa":
-        return <RadioGroup label={t.step_usa}
-          options={[{v:"yes",l:t.yes,icon:"🇺🇸"},{v:"no",l:t.no,icon:"🌍"}]}
-          value={pairing.going_usa}
-          onChange={v => upd("going_usa", v)}/>;
+        return (
+          <div>
+            <RadioGroup label={t.step_usa}
+              options={[{v:"yes",l:t.yes,icon:"🇺🇸"},{v:"no",l:t.no,icon:"🌍"}]}
+              value={pairing.going_usa}
+              onChange={v => upd("going_usa", v)}/>
+            {pairing.going_usa === "yes" && (
+              <div style={{...styles.restrictCard, borderColor: "#C9A84C", marginTop: 16}}>
+                <div style={styles.restrictTitle}>🇺🇸 US Customs — Prohibited Foods</div>
+                <div style={{...styles.restrictText, marginBottom: 8}}>These items cannot be brought into the USA (US CBP / USDA). Your meal plan will avoid them automatically.</div>
+                {[
+                  "🍎 Fresh fruits (apples, oranges, mangoes, berries, etc.)",
+                  "🥦 Fresh vegetables (tomatoes, peppers, leafy greens, carrots, etc.)",
+                  "🥩 Raw or undercooked meat, poultry & seafood",
+                  "🥚 Raw eggs or hard-boiled eggs in the shell",
+                  "🥛 Unsealed / unpasteurized fresh dairy (soft cheeses, raw milk)",
+                  "🌿 Fresh herbs with roots or soil attached",
+                ].map((item, i) => (
+                  <div key={i} style={{ display: "flex", gap: 8, marginBottom: 4 }}>
+                    <span style={{ color: "#F87171", fontWeight: 700 }}>✕</span>
+                    <span style={styles.restrictText}>{item}</span>
+                  </div>
+                ))}
+                <div style={{...styles.restrictText, marginTop: 10, color: "#4ADE80"}}>
+                  ✓ Commercially sealed/packaged foods, canned goods, hard cheeses, dried fruits & nuts, and shelf-stable items are allowed.
+                </div>
+              </div>
+            )}
+          </div>
+        );
 
       case "lunch_bag":
         return <RadioGroup label={t.step_lunch_bag}
