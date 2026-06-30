@@ -981,9 +981,7 @@ export default function NutriCrew() {
       storage.set(USER_KEY, u);
       return u;
     });
-    // Prompt once to set a password (skippable, and skipping is remembered)
-    // so logging in doesn't always depend on waiting for an email code.
-    if (!hasPassword && !storage.get(PASSWORD_PROMPT_DISMISSED_KEY)) {
+    if (!hasPassword) {
       setScreen("set-password");
     } else {
       setScreen("splash");
@@ -1017,7 +1015,6 @@ export default function NutriCrew() {
         <SetPasswordScreen
           email={user?.email}
           onDone={() => { updateProfile({ hasPassword: true }); setScreen("splash"); }}
-          onSkip={() => { storage.set(PASSWORD_PROMPT_DISMISSED_KEY, true); setScreen("splash"); }}
         />
       )}
 
@@ -1287,7 +1284,7 @@ function LoginScreen({ onSent, onSuccess }) {
 }
 
 // ─── SET PASSWORD SCREEN ──────────────────────────────────────────
-function SetPasswordScreen({ email, onDone, onSkip }) {
+function SetPasswordScreen({ email, onDone }) {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
@@ -1358,10 +1355,6 @@ function SetPasswordScreen({ email, onDone, onSkip }) {
           <button style={{ ...styles.primaryBtn, width: "100%", justifyContent: "center", marginTop: 16 }}
             onClick={handleSubmit} disabled={loading}>
             {loading ? "Saving…" : "Set Password"}
-          </button>
-          <button style={{ ...styles.secondaryBtn, width: "100%", justifyContent: "center", marginTop: 10 }}
-            onClick={onSkip} disabled={loading}>
-            Skip for now
           </button>
         </div>
       </div>
