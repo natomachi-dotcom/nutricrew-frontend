@@ -1080,6 +1080,7 @@ export default function NutriCrew() {
               result={calorieResult} loading={calorieLoading}
               onEstimate={handleEstimateCalories}
               onClose={() => { setShowCalorie(false); setCalorieResult(null); setCalorieText(""); }}
+              calorieTarget={pairing.calorie_target || user?.calorie_target}
             />
           )}
           <span style={styles.floatLabelJetlag}>{t.jetlag_fab}</span>
@@ -2741,36 +2742,395 @@ function GymPlanModal({ t, user, month, onClose, onUploadRoster }) {
   );
 }
 
+// ─── FOOD DATABASE (local, no API) ───────────────────────────────
+const FOOD_DB = [
+  // CHOCOLATE
+  { name: "Chocolate – Dark (70%+)", calories: 170, unit: "1 oz / 28 g", tags: ["chocolate","dark"] },
+  { name: "Chocolate – Milk", calories: 155, unit: "1 oz / 28 g", tags: ["chocolate","milk chocolate"] },
+  { name: "Chocolate – White", calories: 158, unit: "1 oz / 28 g", tags: ["chocolate","white chocolate"] },
+  { name: "Hot Chocolate", calories: 190, unit: "1 mug / 240 ml", tags: ["chocolate","cocoa","hot choc"] },
+  { name: "Chocolate Chip Cookie", calories: 148, unit: "1 cookie", tags: ["chocolate","cookie","biscuit"] },
+  { name: "Chocolate Muffin", calories: 340, unit: "1 medium muffin", tags: ["chocolate","muffin","cake"] },
+  // COFFEE & TEA
+  { name: "Coffee – Black", calories: 2, unit: "1 cup / 240 ml", tags: ["coffee","black","americano"] },
+  { name: "Coffee – With Milk", calories: 50, unit: "1 cup / 240 ml", tags: ["coffee","milk"] },
+  { name: "Coffee – Latte (whole milk)", calories: 190, unit: "12 oz latte", tags: ["coffee","latte"] },
+  { name: "Coffee – Latte (skim milk)", calories: 100, unit: "12 oz latte", tags: ["coffee","latte","skim"] },
+  { name: "Coffee – Cappuccino", calories: 120, unit: "12 oz", tags: ["coffee","cappuccino"] },
+  { name: "Coffee – Flat White", calories: 150, unit: "12 oz", tags: ["coffee","flat white"] },
+  { name: "Coffee – Espresso", calories: 5, unit: "1 shot / 30 ml", tags: ["coffee","espresso"] },
+  { name: "Coffee – Americano", calories: 10, unit: "12 oz", tags: ["coffee","americano"] },
+  { name: "Coffee – Mocha", calories: 290, unit: "12 oz", tags: ["coffee","mocha"] },
+  { name: "Coffee – Frappuccino", calories: 370, unit: "16 oz (large)", tags: ["coffee","frappuccino","frappe","cold"] },
+  { name: "Coffee – Cold Brew (black)", calories: 5, unit: "12 oz", tags: ["coffee","cold brew"] },
+  { name: "Tea – Black (no milk)", calories: 2, unit: "1 cup / 240 ml", tags: ["tea","black tea"] },
+  { name: "Tea – With Milk", calories: 40, unit: "1 cup / 240 ml", tags: ["tea","milk tea"] },
+  { name: "Tea – Chai Latte", calories: 240, unit: "12 oz", tags: ["tea","chai","latte"] },
+  { name: "Tea – Green", calories: 2, unit: "1 cup / 240 ml", tags: ["tea","green tea"] },
+  // EGGS
+  { name: "Egg – Fried (1)", calories: 90, unit: "1 large egg", tags: ["egg","fried egg"] },
+  { name: "Egg – Boiled (1)", calories: 78, unit: "1 large egg", tags: ["egg","boiled","hard boiled"] },
+  { name: "Egg – Scrambled (2 eggs)", calories: 182, unit: "2 large eggs + butter", tags: ["egg","scrambled"] },
+  { name: "Egg – Poached (1)", calories: 72, unit: "1 large egg", tags: ["egg","poached"] },
+  { name: "Omelette – Plain (2 eggs)", calories: 186, unit: "2-egg omelette", tags: ["egg","omelette","omelet"] },
+  { name: "Omelette – Cheese & Ham", calories: 280, unit: "2-egg omelette + fillings", tags: ["egg","omelette","cheese","ham"] },
+  // CHICKEN
+  { name: "Chicken Breast – Grilled", calories: 165, unit: "100 g", tags: ["chicken","breast","grilled"] },
+  { name: "Chicken Breast – Baked", calories: 158, unit: "100 g", tags: ["chicken","breast","baked"] },
+  { name: "Chicken Thigh – Grilled", calories: 209, unit: "100 g", tags: ["chicken","thigh"] },
+  { name: "Chicken – Fried (1 piece)", calories: 320, unit: "~120 g piece", tags: ["chicken","fried","crispy"] },
+  { name: "Chicken Nuggets (6 pcs)", calories: 280, unit: "6 nuggets", tags: ["chicken","nuggets"] },
+  { name: "Chicken Sandwich", calories: 440, unit: "1 sandwich", tags: ["chicken","sandwich"] },
+  { name: "Chicken Wrap", calories: 380, unit: "1 wrap", tags: ["chicken","wrap"] },
+  // BEEF / STEAK
+  { name: "Beef Steak – Sirloin", calories: 207, unit: "100 g grilled", tags: ["beef","steak","sirloin"] },
+  { name: "Beef Steak – Ribeye", calories: 263, unit: "100 g grilled", tags: ["beef","steak","ribeye"] },
+  { name: "Ground Beef (lean)", calories: 215, unit: "100 g cooked", tags: ["beef","ground","mince","minced"] },
+  { name: "Burger – Beef", calories: 490, unit: "1 quarter-pounder", tags: ["burger","beef","hamburger"] },
+  { name: "Burger – Cheeseburger", calories: 540, unit: "1 burger", tags: ["burger","cheeseburger","beef","cheese"] },
+  { name: "Burger – Chicken", calories: 430, unit: "1 burger", tags: ["burger","chicken"] },
+  { name: "Burger – Veggie", calories: 380, unit: "1 burger", tags: ["burger","veggie","vegetarian"] },
+  // FISH & SEAFOOD
+  { name: "Salmon – Grilled", calories: 206, unit: "100 g", tags: ["salmon","fish","grilled"] },
+  { name: "Salmon – Smoked", calories: 117, unit: "100 g", tags: ["salmon","fish","smoked"] },
+  { name: "Tuna – Canned in Water", calories: 116, unit: "100 g drained", tags: ["tuna","fish","canned"] },
+  { name: "Tuna – Canned in Oil", calories: 198, unit: "100 g drained", tags: ["tuna","fish","canned","oil"] },
+  { name: "Shrimp / Prawns (cooked)", calories: 99, unit: "100 g", tags: ["shrimp","prawn","seafood"] },
+  // GRAINS & LEGUMES
+  { name: "Rice – White (cooked)", calories: 206, unit: "1 cup / 186 g", tags: ["rice","white rice"] },
+  { name: "Rice – Brown (cooked)", calories: 216, unit: "1 cup / 195 g", tags: ["rice","brown rice"] },
+  { name: "Pasta – Plain (cooked)", calories: 220, unit: "1 cup / 140 g", tags: ["pasta","spaghetti","noodle"] },
+  { name: "Pasta – Tomato Sauce", calories: 310, unit: "1 cup pasta + sauce", tags: ["pasta","tomato","marinara"] },
+  { name: "Pasta – Carbonara", calories: 480, unit: "1 serving", tags: ["pasta","carbonara","cream"] },
+  { name: "Quinoa (cooked)", calories: 222, unit: "1 cup / 185 g", tags: ["quinoa","grain"] },
+  { name: "Lentils (cooked)", calories: 230, unit: "1 cup / 198 g", tags: ["lentils","legume","bean"] },
+  { name: "Chickpeas (cooked)", calories: 269, unit: "1 cup / 164 g", tags: ["chickpeas","legume","bean"] },
+  { name: "Oatmeal – Plain", calories: 166, unit: "1 cup cooked", tags: ["oatmeal","oats","porridge"] },
+  { name: "Oatmeal – With Honey & Banana", calories: 280, unit: "1 cup cooked + toppings", tags: ["oatmeal","oats","porridge","honey","banana"] },
+  // BREAD & BAKERY
+  { name: "Bread – White Slice", calories: 79, unit: "1 slice / 30 g", tags: ["bread","white","toast"] },
+  { name: "Bread – Whole Wheat Slice", calories: 69, unit: "1 slice / 28 g", tags: ["bread","whole wheat","wholemeal","toast"] },
+  { name: "Bread – Sourdough Slice", calories: 85, unit: "1 slice / 35 g", tags: ["bread","sourdough","toast"] },
+  { name: "Baguette (portion)", calories: 140, unit: "2 oz / 56 g", tags: ["bread","baguette","french"] },
+  { name: "Dinner Roll", calories: 100, unit: "1 roll / 35 g", tags: ["bread","roll"] },
+  { name: "Bagel – Plain", calories: 245, unit: "1 medium", tags: ["bagel","bread"] },
+  { name: "Bagel – Everything", calories: 260, unit: "1 medium", tags: ["bagel","bread","everything"] },
+  { name: "Croissant – Plain", calories: 272, unit: "1 medium", tags: ["croissant","pastry"] },
+  { name: "Croissant – Butter", calories: 290, unit: "1 medium", tags: ["croissant","pastry","butter"] },
+  { name: "Muffin – Blueberry", calories: 340, unit: "1 medium", tags: ["muffin","blueberry"] },
+  { name: "Muffin – Bran", calories: 305, unit: "1 medium", tags: ["muffin","bran"] },
+  { name: "Pancake (1 plain)", calories: 90, unit: "1 medium / 40 g", tags: ["pancake","breakfast","crepe"] },
+  { name: "Waffle (1)", calories: 218, unit: "1 round / 75 g", tags: ["waffle","breakfast"] },
+  // DAIRY
+  { name: "Milk – Whole", calories: 149, unit: "1 cup / 240 ml", tags: ["milk","whole milk"] },
+  { name: "Milk – 2%", calories: 122, unit: "1 cup / 240 ml", tags: ["milk","2%","semi-skimmed"] },
+  { name: "Milk – Skim / Nonfat", calories: 83, unit: "1 cup / 240 ml", tags: ["milk","skim","nonfat"] },
+  { name: "Milk – Almond", calories: 30, unit: "1 cup / 240 ml", tags: ["milk","almond milk","plant milk"] },
+  { name: "Milk – Oat", calories: 120, unit: "1 cup / 240 ml", tags: ["milk","oat milk"] },
+  { name: "Yogurt – Greek, Plain (full-fat)", calories: 190, unit: "170 g", tags: ["yogurt","greek","plain"] },
+  { name: "Yogurt – Greek, Plain (0% fat)", calories: 100, unit: "170 g", tags: ["yogurt","greek","nonfat"] },
+  { name: "Yogurt – Flavored (fruit)", calories: 170, unit: "170 g", tags: ["yogurt","flavored","fruit"] },
+  { name: "Cheese – Cheddar", calories: 113, unit: "1 oz / 28 g", tags: ["cheese","cheddar"] },
+  { name: "Cheese – Mozzarella", calories: 85, unit: "1 oz / 28 g", tags: ["cheese","mozzarella"] },
+  { name: "Cheese – Feta", calories: 75, unit: "1 oz / 28 g", tags: ["cheese","feta"] },
+  { name: "Cheese – Parmesan", calories: 110, unit: "1 oz / 28 g", tags: ["cheese","parmesan"] },
+  { name: "Butter", calories: 102, unit: "1 tbsp / 14 g", tags: ["butter","dairy"] },
+  // FRUITS
+  { name: "Apple – Small", calories: 77, unit: "1 small / 149 g", tags: ["apple","fruit"] },
+  { name: "Apple – Medium", calories: 95, unit: "1 medium / 182 g", tags: ["apple","fruit"] },
+  { name: "Apple – Large", calories: 116, unit: "1 large / 223 g", tags: ["apple","fruit"] },
+  { name: "Banana – Small", calories: 72, unit: "1 small / 100 g", tags: ["banana","fruit"] },
+  { name: "Banana – Medium", calories: 105, unit: "1 medium / 118 g", tags: ["banana","fruit"] },
+  { name: "Banana – Large", calories: 121, unit: "1 large / 136 g", tags: ["banana","fruit"] },
+  { name: "Orange – Medium", calories: 62, unit: "1 medium / 131 g", tags: ["orange","citrus","fruit"] },
+  { name: "Grapes", calories: 104, unit: "1 cup / 151 g", tags: ["grapes","fruit"] },
+  { name: "Strawberries", calories: 49, unit: "1 cup / 152 g", tags: ["strawberries","berries","fruit"] },
+  { name: "Blueberries", calories: 84, unit: "1 cup / 148 g", tags: ["blueberries","berries","fruit"] },
+  { name: "Mango (cubed)", calories: 99, unit: "1 cup / 165 g", tags: ["mango","fruit"] },
+  { name: "Watermelon", calories: 86, unit: "2 cups / 280 g", tags: ["watermelon","melon","fruit"] },
+  { name: "Avocado – Half", calories: 114, unit: "½ medium avocado", tags: ["avocado","fruit"] },
+  { name: "Avocado – Whole", calories: 227, unit: "1 medium avocado", tags: ["avocado","fruit"] },
+  // VEGETABLES
+  { name: "Broccoli (steamed)", calories: 55, unit: "1 cup / 156 g", tags: ["broccoli","vegetable","veg"] },
+  { name: "Spinach (raw)", calories: 7, unit: "1 cup / 30 g", tags: ["spinach","leafy green","vegetable","veg"] },
+  { name: "Carrots (raw)", calories: 52, unit: "1 medium carrot", tags: ["carrot","carrots","vegetable","veg"] },
+  { name: "Sweet Potato (baked)", calories: 103, unit: "1 medium / 130 g", tags: ["sweet potato","yam","vegetable","veg"] },
+  { name: "Potato – Baked", calories: 161, unit: "1 medium / 173 g", tags: ["potato","baked potato","vegetable"] },
+  { name: "French Fries (medium)", calories: 320, unit: "~117 g serving", tags: ["fries","french fries","chips","potato"] },
+  // SALADS
+  { name: "Salad – Garden (no dressing)", calories: 20, unit: "1 bowl", tags: ["salad","garden","green","greens"] },
+  { name: "Salad – Caesar", calories: 360, unit: "1 entrée bowl", tags: ["salad","caesar"] },
+  { name: "Salad – Greek", calories: 180, unit: "1 bowl", tags: ["salad","greek"] },
+  { name: "Dressing – Vinaigrette", calories: 75, unit: "2 tbsp", tags: ["dressing","vinaigrette","salad"] },
+  { name: "Dressing – Ranch", calories: 130, unit: "2 tbsp", tags: ["dressing","ranch","salad"] },
+  // SANDWICHES & WRAPS
+  { name: "Sandwich – Ham & Cheese", calories: 350, unit: "1 sandwich", tags: ["sandwich","ham","cheese"] },
+  { name: "Sandwich – Turkey", calories: 290, unit: "1 sandwich", tags: ["sandwich","turkey"] },
+  { name: "Sandwich – BLT", calories: 360, unit: "1 sandwich", tags: ["sandwich","blt","bacon"] },
+  { name: "Sandwich – Tuna", calories: 370, unit: "1 sandwich", tags: ["sandwich","tuna","fish"] },
+  { name: "Sandwich – Veggie", calories: 270, unit: "1 sandwich", tags: ["sandwich","veggie","vegetarian"] },
+  // PIZZA
+  { name: "Pizza – Margherita (slice)", calories: 240, unit: "1 slice / ~107 g", tags: ["pizza","margherita","cheese"] },
+  { name: "Pizza – Pepperoni (slice)", calories: 298, unit: "1 slice / ~107 g", tags: ["pizza","pepperoni","meat"] },
+  { name: "Pizza – Veggie (slice)", calories: 215, unit: "1 slice / ~107 g", tags: ["pizza","veggie","vegetarian"] },
+  // SOUPS
+  { name: "Soup – Tomato", calories: 74, unit: "1 cup / 248 g", tags: ["soup","tomato"] },
+  { name: "Soup – Chicken Noodle", calories: 75, unit: "1 cup / 244 g", tags: ["soup","chicken","noodle"] },
+  { name: "Soup – Vegetable", calories: 60, unit: "1 cup", tags: ["soup","vegetable","veg"] },
+  { name: "Soup – Lentil", calories: 139, unit: "1 cup", tags: ["soup","lentil"] },
+  { name: "Soup – Pho", calories: 215, unit: "1 bowl", tags: ["soup","pho","vietnamese","noodle"] },
+  // SNACKS
+  { name: "Hummus", calories: 70, unit: "2 tbsp / 30 g", tags: ["hummus","dip","snack"] },
+  { name: "Crackers – Whole Wheat (5)", calories: 90, unit: "5 crackers / 20 g", tags: ["crackers","whole wheat","snack"] },
+  { name: "Crackers – Regular (5)", calories: 70, unit: "5 crackers", tags: ["crackers","snack"] },
+  { name: "Rice Cake (1)", calories: 35, unit: "1 cake / 9 g", tags: ["rice cake","snack"] },
+  { name: "Chips – Potato", calories: 155, unit: "1 oz / 28 g", tags: ["chips","crisps","potato","snack"] },
+  { name: "Chips – Tortilla / Nachos", calories: 140, unit: "1 oz / 28 g", tags: ["chips","tortilla","nachos","snack"] },
+  { name: "Popcorn (air-popped)", calories: 31, unit: "1 cup / 8 g", tags: ["popcorn","snack"] },
+  { name: "Granola Bar", calories: 190, unit: "1 bar / ~47 g", tags: ["granola","bar","snack"] },
+  { name: "Protein Bar", calories: 220, unit: "1 bar / ~60 g", tags: ["protein","bar","snack"] },
+  // NUTS & SEEDS
+  { name: "Almonds", calories: 164, unit: "1 oz / 28 g (~23 nuts)", tags: ["almonds","nuts","snack"] },
+  { name: "Cashews", calories: 157, unit: "1 oz / 28 g (~18 nuts)", tags: ["cashews","nuts","snack"] },
+  { name: "Peanuts", calories: 161, unit: "1 oz / 28 g", tags: ["peanuts","nuts","snack"] },
+  { name: "Walnuts", calories: 185, unit: "1 oz / 28 g (~14 halves)", tags: ["walnuts","nuts","snack"] },
+  { name: "Mixed Nuts", calories: 173, unit: "1 oz / 28 g", tags: ["mixed nuts","nuts","snack"] },
+  { name: "Peanut Butter", calories: 188, unit: "2 tbsp / 32 g", tags: ["peanut butter","nut butter","snack"] },
+  // SWEETS & DESSERTS
+  { name: "Ice Cream – Vanilla (½ cup)", calories: 137, unit: "½ cup / 66 g", tags: ["ice cream","vanilla","dessert"] },
+  { name: "Ice Cream – Chocolate (½ cup)", calories: 143, unit: "½ cup / 66 g", tags: ["ice cream","chocolate","dessert"] },
+  { name: "Ice Cream – Strawberry (½ cup)", calories: 127, unit: "½ cup / 66 g", tags: ["ice cream","strawberry","dessert"] },
+  { name: "Snickers Bar", calories: 250, unit: "1 bar / 52 g", tags: ["snickers","chocolate","candy","snack"] },
+  { name: "Kit Kat (4 fingers)", calories: 210, unit: "1 pack / 41 g", tags: ["kit kat","kitkat","chocolate","wafer","candy"] },
+  { name: "M&Ms", calories: 240, unit: "1.69 oz bag / 48 g", tags: ["m&ms","candy","chocolate"] },
+  { name: "Donut – Glazed", calories: 269, unit: "1 donut / 60 g", tags: ["donut","doughnut","glazed","sweet"] },
+  { name: "Cookie – Oatmeal Raisin", calories: 133, unit: "1 cookie / 44 g", tags: ["cookie","oatmeal","raisin","biscuit"] },
+  // DRINKS
+  { name: "Orange Juice", calories: 112, unit: "1 cup / 240 ml", tags: ["juice","orange juice","oj","drink"] },
+  { name: "Apple Juice", calories: 114, unit: "1 cup / 240 ml", tags: ["juice","apple juice","drink"] },
+  { name: "Cola / Soda", calories: 140, unit: "12 fl oz / 355 ml can", tags: ["soda","cola","coke","pepsi","fizzy","drink"] },
+  { name: "Diet Cola / Diet Soda", calories: 0, unit: "12 fl oz / 355 ml can", tags: ["diet soda","diet cola","diet coke","zero","drink"] },
+  { name: "Energy Drink – Red Bull", calories: 110, unit: "8.4 fl oz / 250 ml", tags: ["energy drink","red bull","drink"] },
+  { name: "Energy Drink – Monster", calories: 210, unit: "16 fl oz / 473 ml", tags: ["energy drink","monster","drink"] },
+  { name: "Beer – Regular", calories: 154, unit: "12 fl oz / 355 ml", tags: ["beer","lager","ale","alcohol","drink"] },
+  { name: "Beer – Light", calories: 103, unit: "12 fl oz / 355 ml", tags: ["beer","light beer","alcohol","drink"] },
+  { name: "Wine – Red", calories: 125, unit: "5 fl oz / 150 ml glass", tags: ["wine","red wine","alcohol","drink"] },
+  { name: "Wine – White", calories: 121, unit: "5 fl oz / 150 ml glass", tags: ["wine","white wine","alcohol","drink"] },
+  { name: "Smoothie – Fruit", calories: 270, unit: "300 ml", tags: ["smoothie","fruit","drink","shake"] },
+  { name: "Smoothie – Green", calories: 200, unit: "300 ml", tags: ["smoothie","green","spinach","drink","shake"] },
+  { name: "Protein Shake (whey + water)", calories: 130, unit: "1 scoop in 300 ml water", tags: ["protein","shake","whey","drink"] },
+  { name: "Water", calories: 0, unit: "any amount", tags: ["water","drink","mineral water"] },
+  // FAST FOOD & WORLD CUISINE
+  { name: "Subway 6\" Turkey Sub", calories: 280, unit: "6-inch sub", tags: ["subway","turkey","sandwich","fast food"] },
+  { name: "McDonald's Big Mac", calories: 550, unit: "1 burger", tags: ["mcdonalds","big mac","burger","fast food"] },
+  { name: "McDonald's Fries (medium)", calories: 320, unit: "medium portion", tags: ["mcdonalds","fries","chips","fast food"] },
+  { name: "Sushi Roll (6 pieces)", calories: 255, unit: "6-piece roll", tags: ["sushi","roll","japanese","fish"] },
+  { name: "Spring Roll (fried)", calories: 100, unit: "1 roll", tags: ["spring roll","fried","asian"] },
+  { name: "Tacos – Chicken (2)", calories: 360, unit: "2 soft tacos", tags: ["taco","tacos","chicken","mexican"] },
+  { name: "Burrito – Chicken", calories: 490, unit: "1 burrito", tags: ["burrito","chicken","mexican"] },
+  { name: "Pad Thai (takeaway)", calories: 430, unit: "1 serving", tags: ["pad thai","noodle","thai","asian"] },
+];
+
+function loadDailyLog() {
+  try {
+    const saved = localStorage.getItem("nc_daily_cal");
+    if (!saved) return [];
+    const { date, items } = JSON.parse(saved);
+    return date === new Date().toDateString() ? (items || []) : [];
+  } catch { return []; }
+}
+
+function saveDailyLog(items) {
+  try {
+    localStorage.setItem("nc_daily_cal", JSON.stringify({ date: new Date().toDateString(), items }));
+  } catch {}
+}
+
 // ─── CALORIE MODAL ────────────────────────────────────────────────
-function CalorieModal({ t, text, setText, result, loading, onEstimate, onClose }) {
+function CalorieModal({ t, text, setText, result, loading, onEstimate, onClose, calorieTarget }) {
+  const [query, setQuery] = useState("");
+  const [suggestions, setSuggestions] = useState([]);
+  const [dailyLog, setDailyLog] = useState(() => loadDailyLog());
+  const [showAI, setShowAI] = useState(false);
+
+  useEffect(() => {
+    if (query.length < 2) { setSuggestions([]); return; }
+    const q = query.toLowerCase();
+    setSuggestions(
+      FOOD_DB.filter(f => f.name.toLowerCase().includes(q) || f.tags.some(tag => tag.includes(q))).slice(0, 8)
+    );
+  }, [query]);
+
+  const addToLog = (food) => {
+    const next = [...dailyLog, { ...food, id: Date.now() }];
+    setDailyLog(next); saveDailyLog(next);
+    setQuery(""); setSuggestions([]);
+  };
+  const removeFromLog = (id) => {
+    const next = dailyLog.filter(e => e.id !== id);
+    setDailyLog(next); saveDailyLog(next);
+  };
+  const clearLog = () => { setDailyLog([]); saveDailyLog([]); };
+
+  const total = dailyLog.reduce((s, e) => s + e.calories, 0);
+  const pct = calorieTarget ? Math.min(100, Math.round((total / calorieTarget) * 100)) : null;
+  const over = calorieTarget && total > calorieTarget;
+
   return (
     <div style={styles.modalOverlay}>
-      <div style={styles.modal}>
+      <div style={{ ...styles.modal, maxHeight: "88vh", overflowY: "auto", gap: 12 }}>
         <div style={styles.modalHeader}>
           <span style={styles.modalTitle}>{t.calorie_title}</span>
           <button style={styles.closeBtn} onClick={onClose}>✕</button>
         </div>
-        <textarea style={styles.calorieInput} value={text}
-          onChange={e => setText(e.target.value)}
-          placeholder={t.calorie_placeholder} rows={4}/>
-        <button style={styles.primaryBtn} onClick={onEstimate} disabled={loading || !text.trim()}>
-          {loading ? "..." : t.calorie_btn}
-        </button>
-        {result && result.error && (
-          <div style={styles.calorieError}>{t.calorie_error}</div>
-        )}
-        {result && !result.error && (
-          <div style={styles.calorieResult}>
-            <div style={styles.calResultTotal}>≈ {result.total} kcal</div>
-            {result.breakdown?.map((item,i) => (
-              <div key={i} style={styles.calBreakdown}>
-                <span>{item.food}</span>
-                <span style={{color:C.gold}}>{item.calories} kcal</span>
+
+        {/* SEARCH INPUT */}
+        <div style={{ position: "relative" }}>
+          <input
+            type="text"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Search food (e.g. chocolate, egg, coffee)…"
+            style={{
+              width: "100%", boxSizing: "border-box",
+              background: C.navyMid, color: C.white,
+              border: `1px solid ${C.navyBorder}`, borderRadius: 10,
+              padding: "11px 14px", fontSize: 14, fontFamily: "inherit", outline: "none",
+            }}
+          />
+          {suggestions.length > 0 && (
+            <div style={{
+              position: "absolute", top: "calc(100% + 2px)", left: 0, right: 0, zIndex: 200,
+              background: C.navyCard, border: `1px solid ${C.navyBorder}`,
+              borderRadius: 10, overflow: "hidden", boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
+            }}>
+              {suggestions.map(food => (
+                <button key={food.name} onClick={() => addToLog(food)} style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  width: "100%", background: "none", border: "none",
+                  borderBottom: `1px solid ${C.navyBorder}`, color: C.white,
+                  padding: "10px 14px", cursor: "pointer", textAlign: "left", fontSize: 13,
+                }}>
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{food.name}</div>
+                    <div style={{ color: C.muted, fontSize: 11 }}>{food.unit}</div>
+                  </div>
+                  <div style={{ color: C.gold, fontWeight: 700, whiteSpace: "nowrap", marginLeft: 10 }}>
+                    +{food.calories} kcal
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* DAILY LOG */}
+        {dailyLog.length > 0 && (
+          <div style={{ background: C.navyCard, borderRadius: 10, border: `1px solid ${C.navyBorder}`, overflow: "hidden" }}>
+            <div style={{
+              padding: "9px 14px", borderBottom: `1px solid ${C.navyBorder}`,
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+            }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "1px" }}>
+                Today's Intake
+              </span>
+              <button onClick={clearLog} style={{ background: "none", border: "none", color: C.muted, fontSize: 11, cursor: "pointer" }}>
+                Clear all
+              </button>
+            </div>
+            {dailyLog.map(entry => (
+              <div key={entry.id} style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "8px 14px", borderBottom: `1px solid ${C.navyBorder}22`,
+              }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, color: C.white }}>{entry.name}</div>
+                  <div style={{ fontSize: 11, color: C.muted }}>{entry.unit}</div>
+                </div>
+                <span style={{ color: C.gold, fontWeight: 600, fontSize: 13, marginRight: 10 }}>{entry.calories} kcal</span>
+                <button onClick={() => removeFromLog(entry.id)} style={{
+                  background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 18, lineHeight: 1, padding: 0,
+                }}>×</button>
               </div>
             ))}
-            {result.note && <div style={styles.calNote}>{result.note}</div>}
+            <div style={{ padding: "12px 14px" }}>
+              {pct !== null && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: C.muted, marginBottom: 4 }}>
+                    <span>Progress toward daily target</span>
+                    <span style={{ color: over ? C.red : C.green, fontWeight: 700 }}>{pct}%</span>
+                  </div>
+                  <div style={{ height: 6, background: C.navyBorder, borderRadius: 3, overflow: "hidden" }}>
+                    <div style={{
+                      height: "100%", borderRadius: 3, transition: "width 0.3s",
+                      width: `${pct}%`,
+                      background: over ? C.red : pct > 80 ? C.gold : C.green,
+                    }} />
+                  </div>
+                </div>
+              )}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <span style={{ fontSize: 13, color: C.muted }}>Total today</span>
+                <div style={{ textAlign: "right" }}>
+                  <span style={{ fontSize: 26, fontWeight: 800, color: over ? C.red : C.gold }}>{total.toLocaleString()}</span>
+                  <span style={{ fontSize: 13, color: C.muted }}> kcal</span>
+                  {calorieTarget && (
+                    <div style={{ fontSize: 11, color: C.muted }}>of {calorieTarget.toLocaleString()} target</div>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         )}
+
+        {/* AI ESTIMATE (collapsible) */}
+        <button onClick={() => setShowAI(v => !v)} style={{
+          background: "none", border: `1px solid ${C.navyBorder}`, borderRadius: 8,
+          color: C.muted, fontSize: 12, padding: "8px 12px", cursor: "pointer",
+          textAlign: "left", width: "100%", fontFamily: "inherit",
+        }}>
+          {showAI ? "▾" : "▸"} Can't find it? Estimate by description (AI)
+        </button>
+
+        {showAI && (
+          <>
+            <textarea style={styles.calorieInput} value={text}
+              onChange={e => setText(e.target.value)}
+              placeholder={t.calorie_placeholder} rows={3}/>
+            <button style={styles.primaryBtn} onClick={onEstimate} disabled={loading || !text.trim()}>
+              {loading ? "..." : t.calorie_btn}
+            </button>
+            {result && result.error && (
+              <div style={styles.calorieError}>{t.calorie_error}</div>
+            )}
+            {result && !result.error && (
+              <div style={styles.calorieResult}>
+                <div style={styles.calResultTotal}>≈ {result.total} kcal</div>
+                {result.breakdown?.map((item, i) => (
+                  <div key={i} style={styles.calBreakdown}>
+                    <span>{item.food}</span>
+                    <span style={{ color: C.gold }}>{item.calories} kcal</span>
+                  </div>
+                ))}
+                {result.note && <div style={styles.calNote}>{result.note}</div>}
+                {result.total > 0 && (
+                  <button onClick={() => {
+                    const entry = { name: text.slice(0, 60), calories: result.total, unit: "AI estimate", id: Date.now() };
+                    const next = [...dailyLog, entry];
+                    setDailyLog(next); saveDailyLog(next);
+                  }} style={{
+                    marginTop: 10, width: "100%", background: C.navyMid,
+                    border: `1px solid ${C.gold}`, borderRadius: 8, color: C.gold,
+                    padding: "9px", fontSize: 13, cursor: "pointer", fontFamily: "inherit",
+                  }}>
+                    + Add to Today's Intake
+                  </button>
+                )}
+              </div>
+            )}
+          </>
+        )}
+
         <div style={styles.calorieDisclaimer}>{t.calorie_disclaimer}</div>
       </div>
     </div>
