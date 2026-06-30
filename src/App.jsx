@@ -903,16 +903,17 @@ export default function NutriCrew() {
     const email = user?.email || pairing?.email;
     if (!email) return;
     storage.set(PENDING_PAIRING_KEY, pairing);
-    try {
-      const res = await fetch(`${API_BASE}/api/create-checkout-session`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, plan }),
-      });
-      const data = await res.json();
-      if (data.url) window.location.href = data.url;
-    } catch {
+    const res = await fetch(`${API_BASE}/api/create-checkout-session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, plan }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (data.url) {
+      window.location.href = data.url;
+    } else {
       storage.set(PENDING_PAIRING_KEY, null);
+      throw new Error(data.error || "Could not start checkout");
     }
   };
 
@@ -2380,12 +2381,19 @@ function NearbyPlaces({ t, pairing, user, isPremium }) {
 // ─── PREMIUM SCREEN ───────────────────────────────────────────────
 function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess, onGenerate, returnScreen }) {
   const [loading, setLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState(null);
   const [billing, setBilling] = useState("monthly"); // monthly | annual
 
   const handleClick = async () => {
     setLoading(true);
-    await onUpgrade(billing);
-    setLoading(false);
+    setCheckoutError(null);
+    try {
+      await onUpgrade(billing);
+    } catch (err) {
+      setCheckoutError(err.message || "Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (premiumSuccess) {
@@ -2452,6 +2460,11 @@ function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess, onGenerate, retur
         </button>
       </div>
 
+      {checkoutError && (
+        <div style={{ color: "#e55", fontSize: 13, textAlign: "center", marginBottom: 8, maxWidth: 280 }}>
+          {checkoutError}
+        </div>
+      )}
       <button style={styles.primaryBtn} onClick={handleClick} disabled={loading}>
         {loading ? "…" : billing === "annual" ? `${t.upgrade} — $62.32/year` : `${t.upgrade} — $7.99/month`}
       </button>
