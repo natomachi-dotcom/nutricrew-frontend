@@ -1571,6 +1571,18 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
     setLocalVal(pairing[currentStep] ?? user?.[currentStep] ?? "");
   }
 
+  // Auto-initialize defaults so pre-filled/default values work immediately with Continue
+  useEffect(() => {
+    if (currentStep === "weight" && !pairing.weight && !user?.weight) {
+      upd("weight", "70kg");
+      setLocalVal("70");
+    }
+    if (currentStep === "budget") {
+      if (!pairing.budget_type) upd("budget_type", user?.budget_type || "day");
+      if (!pairing.budget_amount && !user?.budget_amount) upd("budget_amount", "50");
+    }
+  }, [currentStep]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const save = (v) => {
     upd(currentStep, v);
     if (["name","email","gender","weight","position","dob"].includes(currentStep)) {
@@ -1581,7 +1593,7 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
   };
 
   const canContinue = () => {
-    if (currentStep === "budget") return !!(pairing.budget_type && pairing.budget_amount);
+    if (currentStep === "budget") return !!((pairing.budget_type || user?.budget_type) && (pairing.budget_amount || user?.budget_amount));
     if (currentStep === "destination") {
       const numDays = pairing.pairing_days || 1;
       const dests = pairing.destinations || [];
@@ -1863,13 +1875,13 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
             <div style={styles.unitToggle}>
               {["day","total"].map(u => (
                 <button key={u}
-                  style={{...styles.unitBtn, ...(pairing.budget_type===u?styles.unitBtnActive:{})}}
+                  style={{...styles.unitBtn, ...((pairing.budget_type || user?.budget_type || "day")===u?styles.unitBtnActive:{})}}
                   onClick={() => upd("budget_type", u)}>
                   {u === "day" ? t.budget_day : t.budget_total}
                 </button>
               ))}
             </div>
-            <TextInput value={pairing.budget_amount || ""} type="number"
+            <TextInput value={pairing.budget_amount || user?.budget_amount || ""} type="number"
               onChange={v => upd("budget_amount", v)}
               placeholder="50" icon="💰"/>
           </div>
@@ -2038,6 +2050,7 @@ function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, 
         <PlaneIcon size={48} color={C.gold}/>
       </div>
       <div style={styles.loadingText}>{t.plan_loading}</div>
+      <div style={{ color: C.muted, fontSize: 13, marginBottom: 8 }}>Usually 15–20 seconds…</div>
       <div style={styles.loadingDots}>
         <div style={styles.dot}/><div style={styles.dot}/><div style={styles.dot}/>
       </div>
@@ -2204,8 +2217,15 @@ function DayPlan({ day, t, favorites, onToggleFavorite, onOpenAirplaneMeal }) {
 }
 
 function GroceryList({ list }) {
-  const [checked, setChecked] = useState({});
-  const toggle = (key) => setChecked(prev => ({ ...prev, [key]: !prev[key] }));
+  const storageKey = "grocery_checked_" + btoa(JSON.stringify(list)).slice(0, 32);
+  const [checked, setChecked] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(storageKey) || "{}"); } catch { return {}; }
+  });
+  const toggle = (key) => setChecked(prev => {
+    const next = { ...prev, [key]: !prev[key] };
+    try { localStorage.setItem(storageKey, JSON.stringify(next)); } catch {}
+    return next;
+  });
   const sections = [
     {key:"produce",label:"🥦 Produce",color:C.green},
     {key:"protein",label:"🥩 Protein",color:C.sky},
@@ -2253,7 +2273,7 @@ function FoodRestrictions({ data, pairing }) {
       )}
       {data.destination && (
         <div style={styles.restrictCard}>
-          <div style={styles.restrictTitle}>🌍 {(pairing.destinations || []).join(", ")} Rules</div>
+          <div style={styles.restrictTitle}>🌍 {[...new Set(pairing.destinations || [])].join(", ")} Rules</div>
           <div style={styles.restrictText}>{data.destination}</div>
         </div>
       )}
