@@ -2173,6 +2173,8 @@ function DayPlan({ day, t, favorites, onToggleFavorite, onOpenAirplaneMeal }) {
 }
 
 function GroceryList({ list }) {
+  const [checked, setChecked] = useState({});
+  const toggle = (key) => setChecked(prev => ({ ...prev, [key]: !prev[key] }));
   const sections = [
     {key:"produce",label:"🥦 Produce",color:C.green},
     {key:"protein",label:"🥩 Protein",color:C.sky},
@@ -2185,12 +2187,24 @@ function GroceryList({ list }) {
       {sections.map(s => list[s.key]?.length > 0 && (
         <div key={s.key} style={styles.grocSection}>
           <div style={{...styles.grocTitle, color: s.color}}>{s.label}</div>
-          {list[s.key].map((item,i) => (
-            <div key={i} style={styles.grocItem}>
-              <div style={styles.checkbox}/>
-              <span style={styles.grocText}>{item}</span>
-            </div>
-          ))}
+          {list[s.key].map((item, i) => {
+            const id = `${s.key}-${i}`;
+            const done = !!checked[id];
+            return (
+              <div key={i} style={styles.grocItem} onClick={() => toggle(id)}>
+                <div style={{
+                  ...styles.checkbox,
+                  background: done ? C.gold : "transparent",
+                  borderColor: done ? C.gold : C.navyBorder,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  cursor: "pointer", flexShrink: 0,
+                }}>
+                  {done && <span style={{ color: C.navy, fontSize: 11, fontWeight: 900, lineHeight: 1 }}>✓</span>}
+                </div>
+                <span style={{ ...styles.grocText, textDecoration: done ? "line-through" : "none", opacity: done ? 0.45 : 1 }}>{item}</span>
+              </div>
+            );
+          })}
         </div>
       ))}
     </div>
