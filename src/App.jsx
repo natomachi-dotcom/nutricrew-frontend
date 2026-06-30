@@ -16,7 +16,7 @@ const C = {
   skyLight:"#7BBFE0",
   green:   "#4CAF7D",
   white:   "#F8FAFF",
-  muted:   "#7A8EAA",
+  muted:   "#B8CCDE",
   red:     "#E05555",
   bg:      "#07101E",
 };
