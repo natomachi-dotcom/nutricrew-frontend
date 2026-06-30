@@ -118,6 +118,7 @@ const T = {
     nearby_open: "Open now",
     nearby_closed: "Closed",
     new_pairing: "New Pairing",
+    try_again: "Try Again",
     view_last_plan: "View Last Plan",
     saved_meals_title: "Saved Meals",
     saved_fab: "Saved",
@@ -278,6 +279,7 @@ const T = {
     nearby_open: "Ouvert maintenant",
     nearby_closed: "Fermé",
     new_pairing: "Nouveau Pairing",
+    try_again: "Réessayer",
     view_last_plan: "Voir le Dernier Plan",
     saved_meals_title: "Repas Enregistrés",
     saved_fab: "Sauvés",
@@ -438,6 +440,7 @@ const T = {
     nearby_open: "Abierto ahora",
     nearby_closed: "Cerrado",
     new_pairing: "Nuevo Pairing",
+    try_again: "Intentar de Nuevo",
     view_last_plan: "Ver Último Plan",
     saved_meals_title: "Comidas Guardadas",
     saved_fab: "Guardados",
@@ -1086,7 +1089,7 @@ export default function NutriCrew() {
           t={t} plan={plan} loading={loading} pairing={pairing}
           user={user} activeTab={activeTab} setActiveTab={setActiveTab}
           activeDay={activeDay} setActiveDay={setActiveDay}
-          onNewPairing={startNewPairing} lang={lang}
+          onNewPairing={startNewPairing} onRetry={handleGenerate} lang={lang}
           favorites={favorites} onToggleFavorite={toggleFavorite}
           onOpenAirplaneMeal={() => setShowAirplaneMeal(true)}
           isPremium={plan?.isPremium ?? false}
@@ -2040,7 +2043,7 @@ function BPField({ label, value, highlight }) {
 }
 
 // ─── PLAN SCREEN ──────────────────────────────────────────────────
-function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, activeDay, setActiveDay, onNewPairing, favorites, onToggleFavorite, onOpenAirplaneMeal, isPremium }) {
+function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, activeDay, setActiveDay, onNewPairing, onRetry, favorites, onToggleFavorite, onOpenAirplaneMeal, isPremium }) {
   const days = pairing.pairing_days || 1;
   const hasJetlag = Math.abs(parseInt(pairing.timezone||0)) >= 4;
 
@@ -2061,7 +2064,11 @@ function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, 
     <div style={styles.loadingScreen}>
       <div style={{fontSize:40}}>⚠️</div>
       <div style={styles.loadingText}>{t.plan_error}</div>
-      <button style={styles.primaryBtn} onClick={onNewPairing}>{t.new_pairing}</button>
+      <div style={{ color: C.muted, fontSize: 13, marginBottom: 20, textAlign: "center", maxWidth: 280 }}>
+        This might be a temporary issue — your pairing data is saved.
+      </div>
+      <button style={styles.primaryBtn} onClick={onRetry}>{t.try_again}</button>
+      <button style={{ ...styles.primaryBtn, background: "transparent", color: C.muted, border: `1px solid ${C.navyBorder}`, marginTop: 10 }} onClick={onNewPairing}>{t.new_pairing}</button>
     </div>
   );
 
@@ -3922,13 +3929,19 @@ function CheckGroup({ label, options, values, onChange }) {
 
 // ─── API CALLS ────────────────────────────────────────────────────
 async function generatePlan(data, lang) {
-  // Calls our own backend (server.js), which builds the prompts, keeps the
-  // Anthropic API key secret, and generates each day in parallel.
-  const res = await fetch(`${API_BASE}/api/generate-plan`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ data, lang })
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 90000); // 90s max
+  let res;
+  try {
+    res = await fetch(`${API_BASE}/api/generate-plan`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data, lang }),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     if (res.status === 403 && body?.error === "premium_required") {
@@ -3936,7 +3949,9 @@ async function generatePlan(data, lang) {
     }
     throw new Error("Failed to generate plan");
   }
-  return await res.json();
+  const result = await res.json().catch(() => { throw new Error("Invalid response from server"); });
+  if (!result || !result.days) throw new Error("Incomplete plan response");
+  return result;
 }
 
 async function estimateCalories(description, lang) {
