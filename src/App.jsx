@@ -872,10 +872,10 @@ export default function NutriCrew() {
   const totalSteps = steps.length;
 
   // Kitchen, lunch_bag, cooking_pref, diets/diet_other, calorie target, goals,
-  // and budget are profile data — mirror them into the user profile as soon
-  // as they're set so they're never re-asked once known. Pairing-specific
-  // fields (departure, destinations, etc.) stay pairing-only.
-  const PROFILE_FIELDS = ["kitchen", "lunch_bag", "cooking_pref", "diets", "diet_other", "calorie_target", "calorie_deficit_amount", "calorie_deficit_preset", "goals", "budget_type", "budget_amount"];
+  // budget, and departure are profile data — mirror them into the user profile
+  // so they're never re-asked. departure is a home-airport — crews almost
+  // always depart from the same airport every pairing.
+  const PROFILE_FIELDS = ["kitchen", "lunch_bag", "cooking_pref", "diets", "diet_other", "calorie_target", "calorie_deficit_amount", "calorie_deficit_preset", "goals", "budget_type", "budget_amount", "departure"];
   const upd = (k, v) => {
     setPairing(p => ({ ...p, [k]: v }));
     if (PROFILE_FIELDS.includes(k)) {
@@ -1584,6 +1584,10 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
       if (!pairing.budget_type) upd("budget_type", user?.budget_type || "day");
       if (!pairing.budget_amount && !user?.budget_amount) upd("budget_amount", "50");
     }
+    if (currentStep === "departure" && !pairing.departure && user?.departure) {
+      upd("departure", user.departure);
+      setLocalVal(user.departure);
+    }
   }, [currentStep]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = (v) => {
@@ -1597,10 +1601,13 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
 
   const canContinue = () => {
     if (currentStep === "budget") return !!((pairing.budget_type || user?.budget_type) && (pairing.budget_amount || user?.budget_amount));
+    // departure: check localVal (the displayed value) directly — avoids any
+    // timing gap between onChange writing to pairing state and canContinue reading it.
+    if (currentStep === "departure") return !!(localVal.trim() || pairing.departure?.trim() || user?.departure?.trim());
     if (currentStep === "destination") {
       const numDays = pairing.pairing_days || 1;
       const dests = pairing.destinations || [];
-      return dests.length >= numDays && dests.slice(0, numDays).every(d => d?.trim());
+      return dests.length >= numDays && dests.slice(0, numDays).every(d => d && d.trim());
     }
     if (currentStep === "diet") {
       if (!pairing.diets || pairing.diets.length === 0) return false;
@@ -1705,7 +1712,7 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
         return <TextInput label={t.step_route + " — " + "Departure"} value={localVal}
           onChange={v => {
             setLocalVal(v);
-            upd("departure", v);
+            save(v);
             upd("timezone", computeTimezoneDiff(v, pairing.destinations) ?? 0);
           }}
           placeholder="Montreal (YUL)" icon="🛫"/>;
