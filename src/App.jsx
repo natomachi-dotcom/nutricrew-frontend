@@ -684,7 +684,12 @@ export default function NutriCrew() {
   const [screen, setScreen] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("premium") === "true") return "premium";
-    if (storage.get(SESSION_KEY)?.token) return "loading";
+    if (storage.get(SESSION_KEY)?.token) {
+      // If we already have a cached user profile, skip the loading spinner and
+      // render immediately — verify-session will update isPremium in background.
+      if (storage.get(USER_KEY)?.email) return "splash";
+      return "loading";
+    }
     if (storage.get(USER_KEY)?.email) return "login"; // returning user, session expired
     return "splash"; // first time — show the welcome screen before check-in
   }); // login | otp | set-password | loading | splash | checkin | boarding | plan | premium
@@ -810,20 +815,27 @@ export default function NutriCrew() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token: sess.token }),
     })
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then(data => {
-        setUser(prev => {
-          const u = prev?.email
-            ? { ...prev, isPremium: !!data.isPremium }
-            : { email: data.email, name: data.name || "", isPremium: !!data.isPremium };
-          storage.set(USER_KEY, u);
-          return u;
-        });
-        setScreen(s => s === "loading" ? "splash" : s);
+      .then(async r => {
+        if (r.ok) {
+          const data = await r.json();
+          setUser(prev => {
+            const u = prev?.email
+              ? { ...prev, isPremium: !!data.isPremium }
+              : { email: data.email, name: data.name || "", isPremium: !!data.isPremium };
+            storage.set(USER_KEY, u);
+            return u;
+          });
+          setScreen(s => s === "loading" ? "splash" : s);
+        } else {
+          // Auth failure (401/403) — session is genuinely invalid; redirect to login.
+          storage.set(SESSION_KEY, null);
+          setScreen(storage.get(USER_KEY)?.email ? "login" : "splash");
+        }
       })
       .catch(() => {
-        storage.set(SESSION_KEY, null);
-        setScreen(storage.get(USER_KEY)?.email ? "login" : "splash");
+        // Network error or Render cold-start timeout — don't boot the user.
+        // If they were on "loading", fall back to splash/login from localStorage.
+        setScreen(s => s === "loading" ? (storage.get(USER_KEY)?.email ? "login" : "splash") : s);
       });
   }, []); // eslint-disable-line
 
