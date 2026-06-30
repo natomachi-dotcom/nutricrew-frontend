@@ -184,6 +184,21 @@ const T = {
     roster_depart_label: "Departure Date (YYYY-MM-DD)",
     roster_return_label: "Return Date (YYYY-MM-DD)",
     roster_confirm_all: "All Correct — Schedule Plans",
+    step_duty: "Your Duty Schedule",
+    duty_report: "Report Time",
+    duty_length: "Duty Length",
+    duty_layover: "Layover Type",
+    layover_short: "Short  ≤8h",
+    layover_standard: "Standard 8–24h",
+    layover_long: "Long  24h+",
+    duty_direction: "Flight Direction",
+    dir_east: "Eastward",
+    dir_west: "Westward",
+    dir_ns: "North/South",
+    duty_skip: "Skip — standard pairing",
+    tab_performance: "Performance",
+    perf_advisory_title: "Duty Performance Advisory",
+    perf_badge: "🧠 Cognitive Mode",
   },
   fr: {
     tagline: "Alimentez Votre Vol",
@@ -345,6 +360,21 @@ const T = {
     roster_depart_label: "Date Départ (AAAA-MM-JJ)",
     roster_return_label: "Date Retour (AAAA-MM-JJ)",
     roster_confirm_all: "Tout Correct — Planifier",
+    step_duty: "Votre Planning Service",
+    duty_report: "Heure de Présentation",
+    duty_length: "Durée de Service",
+    duty_layover: "Type d'Escale",
+    layover_short: "Court  ≤8h",
+    layover_standard: "Standard 8–24h",
+    layover_long: "Long  24h+",
+    duty_direction: "Direction du Vol",
+    dir_east: "Vers l'Est",
+    dir_west: "Vers l'Ouest",
+    dir_ns: "Nord/Sud",
+    duty_skip: "Ignorer — pairing standard",
+    tab_performance: "Performance",
+    perf_advisory_title: "Avis Performance de Service",
+    perf_badge: "🧠 Mode Cognitif",
   },
   es: {
     tagline: "Combustible Para Tu Vuelo",
@@ -506,6 +536,21 @@ const T = {
     roster_depart_label: "Fecha Salida (AAAA-MM-DD)",
     roster_return_label: "Fecha Regreso (AAAA-MM-DD)",
     roster_confirm_all: "Todo Correcto — Programar",
+    step_duty: "Tu Horario de Servicio",
+    duty_report: "Hora de Presentación",
+    duty_length: "Duración de Servicio",
+    duty_layover: "Tipo de Escala",
+    layover_short: "Corta  ≤8h",
+    layover_standard: "Estándar 8–24h",
+    layover_long: "Larga  24h+",
+    duty_direction: "Dirección del Vuelo",
+    dir_east: "Hacia el Este",
+    dir_west: "Hacia el Oeste",
+    dir_ns: "Norte/Sur",
+    duty_skip: "Omitir — pairing estándar",
+    tab_performance: "Rendimiento",
+    perf_advisory_title: "Aviso de Rendimiento de Servicio",
+    perf_badge: "🧠 Modo Cognitivo",
   }
 };
 
@@ -872,7 +917,7 @@ export default function NutriCrew() {
     "kitchen", "lunch_bag", "cooking_pref", "diet",
     ...((pairing.diets || user?.diets || []).includes("calorie_deficit") ? ["calorie_target"] : []),
     "goals", "budget",
-    "pairing_days", "departure", "destination", "going_usa",
+    "pairing_days", "departure", "destination", "going_usa", "duty_schedule",
     ...((pairing.kitchen || user?.kitchen || []).includes("airplane_food") ? ["airplane_meal_plan"] : []),
   ];
   const personalSteps = ["name","email","gender","weight","dob","position","kitchen","lunch_bag","cooking_pref","diet","calorie_target","goals","budget"];
@@ -1614,6 +1659,7 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
 
   const canContinue = () => {
     if (currentStep === "budget") return !!((pairing.budget_type || user?.budget_type) && (pairing.budget_amount || user?.budget_amount));
+    if (currentStep === "duty_schedule") return true; // all fields optional
     // departure: check localVal (the displayed value) directly — avoids any
     // timing gap between onChange writing to pairing state and canContinue reading it.
     if (currentStep === "departure") return !!(localVal.trim() || pairing.departure?.trim() || user?.departure?.trim());
@@ -1769,6 +1815,9 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
           options={[{v:"yes",l:t.yes,icon:"🇺🇸"},{v:"no",l:t.no,icon:"🌍"}]}
           value={pairing.going_usa}
           onChange={v => upd("going_usa", v)}/>;
+
+      case "duty_schedule":
+        return <DutyScheduleStep t={t} pairing={pairing} upd={upd} />;
 
       case "lunch_bag":
         return <RadioGroup label={t.step_lunch_bag}
@@ -2125,15 +2174,24 @@ function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, 
         </div>
       )}
 
+      {/* Cognitive performance badge */}
+      {plan.performanceAdvisory && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#0F2040", border: `1px solid ${C.sky}`, borderRadius: 10, padding: "8px 14px", marginBottom: 12 }}>
+          <span style={{ fontSize: 16 }}>🧠</span>
+          <span style={{ color: C.sky, fontWeight: 700, fontSize: 13 }}>{t.perf_badge}</span>
+          <span style={{ color: C.muted, fontSize: 11 }}>Meals timed to your duty schedule</span>
+        </div>
+      )}
+
       {/* Tabs */}
       <div style={styles.tabBar}>
-        {["plan","grocery","restrictions","nearby"].map(tab => (
+        {["plan","grocery","restrictions","nearby",...(plan.performanceAdvisory ? ["performance"] : [])].map(tab => (
           <button key={tab}
             style={{...styles.tab, ...(activeTab===tab?styles.tabActive:{})}}
             onClick={() => setActiveTab(tab)}>
-            {tab === "plan" ? "🍽️" : tab === "grocery" ? "🛒" : tab === "restrictions" ? "🚫" : "📍"}
+            {tab === "plan" ? "🍽️" : tab === "grocery" ? "🛒" : tab === "restrictions" ? "🚫" : tab === "performance" ? "⚡" : "📍"}
             <span style={styles.tabLabel}>
-              {tab === "plan" ? t.tab_plan : tab === "grocery" ? t.tab_grocery : tab === "restrictions" ? t.tab_restrictions : t.tab_nearby}
+              {tab === "plan" ? t.tab_plan : tab === "grocery" ? t.tab_grocery : tab === "restrictions" ? t.tab_restrictions : tab === "performance" ? t.tab_performance : t.tab_nearby}
             </span>
             {tab === "nearby" && !isPremium && <span style={styles.premiumLockBadge}>👑</span>}
           </button>
@@ -2165,6 +2223,24 @@ function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, 
         )}
         {activeTab === "nearby" && (
           <NearbyPlaces t={t} pairing={pairing} user={user} isPremium={isPremium}/>
+        )}
+        {activeTab === "performance" && plan.performanceAdvisory && (
+          <div style={{ padding: "4px 0" }}>
+            <div style={{ fontWeight: 700, fontSize: 15, color: C.sky, marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
+              <span>⚡</span>{t.perf_advisory_title}
+            </div>
+            {plan.performanceAdvisory.replace(/^COGNITIVE PERFORMANCE PROTOCOL[^\n]*\n/, "").split("\n\n").map((block, i) => (
+              <div key={i} style={{ background: C.navyCard, borderRadius: 12, padding: "14px 16px", marginBottom: 12, border: `1px solid ${C.navyBorder}` }}>
+                <div style={{ color: C.white, fontSize: 13, lineHeight: 1.6 }}>
+                  {block.split("\n").map((line, j) => (
+                    <div key={j} style={{ marginBottom: line.startsWith("-") ? 4 : 0, color: j === 0 ? C.gold : C.muted }}>
+                      {line}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>
@@ -3767,6 +3843,64 @@ function ProfileModal({ t, user, onSave, onClose }) {
         </div>
 
         <button style={styles.primaryBtn} onClick={handleSave}>{t.save_profile}</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── DUTY SCHEDULE STEP ───────────────────────────────────────────
+function DutyScheduleStep({ t, pairing, upd }) {
+  const btnBase = { padding: "9px 14px", borderRadius: 10, cursor: "pointer", fontSize: 13, fontWeight: 600, border: `1.5px solid ${C.navyBorder}`, background: "transparent", color: C.muted };
+  const btnActive = { ...btnBase, background: C.gold, color: C.navy, border: `1.5px solid ${C.gold}` };
+
+  const HOURS = Array.from({ length: 11 }, (_, i) => String(i + 6));
+  const TIMES = [];
+  for (let h = 0; h < 24; h++) {
+    TIMES.push(`${String(h).padStart(2,"0")}:00`);
+    TIMES.push(`${String(h).padStart(2,"0")}:30`);
+  }
+
+  return (
+    <div>
+      <div style={styles.inputLabel}>{t.step_duty}</div>
+      <div style={{ color: C.muted, fontSize: 12, marginBottom: 16 }}>Optional — helps us time meals around your duty window.</div>
+
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ ...styles.hint, marginBottom: 6 }}>{t.duty_report}</div>
+        <select value={pairing.report_time || ""} onChange={e => upd("report_time", e.target.value)}
+          style={{ width: "100%", padding: "10px 12px", borderRadius: 10, background: C.navyCard, color: pairing.report_time ? C.white : C.muted, border: `1.5px solid ${C.navyBorder}`, fontSize: 14 }}>
+          <option value="">— Select time —</option>
+          {TIMES.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ ...styles.hint, marginBottom: 6 }}>{t.duty_length}</div>
+        <select value={pairing.duty_hours || ""} onChange={e => upd("duty_hours", e.target.value)}
+          style={{ width: "100%", padding: "10px 12px", borderRadius: 10, background: C.navyCard, color: pairing.duty_hours ? C.white : C.muted, border: `1.5px solid ${C.navyBorder}`, fontSize: 14 }}>
+          <option value="">— Select hours —</option>
+          {HOURS.map(h => <option key={h} value={h}>{h}h</option>)}
+        </select>
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ ...styles.hint, marginBottom: 6 }}>{t.duty_layover}</div>
+        <div style={{ display: "flex", gap: 8 }}>
+          {[["short", t.layover_short], ["standard", t.layover_standard], ["long", t.layover_long]].map(([v, l]) => (
+            <button key={v} style={pairing.layover_type === v ? btnActive : btnBase}
+              onClick={() => upd("layover_type", v)}>{l}</button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ ...styles.hint, marginBottom: 6 }}>{t.duty_direction}</div>
+        <div style={{ display: "flex", gap: 8 }}>
+          {[["east", t.dir_east, "→"], ["west", t.dir_west, "←"], ["ns", t.dir_ns, "↕"]].map(([v, l, ic]) => (
+            <button key={v} style={pairing.flight_direction === v ? btnActive : btnBase}
+              onClick={() => upd("flight_direction", v)}>{ic} {l}</button>
+          ))}
+        </div>
       </div>
     </div>
   );
