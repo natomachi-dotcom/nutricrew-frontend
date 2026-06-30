@@ -1128,6 +1128,7 @@ export default function NutriCrew() {
 
       {screen === "checkin" && (
         <CheckInScreen
+          key={currentStep}
           t={t} lang={lang} step={step} totalSteps={totalSteps}
           currentStep={currentStep} pairing={pairing} user={user}
           upd={upd} onContinue={handleContinue} onBack={handleBack}
@@ -1622,15 +1623,11 @@ function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onS
 
 // ─── CHECK-IN SCREEN ──────────────────────────────────────────────
 function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, upd, onContinue, onBack, setUser }) {
+  // key={currentStep} on this component (set in parent) guarantees a fresh mount
+  // on every step — no stale localVal between steps.
   const [localVal, setLocalVal] = useState(() => pairing[currentStep] ?? user?.[currentStep] ?? "");
   const [weightUnit, setWeightUnit] = useState("kg");
-  const [prevStep, setPrevStep] = useState(currentStep);
   const [docNumber] = useState(() => Date.now().toString());
-
-  if (currentStep !== prevStep) {
-    setPrevStep(currentStep);
-    setLocalVal(pairing[currentStep] ?? user?.[currentStep] ?? "");
-  }
 
   // Auto-initialize defaults so pre-filled/default values work immediately with Continue
   useEffect(() => {
@@ -1659,10 +1656,11 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
 
   const canContinue = () => {
     if (currentStep === "budget") return !!((pairing.budget_type || user?.budget_type) && (pairing.budget_amount || user?.budget_amount));
-    if (currentStep === "duty_schedule") return true; // all fields optional
-    // departure: check localVal (the displayed value) directly — avoids any
-    // timing gap between onChange writing to pairing state and canContinue reading it.
-    if (currentStep === "departure") return !!(localVal.trim() || pairing.departure?.trim() || user?.departure?.trim());
+    if (currentStep === "duty_schedule") return true;
+    // departure is optional — placeholder looks identical to a real value and crews
+    // can proceed without it (AI gets "unknown departure" context). They can fill it
+    // freely; it's saved to profile on type so it auto-fills on every future pairing.
+    if (currentStep === "departure") return true;
     if (currentStep === "destination") {
       const numDays = pairing.pairing_days || 1;
       const dests = pairing.destinations || [];
@@ -2075,6 +2073,9 @@ function BoardingPassScreen({ t, user, pairing, onGenerate, onBack, isPremiumNee
           )}
           {pairing.going_usa === "yes" && (
             <BPField label="USA RULES" value="⚠️ FOOD RESTRICTIONS" highlight/>
+          )}
+          {pairing.report_time && (
+            <BPField label="🧠 COGNITIVE MODE" value="DUTY OPTIMIZED" highlight/>
           )}
         </div>
 
@@ -2502,6 +2503,7 @@ function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess, onGenerate, retur
           "📅 Roster upload & auto plan delivery",
           "🔥 Calorie deficit plans",
           "🌍 Jetlag meal-timing plan",
+          "🧠 Cognitive Performance meal timing",
           "📍 Nearby stores & restaurants",
         ].map(f => (
           <div key={f} style={styles.premiumFeature}>✓ {f}</div>
