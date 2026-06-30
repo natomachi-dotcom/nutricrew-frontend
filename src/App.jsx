@@ -173,6 +173,16 @@ const T = {
     roster_error: "Could not read the roster. Please try a clearer photo.",
     roster_home_base: "Your Home Base City",
     roster_home_base_placeholder: "e.g. Miami, London, Paris…",
+    roster_edit: "Edit",
+    roster_delete: "Remove",
+    roster_save_edit: "Save",
+    roster_cancel_edit: "Cancel",
+    roster_add_pairing: "+ Add Pairing",
+    roster_going_usa: "Going to USA?",
+    roster_dest_label: "Destinations (comma-separated)",
+    roster_depart_label: "Departure Date (YYYY-MM-DD)",
+    roster_return_label: "Return Date (YYYY-MM-DD)",
+    roster_confirm_all: "All Correct — Schedule Plans",
   },
   fr: {
     tagline: "Alimentez Votre Vol",
@@ -323,6 +333,16 @@ const T = {
     roster_error: "Impossible de lire le planning. Essayez une photo plus nette.",
     roster_home_base: "Ville de Base",
     roster_home_base_placeholder: "ex. Miami, Londres, Paris…",
+    roster_edit: "Modifier",
+    roster_delete: "Supprimer",
+    roster_save_edit: "Enregistrer",
+    roster_cancel_edit: "Annuler",
+    roster_add_pairing: "+ Ajouter Pairing",
+    roster_going_usa: "Vers les États-Unis?",
+    roster_dest_label: "Destinations (séparées par virgule)",
+    roster_depart_label: "Date Départ (AAAA-MM-JJ)",
+    roster_return_label: "Date Retour (AAAA-MM-JJ)",
+    roster_confirm_all: "Tout Correct — Planifier",
   },
   es: {
     tagline: "Combustible Para Tu Vuelo",
@@ -473,6 +493,16 @@ const T = {
     roster_error: "No se pudo leer el roster. Intenta con una foto más clara.",
     roster_home_base: "Tu Ciudad Base",
     roster_home_base_placeholder: "ej. Miami, Londres, París…",
+    roster_edit: "Editar",
+    roster_delete: "Eliminar",
+    roster_save_edit: "Guardar",
+    roster_cancel_edit: "Cancelar",
+    roster_add_pairing: "+ Agregar Pairing",
+    roster_going_usa: "¿Va a EE. UU.?",
+    roster_dest_label: "Destinos (separados por coma)",
+    roster_depart_label: "Fecha Salida (AAAA-MM-DD)",
+    roster_return_label: "Fecha Regreso (AAAA-MM-DD)",
+    roster_confirm_all: "Todo Correcto — Programar",
   }
 };
 
@@ -2392,6 +2422,8 @@ function RosterModal({ t, user, onClose, onRequirePremium }) {
   const [pairings, setPairings] = useState([]);
   const [errMsg, setErrMsg] = useState("");
   const [showGymPlan, setShowGymPlan] = useState(false);
+  const [editingIdx, setEditingIdx] = useState(null);
+  const [editDraft, setEditDraft] = useState(null);
 
   const handleFiles = (e) => {
     const files = Array.from(e.target.files).slice(0, 4);
@@ -2458,6 +2490,7 @@ function RosterModal({ t, user, onClose, onRequirePremium }) {
 
   const overlay = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 };
   const card = { background: C.navyMid, borderRadius: 20, padding: "28px 24px", width: "100%", maxWidth: 480, maxHeight: "85vh", overflowY: "auto", position: "relative" };
+  const inputStyle = { width: "100%", boxSizing: "border-box", background: C.navy, border: `1px solid ${C.navyBorder}`, borderRadius: 8, color: C.white, padding: "9px 12px", fontSize: 13, outline: "none", fontFamily: "inherit" };
 
   return (
     <div style={overlay} onClick={e => e.target === e.currentTarget && onClose()}>
@@ -2510,14 +2543,134 @@ function RosterModal({ t, user, onClose, onRequirePremium }) {
           <div>
             <div style={{ color: C.gold, fontWeight: 700, fontSize: 16, marginBottom: 4 }}>✈️ {t.roster_confirm_title}</div>
             <div style={{ color: C.muted, fontSize: 13, marginBottom: 16 }}>{t.roster_confirm_hint}</div>
-            {pairings.map((p, i) => (
-              <div key={i} style={{ background: C.navy, borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
-                <div style={{ color: C.white, fontWeight: 600, fontSize: 14 }}>{p.pairingDate} → {p.returnDate || "?"}</div>
-                <div style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>{p.departure} → {(p.destinations || []).join(" → ")} · {p.pairingDays} day{p.pairingDays > 1 ? "s" : ""}{p.goingUsa === "yes" ? " · 🇺🇸 USA" : ""}</div>
-              </div>
-            ))}
-            <button onClick={handleConfirm} style={{ width: "100%", padding: "14px", background: C.gold, color: C.navy, border: "none", borderRadius: 12, fontWeight: 700, fontSize: 15, cursor: "pointer", marginTop: 8 }}>
-              {t.roster_confirm_btn}
+
+            {pairings.map((p, i) => {
+              const isEditing = editingIdx === i;
+              return (
+                <div key={i} style={{ background: C.navy, borderRadius: 12, padding: "12px 14px", marginBottom: 10, border: isEditing ? `1px solid ${C.gold}` : `1px solid ${C.navyBorder}` }}>
+                  {!isEditing ? (
+                    <>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                        <div>
+                          <div style={{ color: C.white, fontWeight: 700, fontSize: 14 }}>
+                            {p.pairingDate} → {p.returnDate || "?"}
+                            <span style={{ marginLeft: 8, background: "rgba(255,213,79,0.15)", color: C.gold, fontSize: 11, fontWeight: 600, padding: "2px 7px", borderRadius: 5 }}>
+                              {p.pairingDays} day{p.pairingDays !== 1 ? "s" : ""}
+                            </span>
+                          </div>
+                          <div style={{ color: C.muted, fontSize: 12, marginTop: 5 }}>
+                            ✈️ {p.departure} → {(p.destinations || []).join(" → ")}
+                            {p.goingUsa === "yes" && <span style={{ marginLeft: 6 }}>🇺🇸 USA</span>}
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", gap: 6, flexShrink: 0, marginLeft: 8 }}>
+                          <button
+                            onClick={() => { setEditDraft({ ...p, destinations: (p.destinations || []).join(", ") }); setEditingIdx(i); }}
+                            style={{ background: "rgba(255,213,79,0.12)", color: C.gold, border: "none", borderRadius: 7, padding: "5px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                          >{t.roster_edit}</button>
+                          <button
+                            onClick={() => setPairings(prev => prev.filter((_, idx) => idx !== i))}
+                            style={{ background: "rgba(255,80,80,0.1)", color: "#ff6b6b", border: "none", borderRadius: 7, padding: "5px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                          >{t.roster_delete}</button>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      <div style={{ color: C.gold, fontWeight: 700, fontSize: 13, marginBottom: 2 }}>✏️ {t.roster_edit} Pairing #{i + 1}</div>
+
+                      <div>
+                        <div style={{ color: C.muted, fontSize: 11, marginBottom: 4 }}>{t.roster_depart_label}</div>
+                        <input
+                          value={editDraft.pairingDate || ""}
+                          onChange={e => {
+                            const d = e.target.value;
+                            const start = new Date(d), end = new Date(editDraft.returnDate || d);
+                            const days = isNaN(start) || isNaN(end) ? editDraft.pairingDays : Math.max(1, Math.round((end - start) / 86400000) + 1);
+                            setEditDraft(prev => ({ ...prev, pairingDate: d, pairingDays: days }));
+                          }}
+                          style={inputStyle}
+                          placeholder="2025-06-15"
+                        />
+                      </div>
+
+                      <div>
+                        <div style={{ color: C.muted, fontSize: 11, marginBottom: 4 }}>{t.roster_return_label}</div>
+                        <input
+                          value={editDraft.returnDate || ""}
+                          onChange={e => {
+                            const d = e.target.value;
+                            const start = new Date(editDraft.pairingDate || d), end = new Date(d);
+                            const days = isNaN(start) || isNaN(end) ? editDraft.pairingDays : Math.max(1, Math.round((end - start) / 86400000) + 1);
+                            setEditDraft(prev => ({ ...prev, returnDate: d, pairingDays: days }));
+                          }}
+                          style={inputStyle}
+                          placeholder="2025-06-17"
+                        />
+                      </div>
+
+                      <div>
+                        <div style={{ color: C.muted, fontSize: 11, marginBottom: 4 }}>{t.roster_dest_label}</div>
+                        <input
+                          value={editDraft.destinations || ""}
+                          onChange={e => setEditDraft(prev => ({ ...prev, destinations: e.target.value }))}
+                          style={inputStyle}
+                          placeholder="London, Dubai"
+                        />
+                      </div>
+
+                      <div>
+                        <div style={{ color: C.muted, fontSize: 11, marginBottom: 4 }}>{t.roster_going_usa}</div>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          {["yes", "no"].map(v => (
+                            <button
+                              key={v}
+                              onClick={() => setEditDraft(prev => ({ ...prev, goingUsa: v }))}
+                              style={{ flex: 1, padding: "8px", borderRadius: 8, border: "none", fontWeight: 600, fontSize: 13, cursor: "pointer", background: editDraft.goingUsa === v ? C.gold : C.navyMid, color: editDraft.goingUsa === v ? C.navy : C.muted }}
+                            >{v === "yes" ? "🇺🇸 Yes" : "No"}</button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                        <button
+                          onClick={() => {
+                            const dest = typeof editDraft.destinations === "string"
+                              ? editDraft.destinations.split(",").map(s => s.trim()).filter(Boolean)
+                              : editDraft.destinations || [];
+                            const updated = { ...editDraft, destinations: dest };
+                            setPairings(prev => prev.map((x, idx) => idx === i ? updated : x));
+                            setEditingIdx(null); setEditDraft(null);
+                          }}
+                          style={{ flex: 1, padding: "10px", background: C.gold, color: C.navy, border: "none", borderRadius: 9, fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+                        >{t.roster_save_edit}</button>
+                        <button
+                          onClick={() => { setEditingIdx(null); setEditDraft(null); }}
+                          style={{ flex: 1, padding: "10px", background: C.navyMid, color: C.muted, border: `1px solid ${C.navyBorder}`, borderRadius: 9, fontWeight: 600, fontSize: 13, cursor: "pointer" }}
+                        >{t.roster_cancel_edit}</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            <button
+              onClick={() => {
+                const blank = { pairingDate: "", returnDate: "", pairingDays: 1, departure: homeBase, destinations: "", goingUsa: "no", timezone: 0 };
+                setPairings(prev => [...prev, blank]);
+                setEditDraft({ ...blank });
+                setEditingIdx(pairings.length);
+              }}
+              style={{ width: "100%", padding: "11px", background: "transparent", color: C.gold, border: `1px dashed ${C.gold}`, borderRadius: 10, fontWeight: 600, fontSize: 14, cursor: "pointer", marginBottom: 12 }}
+            >{t.roster_add_pairing}</button>
+
+            <button
+              onClick={handleConfirm}
+              disabled={editingIdx !== null || pairings.length === 0}
+              style={{ width: "100%", padding: "14px", background: editingIdx === null && pairings.length > 0 ? C.gold : C.navyBorder, color: editingIdx === null && pairings.length > 0 ? C.navy : C.muted, border: "none", borderRadius: 12, fontWeight: 700, fontSize: 15, cursor: editingIdx === null && pairings.length > 0 ? "pointer" : "default" }}
+            >
+              {t.roster_confirm_all}
             </button>
           </div>
         )}
