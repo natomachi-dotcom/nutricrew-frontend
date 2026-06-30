@@ -2978,11 +2978,16 @@ function CalorieModal({ t, text, setText, result, loading, onEstimate, onClose, 
 
   return (
     <div style={styles.modalOverlay}>
-      <div style={{ ...styles.modal, maxHeight: "88vh", overflowY: "auto", gap: 12 }}>
-        <div style={styles.modalHeader}>
+      <div style={{ ...styles.modal, maxHeight: "88vh", overflowY: "auto", gap: 12, padding: 0 }}>
+        <div style={{
+          ...styles.modalHeader, padding: "18px 20px 14px",
+          position: "sticky", top: 0, background: C.navyMid, zIndex: 10,
+          borderBottom: `1px solid ${C.navyBorder}`,
+        }}>
           <span style={styles.modalTitle}>{t.calorie_title}</span>
           <button style={styles.closeBtn} onClick={onClose}>✕</button>
         </div>
+        <div style={{ padding: "14px 20px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
 
         {/* SEARCH INPUT */}
         <div style={{ position: "relative" }}>
@@ -3132,6 +3137,7 @@ function CalorieModal({ t, text, setText, result, loading, onEstimate, onClose, 
         )}
 
         <div style={styles.calorieDisclaimer}>{t.calorie_disclaimer}</div>
+        </div>{/* end inner padding div */}
       </div>
     </div>
   );
