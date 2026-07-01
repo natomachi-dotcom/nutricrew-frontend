@@ -881,19 +881,19 @@ export default function NutriCrew() {
       .catch(() => {});
   }, [screen, user?.email, forcePlanOpen]);
 
-  // Register push notifications once per browser session.
-  // Dependency on user?.email lets it fire when login completes, but the
-  // pushRegistrationDone flag (set synchronously) prevents any second attempt —
-  // critical because save() rewrites user.email on every email-field keystroke.
+  // Register push notifications only when the user reaches the plan screen —
+  // never during check-in. Triggering on user?.email caused navigator.serviceWorker
+  // .ready to resolve mid-flow and show the Notification permission bar while the
+  // user was clicking through steps, making the tab appear frozen.
   useEffect(() => {
-    if (!user?.email || pushRegistrationDone) return;
+    if (screen !== "plan" || !user?.email || pushRegistrationDone) return;
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
     const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
-    if (!vapidKey || vapidKey.length < 80) return; // guard against empty/truncated key
+    if (!vapidKey || vapidKey.length < 80) return;
     pushRegistrationDone = true;
+    const email = user.email; // capture before async work to avoid stale closure
     (async () => {
       try {
-        // Use the existing SW registered by vite-plugin-pwa; don't re-register.
         const reg = await navigator.serviceWorker.ready;
         const permission = await Notification.requestPermission();
         if (permission !== 'granted') return;
@@ -905,13 +905,13 @@ export default function NutriCrew() {
         await fetch(`${API_BASE}/api/push/subscribe`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: user.email, subscription: sub.toJSON() }),
+          body: JSON.stringify({ email, subscription: sub.toJSON() }),
         });
       } catch (e) {
         console.warn('Push registration failed:', e.message);
       }
     })();
-  }, [user?.email]); // eslint-disable-line
+  }, [screen, user?.email]); // eslint-disable-line
 
   useEffect(() => {
     const sess = storage.get(SESSION_KEY);
@@ -4063,16 +4063,19 @@ function ProfileModal({ t, user, onSave, onClose }) {
 }
 
 // ─── DUTY SCHEDULE STEP ───────────────────────────────────────────
+const DUTY_HOURS = Array.from({ length: 11 }, (_, i) => String(i + 6));
+const DUTY_TIMES = (() => {
+  const t = [];
+  for (let h = 0; h < 24; h++) {
+    t.push(`${String(h).padStart(2,"0")}:00`);
+    t.push(`${String(h).padStart(2,"0")}:30`);
+  }
+  return t;
+})();
+
 function DutyScheduleStep({ t, pairing, upd }) {
   const btnBase = { padding: "9px 14px", borderRadius: 10, cursor: "pointer", fontSize: 13, fontWeight: 600, border: `1.5px solid ${C.navyBorder}`, background: "transparent", color: C.muted };
   const btnActive = { ...btnBase, background: C.gold, color: C.navy, border: `1.5px solid ${C.gold}` };
-
-  const HOURS = Array.from({ length: 11 }, (_, i) => String(i + 6));
-  const TIMES = [];
-  for (let h = 0; h < 24; h++) {
-    TIMES.push(`${String(h).padStart(2,"0")}:00`);
-    TIMES.push(`${String(h).padStart(2,"0")}:30`);
-  }
 
   return (
     <div>
@@ -4084,7 +4087,7 @@ function DutyScheduleStep({ t, pairing, upd }) {
         <select value={pairing.report_time || ""} onChange={e => upd("report_time", e.target.value)}
           style={{ width: "100%", padding: "10px 12px", borderRadius: 10, background: C.navyCard, color: pairing.report_time ? C.white : C.muted, border: `1.5px solid ${C.navyBorder}`, fontSize: 14 }}>
           <option value="">— Select time —</option>
-          {TIMES.map(t => <option key={t} value={t}>{t}</option>)}
+          {DUTY_TIMES.map(ts => <option key={ts} value={ts}>{ts}</option>)}
         </select>
       </div>
 
@@ -4093,7 +4096,7 @@ function DutyScheduleStep({ t, pairing, upd }) {
         <select value={pairing.duty_hours || ""} onChange={e => upd("duty_hours", e.target.value)}
           style={{ width: "100%", padding: "10px 12px", borderRadius: 10, background: C.navyCard, color: pairing.duty_hours ? C.white : C.muted, border: `1.5px solid ${C.navyBorder}`, fontSize: 14 }}>
           <option value="">— Select hours —</option>
-          {HOURS.map(h => <option key={h} value={h}>{h}h</option>)}
+          {DUTY_HOURS.map(h => <option key={h} value={h}>{h}h</option>)}
         </select>
       </div>
 
