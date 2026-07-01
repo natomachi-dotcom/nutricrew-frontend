@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 // AI backend base URL. Empty in local dev (Vite proxies /api to localhost:3001);
 // set VITE_API_BASE_URL on Vercel to point at the deployed nutricrew-backend.
@@ -1678,6 +1678,11 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
   const [localVal, setLocalVal] = useState(() => pairing[currentStep] ?? user?.[currentStep] ?? "");
   const [weightUnit, setWeightUnit] = useState("kg");
   const [docNumber] = useState(() => Date.now().toString());
+  // Local state for destination inputs — prevents parent re-render on every keystroke.
+  const [localDests, setLocalDests] = useState(() => pairing.destinations || []);
+  const depTimerRef = useRef(null);
+  const tzTimerRef = useRef(null);
+  useEffect(() => { return () => { clearTimeout(depTimerRef.current); clearTimeout(tzTimerRef.current); }; }, []);
 
   // Auto-initialize defaults so pre-filled/default values work immediately with Continue
   useEffect(() => {
@@ -1702,6 +1707,7 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
         if (lastKnown) {
           const filled = Array.from({ length: numDays }, (_, i) => current[i] || lastDests[i] || lastKnown);
           upd("destinations", filled);
+          setLocalDests(filled);
         }
       }
     }
@@ -1725,8 +1731,7 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
     if (currentStep === "departure") return true;
     if (currentStep === "destination") {
       const numDays = pairing.pairing_days || 1;
-      const dests = pairing.destinations || [];
-      return dests.length >= numDays && dests.slice(0, numDays).every(d => d && d.trim());
+      return localDests.length >= numDays && localDests.slice(0, numDays).every(d => d && d.trim());
     }
     if (currentStep === "diet") {
       if (!pairing.diets || pairing.diets.length === 0) return false;
@@ -1831,28 +1836,34 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
         return <TextInput label={t.step_route + " — " + "Departure"} value={localVal}
           onChange={v => {
             setLocalVal(v);
-            save(v);
-            upd("timezone", computeTimezoneDiff(v, pairing.destinations) ?? 0);
+            clearTimeout(depTimerRef.current);
+            depTimerRef.current = setTimeout(() => {
+              save(v);
+              upd("timezone", computeTimezoneDiff(v, pairing.destinations) ?? 0);
+            }, 250);
           }}
           placeholder="Montreal (YUL)" icon="🛫"/>;
 
       case "destination": {
         const numDays = pairing.pairing_days || 1;
-        const dests = pairing.destinations || [];
         const updDest = (i, v) => {
-          const next = [...dests];
+          const next = [...localDests];
           next[i] = v;
-          upd("destinations", next);
-          upd("timezone", computeTimezoneDiff(pairing.departure, next) ?? 0);
+          setLocalDests(next);
+          clearTimeout(tzTimerRef.current);
+          tzTimerRef.current = setTimeout(() => {
+            upd("destinations", next);
+            upd("timezone", computeTimezoneDiff(pairing.departure, next) ?? 0);
+          }, 250);
         };
-        const tzDiff = computeTimezoneDiff(pairing.departure, dests);
+        const tzDiff = computeTimezoneDiff(pairing.departure, localDests);
         return (
           <div>
             <div style={styles.inputLabel}>{t.step_route} — {t.destination_label}</div>
             {Array.from({ length: numDays }).map((_, i) => (
               <div key={i} style={{marginBottom: 12}}>
                 <div style={styles.hint}>{t.day} {i+1}</div>
-                <TextInput value={dests[i] || ""}
+                <TextInput value={localDests[i] || ""}
                   onChange={v => updDest(i, v)}
                   placeholder="Paris (CDG)" icon="🛬"/>
               </div>
@@ -2088,7 +2099,19 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
         <button
           style={{...styles.continueBtn, ...(canContinue()?{}:styles.continueBtnDisabled)}}
           disabled={!canContinue()}
-          onClick={onContinue}>
+          onClick={() => {
+            if (currentStep === "departure") {
+              clearTimeout(depTimerRef.current);
+              save(localVal);
+              upd("timezone", computeTimezoneDiff(localVal, pairing.destinations) ?? 0);
+            }
+            if (currentStep === "destination") {
+              clearTimeout(tzTimerRef.current);
+              upd("destinations", localDests);
+              upd("timezone", computeTimezoneDiff(pairing.departure, localDests) ?? 0);
+            }
+            onContinue();
+          }}>
           {t.continue}
         </button>
       </div>
