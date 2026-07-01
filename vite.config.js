@@ -1,10 +1,23 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { visualizer } from 'rollup-plugin-visualizer'
 
 export default defineConfig({
+  build: {
+    rollupOptions: {
+      output: {
+        // Split React into its own long-cached chunk — it changes rarely,
+        // so returning users only re-download the app chunk on updates.
+        manualChunks: { vendor: ['react', 'react-dom'] },
+      },
+    },
+  },
   plugins: [
     react(),
+    // Generates dist/stats.html after every build — open it to see
+    // a treemap of bundle contents and gzip sizes.
+    visualizer({ filename: 'dist/stats.html', gzipSize: true, open: false }),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'pwa-192.svg', 'pwa-512.svg', 'pwa-maskable-512.svg'],
