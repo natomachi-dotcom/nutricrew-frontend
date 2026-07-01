@@ -704,11 +704,20 @@ const ProfileIcon = () => (
 // ─── HELPERS ──────────────────────────────────────────────────────
 
 function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  // Strip any non-base64 characters (newlines, BOM, zero-width Unicode from copy-paste)
+  const cleaned = (base64String || "").trim().replace(/[^A-Za-z0-9\-_+/=]/g, '');
+  const padding = '='.repeat((4 - (cleaned.length % 4)) % 4);
+  const base64 = (cleaned + padding).replace(/-/g, '+').replace(/_/g, '/');
   const raw = atob(base64);
   return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
 }
+
+// Module-level flag — push registration must only ever be attempted once per
+// browser session. The useEffect below depends on user?.email which changes on
+// every keystroke in the email check-in field, so without this guard we'd fire
+// concurrent SW registration + Notification.requestPermission() calls for every
+// character typed, freezing the browser.
+let pushRegistrationDone = false;
 
 const storage = {
   get: (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
@@ -872,12 +881,14 @@ export default function NutriCrew() {
       .catch(() => {});
   }, [screen, user?.email, forcePlanOpen]);
 
-  // Register push notifications when user is logged in
+  // Register push notifications when user is logged in — runs at most once per
+  // browser session (pushRegistrationDone flag set synchronously before async work).
   useEffect(() => {
-    if (!user?.email) return;
+    if (!user?.email || pushRegistrationDone) return;
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
     const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
     if (!vapidKey) return;
+    pushRegistrationDone = true; // block any concurrent/subsequent attempts immediately
     (async () => {
       try {
         const reg = await navigator.serviceWorker.register('/sw.js');
