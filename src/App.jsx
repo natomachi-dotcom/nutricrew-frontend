@@ -63,8 +63,16 @@ const T = {
     vegan: "Vegan", gluten_free: "Gluten-Free", halal: "Halal",
     kosher: "Kosher", low_carb: "Low-Carb / Keto",
     dairy_free: "Dairy-Free", mediterranean: "Mediterranean", carnivore: "Carnivore",
-    calorie_deficit: "Calorie Deficit ⭐",
+    paleo: "Paleo", calorie_deficit: "Calorie Deficit ⭐",
     diet_other: "Other", diet_other_placeholder: "Tell us about your diet...",
+    allergies_section: "Allergies & Intolerances",
+    nut_free: "Nut-Free", egg_free: "Egg-Free", shellfish_free: "Shellfish-Free",
+    soy_free: "Soy-Free", lactose_free: "Lactose-Free", fodmap: "Low-FODMAP",
+    offline_banner: "Offline — showing last saved plan",
+    feedback_prompt: "How did this plan work for you?",
+    feedback_energy: "Energy", feedback_satiety: "Satiety", feedback_jetlag: "Jet Lag",
+    feedback_comment_placeholder: "Any notes? What worked or didn't... (optional)",
+    feedback_submit: "Submit Feedback", feedback_thanks: "Thanks for your feedback!",
     lose_weight: "Lose Weight", keep_weight: "Maintain Weight", gain_weight: "Gain Weight",
     stay_focused: "Stay Focused & Alert", no_bloating: "Avoid Bloating",
     energy: "Sustained Energy", muscle: "Maintain Muscle", sleep: "Better Sleep",
@@ -239,8 +247,16 @@ const T = {
     vegan: "Végétalien", gluten_free: "Sans Gluten", halal: "Halal",
     kosher: "Casher", low_carb: "Faible en Glucides",
     dairy_free: "Sans Produits Laitiers", mediterranean: "Méditerranéen", carnivore: "Carnivore",
-    calorie_deficit: "Déficit Calorique ⭐",
+    paleo: "Paléo", calorie_deficit: "Déficit Calorique ⭐",
     diet_other: "Autre", diet_other_placeholder: "Décrivez votre alimentation...",
+    allergies_section: "Allergies & Intolérances",
+    nut_free: "Sans Noix", egg_free: "Sans Œufs", shellfish_free: "Sans Fruits de Mer",
+    soy_free: "Sans Soja", lactose_free: "Sans Lactose", fodmap: "FODMAP Faible",
+    offline_banner: "Hors ligne — affichage du dernier plan sauvegardé",
+    feedback_prompt: "Comment ce plan a-t-il fonctionné?",
+    feedback_energy: "Énergie", feedback_satiety: "Satiété", feedback_jetlag: "Décalage Horaire",
+    feedback_comment_placeholder: "Des notes? Ce qui a fonctionné ou non... (optionnel)",
+    feedback_submit: "Envoyer", feedback_thanks: "Merci pour vos commentaires!",
     lose_weight: "Perdre du Poids", keep_weight: "Maintenir le Poids", gain_weight: "Prendre du Poids",
     stay_focused: "Rester Concentré", no_bloating: "Éviter les Ballonnements",
     energy: "Énergie Soutenue", muscle: "Maintenir la Masse Musculaire", sleep: "Meilleur Sommeil",
@@ -415,8 +431,16 @@ const T = {
     vegan: "Vegano", gluten_free: "Sin Gluten", halal: "Halal",
     kosher: "Kosher", low_carb: "Bajo en Carbohidratos",
     dairy_free: "Sin Lácteos", mediterranean: "Mediterráneo", carnivore: "Carnívoro",
-    calorie_deficit: "Déficit Calórico ⭐",
+    paleo: "Paleo", calorie_deficit: "Déficit Calórico ⭐",
     diet_other: "Otra", diet_other_placeholder: "Cuéntanos sobre tu dieta...",
+    allergies_section: "Alergias & Intolerancias",
+    nut_free: "Sin Frutos Secos", egg_free: "Sin Huevo", shellfish_free: "Sin Mariscos",
+    soy_free: "Sin Soja", lactose_free: "Sin Lactosa", fodmap: "Bajo-FODMAP",
+    offline_banner: "Sin conexión — mostrando el último plan guardado",
+    feedback_prompt: "¿Cómo funcionó este plan?",
+    feedback_energy: "Energía", feedback_satiety: "Saciedad", feedback_jetlag: "Jet Lag",
+    feedback_comment_placeholder: "¿Algún comentario? ¿Qué funcionó o no... (opcional)",
+    feedback_submit: "Enviar Opinión", feedback_thanks: "¡Gracias por tu opinión!",
     lose_weight: "Perder Peso", keep_weight: "Mantener Peso", gain_weight: "Ganar Peso",
     stay_focused: "Mantener Concentración", no_bloating: "Evitar Hinchazón",
     energy: "Energía Sostenida", muscle: "Mantener Músculo", sleep: "Mejor Sueño",
@@ -698,6 +722,7 @@ const USER_KEY = "nutricrew_user";
 const SESSION_KEY = "nutricrew_session";
 const PASSWORD_PROMPT_DISMISSED_KEY = "nutricrew_password_prompt_dismissed";
 const SAVED_PLANS_KEY = "nutricrew_saved_plans";
+const FEEDBACK_KEY = "nutricrew_plan_feedback";
 const MAX_SAVED_PLANS = 10;
 
 // Generated plans are cached by their exact input parameters (and language),
@@ -722,8 +747,31 @@ function findSavedPlan(key) {
   return getSavedPlans().find(p => p.key === key);
 }
 
+function getPlanFeedback(planKey) {
+  const all = storage.get(FEEDBACK_KEY) || [];
+  return all.find(f => f.planKey === planKey) || null;
+}
+
+function savePlanFeedback(planKey, feedback) {
+  const all = (storage.get(FEEDBACK_KEY) || []).filter(f => f.planKey !== planKey);
+  storage.set(FEEDBACK_KEY, [{ planKey, ...feedback, submittedAt: Date.now() }, ...all].slice(0, 50));
+}
+
+function useOnlineStatus() {
+  const [isOnline, setIsOnline] = useState(() => navigator.onLine);
+  useEffect(() => {
+    const on = () => setIsOnline(true);
+    const off = () => setIsOnline(false);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
+  }, []);
+  return isOnline;
+}
+
 // ─── MAIN APP ─────────────────────────────────────────────────────
 export default function NutriCrew() {
+  const isOnline = useOnlineStatus();
   const [user, setUser] = useState(() => storage.get(USER_KEY));
   const [lang, setLang] = useState(() => user?.lang || "en");
   const [screen, setScreen] = useState(() => {
@@ -1152,6 +1200,8 @@ export default function NutriCrew() {
           favorites={favorites} onToggleFavorite={toggleFavorite}
           onOpenAirplaneMeal={() => setShowAirplaneMeal(true)}
           isPremium={plan?.isPremium ?? false}
+          isOnline={isOnline}
+          planKey={planCacheKey({ ...user, ...pairing }, lang)}
         />
       )}
 
@@ -1885,13 +1935,12 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
                 {v:"none",l:t.no_restrictions,icon:"🍽️"},
                 {v:"vegetarian",l:t.vegetarian,icon:"🥗"},
                 {v:"vegan",l:t.vegan,icon:"🌱"},
-                {v:"gluten_free",l:t.gluten_free,icon:"🌾"},
                 {v:"halal",l:t.halal,icon:"☪️"},
                 {v:"kosher",l:t.kosher,icon:"✡️"},
                 {v:"low_carb",l:t.low_carb,icon:"🥑"},
-                {v:"dairy_free",l:t.dairy_free,icon:"🥛"},
                 {v:"mediterranean",l:t.mediterranean,icon:"🫒"},
                 {v:"carnivore",l:t.carnivore,icon:"🥩"},
+                {v:"paleo",l:t.paleo,icon:"🦴"},
                 {v:"calorie_deficit",l:t.calorie_deficit,icon:"🔥",premium:true},
                 {v:"other",l:t.diet_other,icon:"✏️"},
               ]}
@@ -1909,6 +1958,30 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
                   upd("calorie_deficit_amount", null);
                   upd("calorie_deficit_preset", null);
                 }
+              }}/>
+            <div style={{ color: C.gold, fontWeight: 700, fontSize: 12, textTransform: "uppercase", letterSpacing: 1, marginTop: 18, marginBottom: 8 }}>
+              🚨 {t.allergies_section}
+            </div>
+            <CheckGroup label=""
+              options={[
+                {v:"gluten_free",l:t.gluten_free,icon:"🌾"},
+                {v:"dairy_free",l:t.dairy_free,icon:"🧀"},
+                {v:"lactose_free",l:t.lactose_free,icon:"🥛"},
+                {v:"nut_free",l:t.nut_free,icon:"🥜"},
+                {v:"egg_free",l:t.egg_free,icon:"🥚"},
+                {v:"shellfish_free",l:t.shellfish_free,icon:"🦐"},
+                {v:"soy_free",l:t.soy_free,icon:"🫘"},
+                {v:"fodmap",l:t.fodmap,icon:"🌿"},
+              ]}
+              values={pairing.diets || []}
+              onChange={v => {
+                let next = v;
+                if (v.includes("none") && !(pairing.diets || []).includes("none")) {
+                  next = ["none"];
+                } else if ((pairing.diets || []).includes("none") && v.length > 1) {
+                  next = v.filter(d => d !== "none");
+                }
+                upd("diets", next);
               }}/>
             {(pairing.diets || []).includes("other") && (
               <div style={{marginTop:12}}>
@@ -2113,7 +2186,7 @@ function BPField({ label, value, highlight }) {
 }
 
 // ─── PLAN SCREEN ──────────────────────────────────────────────────
-function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, activeDay, setActiveDay, onNewPairing, onRetry, favorites, onToggleFavorite, onOpenAirplaneMeal, isPremium }) {
+function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, activeDay, setActiveDay, onNewPairing, onRetry, favorites, onToggleFavorite, onOpenAirplaneMeal, isPremium, isOnline, planKey }) {
   const days = pairing.pairing_days || 1;
   const hasJetlag = Math.abs(parseInt(pairing.timezone||0)) >= 4;
 
@@ -2144,6 +2217,13 @@ function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, 
 
   return (
     <div style={styles.planScreen}>
+      {/* Offline banner */}
+      {!isOnline && (
+        <div style={{ background: "#3A2A00", border: `1px solid ${C.gold}`, borderRadius: 10, padding: "8px 14px", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 16 }}>📵</span>
+          <span style={{ color: C.gold, fontSize: 13 }}>{t.offline_banner}</span>
+        </div>
+      )}
       {/* Header */}
       <div style={styles.planHeader}>
         <div>
@@ -2244,6 +2324,74 @@ function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, 
           </div>
         )}
       </div>
+
+      {/* Feedback section — only shown when a real plan is loaded */}
+      {planKey && <PlanFeedback t={t} planKey={planKey} />}
+    </div>
+  );
+}
+
+function PlanFeedback({ t, planKey }) {
+  const existing = getPlanFeedback(planKey);
+  const [open, setOpen] = useState(false);
+  const [submitted, setSubmitted] = useState(!!existing);
+  const [ratings, setRatings] = useState(existing ? { energy: existing.energy, satiety: existing.satiety, jetlag: existing.jetlag } : { energy: 0, satiety: 0, jetlag: 0 });
+  const [comment, setComment] = useState(existing?.comment || "");
+
+  const handleSubmit = () => {
+    savePlanFeedback(planKey, { energy: ratings.energy, satiety: ratings.satiety, jetlag: ratings.jetlag, comment: comment.trim() });
+    setSubmitted(true);
+    setOpen(false);
+  };
+
+  const StarRow = ({ label, key: rkey, value, onChange }) => (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+      <span style={{ color: C.muted, fontSize: 13, minWidth: 80 }}>{label}</span>
+      <div style={{ display: "flex", gap: 6 }}>
+        {[1,2,3,4,5].map(n => (
+          <button key={n} onClick={() => onChange(n)}
+            style={{ background: "none", border: "none", cursor: "pointer", fontSize: 22, padding: 0, lineHeight: 1, opacity: n <= value ? 1 : 0.25 }}>
+            ⭐
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  if (submitted && !open) return (
+    <div style={{ margin: "20px 0 8px", textAlign: "center", color: C.muted, fontSize: 13 }}>
+      ✓ {t.feedback_thanks}
+    </div>
+  );
+
+  if (!open) return (
+    <div style={{ margin: "20px 0 8px", textAlign: "center" }}>
+      <button onClick={() => setOpen(true)}
+        style={{ background: "none", border: `1px solid ${C.navyBorder}`, borderRadius: 20, padding: "8px 20px", color: C.muted, fontSize: 13, cursor: "pointer" }}>
+        ⭐ {t.feedback_prompt}
+      </button>
+    </div>
+  );
+
+  return (
+    <div style={{ background: C.navyCard, borderRadius: 14, padding: "16px 18px", margin: "16px 0 8px", border: `1px solid ${C.navyBorder}` }}>
+      <div style={{ color: C.gold, fontWeight: 700, fontSize: 14, marginBottom: 16 }}>⭐ {t.feedback_prompt}</div>
+      <StarRow label={t.feedback_energy} rkey="energy" value={ratings.energy} onChange={v => setRatings(r => ({...r, energy: v}))}/>
+      <StarRow label={t.feedback_satiety} rkey="satiety" value={ratings.satiety} onChange={v => setRatings(r => ({...r, satiety: v}))}/>
+      <StarRow label={t.feedback_jetlag} rkey="jetlag" value={ratings.jetlag} onChange={v => setRatings(r => ({...r, jetlag: v}))}/>
+      <textarea
+        value={comment}
+        onChange={e => setComment(e.target.value)}
+        placeholder={t.feedback_comment_placeholder}
+        rows={3}
+        style={{ width: "100%", boxSizing: "border-box", background: C.navyMid, border: `1px solid ${C.navyBorder}`, borderRadius: 10, color: C.white, padding: "10px 12px", fontSize: 13, resize: "none", outline: "none", fontFamily: "inherit", marginBottom: 12 }}
+      />
+      <button
+        onClick={handleSubmit}
+        disabled={!ratings.energy && !ratings.satiety && !ratings.jetlag}
+        style={{ ...{ width: "100%", padding: "11px 0", borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: "pointer", border: "none", background: C.gold, color: C.navy }, ...(!ratings.energy && !ratings.satiety && !ratings.jetlag ? { opacity: 0.4, cursor: "not-allowed" } : {}) }}>
+        {t.feedback_submit}
+      </button>
     </div>
   );
 }
@@ -3796,14 +3944,29 @@ function ProfileModal({ t, user, onSave, onClose }) {
             {v:"none",l:t.no_restrictions,icon:"🍽️"},
             {v:"vegetarian",l:t.vegetarian,icon:"🥗"},
             {v:"vegan",l:t.vegan,icon:"🌱"},
-            {v:"gluten_free",l:t.gluten_free,icon:"🌾"},
             {v:"halal",l:t.halal,icon:"☪️"},
             {v:"kosher",l:t.kosher,icon:"✡️"},
             {v:"low_carb",l:t.low_carb,icon:"🥑"},
-            {v:"dairy_free",l:t.dairy_free,icon:"🥛"},
             {v:"mediterranean",l:t.mediterranean,icon:"🫒"},
             {v:"carnivore",l:t.carnivore,icon:"🥩"},
+            {v:"paleo",l:t.paleo,icon:"🦴"},
             {v:"other",l:t.diet_other,icon:"✏️"},
+          ]}
+          values={diets}
+          onChange={onDietsChange}/>
+        <div style={{ color: C.gold, fontWeight: 700, fontSize: 12, textTransform: "uppercase", letterSpacing: 1, marginTop: 18, marginBottom: 8 }}>
+          🚨 {t.allergies_section}
+        </div>
+        <CheckGroup label=""
+          options={[
+            {v:"gluten_free",l:t.gluten_free,icon:"🌾"},
+            {v:"dairy_free",l:t.dairy_free,icon:"🧀"},
+            {v:"lactose_free",l:t.lactose_free,icon:"🥛"},
+            {v:"nut_free",l:t.nut_free,icon:"🥜"},
+            {v:"egg_free",l:t.egg_free,icon:"🥚"},
+            {v:"shellfish_free",l:t.shellfish_free,icon:"🦐"},
+            {v:"soy_free",l:t.soy_free,icon:"🫘"},
+            {v:"fodmap",l:t.fodmap,icon:"🌿"},
           ]}
           values={diets}
           onChange={onDietsChange}/>
