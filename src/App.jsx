@@ -881,17 +881,20 @@ export default function NutriCrew() {
       .catch(() => {});
   }, [screen, user?.email, forcePlanOpen]);
 
-  // Register push notifications when user is logged in — runs at most once per
-  // browser session (pushRegistrationDone flag set synchronously before async work).
+  // Register push notifications once per browser session.
+  // Dependency on user?.email lets it fire when login completes, but the
+  // pushRegistrationDone flag (set synchronously) prevents any second attempt —
+  // critical because save() rewrites user.email on every email-field keystroke.
   useEffect(() => {
     if (!user?.email || pushRegistrationDone) return;
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
     const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
-    if (!vapidKey) return;
-    pushRegistrationDone = true; // block any concurrent/subsequent attempts immediately
+    if (!vapidKey || vapidKey.length < 80) return; // guard against empty/truncated key
+    pushRegistrationDone = true;
     (async () => {
       try {
-        const reg = await navigator.serviceWorker.register('/sw.js');
+        // Use the existing SW registered by vite-plugin-pwa; don't re-register.
+        const reg = await navigator.serviceWorker.ready;
         const permission = await Notification.requestPermission();
         if (permission !== 'granted') return;
         const existing = await reg.pushManager.getSubscription();
