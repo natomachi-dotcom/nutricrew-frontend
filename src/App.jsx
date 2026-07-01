@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, startTransition } from "react";
 
 // AI backend base URL. Empty in local dev (Vite proxies /api to localhost:3001);
 // set VITE_API_BASE_URL on Vercel to point at the deployed nutricrew-backend.
@@ -1026,7 +1026,7 @@ export default function NutriCrew() {
 
   const handleContinue = () => {
     if (step < totalSteps - 1) {
-      setStep(s => s + 1);
+      startTransition(() => setStep(s => s + 1));
     } else {
       // Show boarding pass before generating
       setScreen("boarding");
@@ -1034,7 +1034,7 @@ export default function NutriCrew() {
   };
 
   const handleBack = () => {
-    if (step > 0) setStep(s => s - 1);
+    if (step > 0) startTransition(() => setStep(s => s - 1));
   };
 
   const needsPremiumForDiet = (pairing.diets || []).includes("calorie_deficit") && !isPremium;
@@ -4064,18 +4064,12 @@ function ProfileModal({ t, user, onSave, onClose }) {
 
 // ─── DUTY SCHEDULE STEP ───────────────────────────────────────────
 const DUTY_HOURS = Array.from({ length: 11 }, (_, i) => String(i + 6));
-const DUTY_TIMES = (() => {
-  const t = [];
-  for (let h = 0; h < 24; h++) {
-    t.push(`${String(h).padStart(2,"0")}:00`);
-    t.push(`${String(h).padStart(2,"0")}:30`);
-  }
-  return t;
-})();
 
 function DutyScheduleStep({ t, pairing, upd }) {
   const btnBase = { padding: "9px 14px", borderRadius: 10, cursor: "pointer", fontSize: 13, fontWeight: 600, border: `1.5px solid ${C.navyBorder}`, background: "transparent", color: C.muted };
   const btnActive = { ...btnBase, background: C.gold, color: C.navy, border: `1.5px solid ${C.gold}` };
+  const hrBtn = { padding: "7px 10px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600, border: `1.5px solid ${C.navyBorder}`, background: "transparent", color: C.muted };
+  const hrBtnActive = { ...hrBtn, background: C.gold, color: C.navy, border: `1.5px solid ${C.gold}` };
 
   return (
     <div>
@@ -4084,20 +4078,22 @@ function DutyScheduleStep({ t, pairing, upd }) {
 
       <div style={{ marginBottom: 16 }}>
         <div style={{ ...styles.hint, marginBottom: 6 }}>{t.duty_report}</div>
-        <select value={pairing.report_time || ""} onChange={e => upd("report_time", e.target.value)}
-          style={{ width: "100%", padding: "10px 12px", borderRadius: 10, background: C.navyCard, color: pairing.report_time ? C.white : C.muted, border: `1.5px solid ${C.navyBorder}`, fontSize: 14 }}>
-          <option value="">— Select time —</option>
-          {DUTY_TIMES.map(ts => <option key={ts} value={ts}>{ts}</option>)}
-        </select>
+        <input
+          type="time"
+          value={pairing.report_time || ""}
+          onChange={e => upd("report_time", e.target.value)}
+          style={{ width: "100%", padding: "10px 12px", borderRadius: 10, background: C.navyCard, color: pairing.report_time ? C.white : C.muted, border: `1.5px solid ${C.navyBorder}`, fontSize: 14, boxSizing: "border-box", colorScheme: "dark", outline: "none" }}
+        />
       </div>
 
       <div style={{ marginBottom: 16 }}>
         <div style={{ ...styles.hint, marginBottom: 6 }}>{t.duty_length}</div>
-        <select value={pairing.duty_hours || ""} onChange={e => upd("duty_hours", e.target.value)}
-          style={{ width: "100%", padding: "10px 12px", borderRadius: 10, background: C.navyCard, color: pairing.duty_hours ? C.white : C.muted, border: `1.5px solid ${C.navyBorder}`, fontSize: 14 }}>
-          <option value="">— Select hours —</option>
-          {DUTY_HOURS.map(h => <option key={h} value={h}>{h}h</option>)}
-        </select>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {DUTY_HOURS.map(h => (
+            <button key={h} style={pairing.duty_hours === h ? hrBtnActive : hrBtn}
+              onClick={() => upd("duty_hours", h)}>{h}h</button>
+          ))}
+        </div>
       </div>
 
       <div style={{ marginBottom: 16 }}>
