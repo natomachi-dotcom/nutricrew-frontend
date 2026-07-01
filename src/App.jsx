@@ -2137,7 +2137,6 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
 
 // ─── BOARDING PASS ────────────────────────────────────────────────
 function BoardingPassScreen({ t, user, pairing, onGenerate, onBack, isPremiumNeeded }) {
-  console.log("boarding-pass pairing:", pairing);
   const mergedUser = { ...(user || {}), ...pairing };
   const allDiets = mergedUser.diets || (mergedUser.diet ? [mergedUser.diet] : []);
   const filteredDiets = allDiets.filter(d => d && d !== "none");
