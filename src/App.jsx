@@ -2682,7 +2682,7 @@ function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess, onGenerate, retur
         <div style={styles.premiumTitle}>Welcome to Premium!</div>
         <div style={styles.premiumMsg}>
           {ctaBack
-            ? "Your account is now active. Gym Plans, Roster Automation, Calorie Deficit plans, Jetlag Meal Plans, and Nearby Places are all unlocked."
+            ? "Your account is now active. Gym Plans, Roster Automation, Calorie Deficit plans, Jetlag Meal Plans, Cognitive Performance meal timing, and Nearby Places are all unlocked."
             : "Your account is now active. Tap below to generate your plan."}
         </div>
         <button style={styles.primaryBtn} onClick={ctaBack ? onBack : onGenerate}>
@@ -2704,7 +2704,13 @@ function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess, onGenerate, retur
           "📅 Roster upload & auto plan delivery",
           "🔥 Calorie deficit plans",
           "🌍 Jetlag meal-timing plan",
-          "🧠 Cognitive Performance meal timing",
+        ].map(f => (
+          <div key={f} style={styles.premiumFeature}>✓ {f}</div>
+        ))}
+        <div style={{ ...styles.premiumFeature, color: C.gold, fontWeight: 700, borderLeft: `3px solid ${C.gold}`, paddingLeft: 13 }}>
+          ✓ 🧠 Cognitive Performance meal timing
+        </div>
+        {[
           "📍 Nearby stores & restaurants",
         ].map(f => (
           <div key={f} style={styles.premiumFeature}>✓ {f}</div>
