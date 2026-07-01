@@ -2137,6 +2137,7 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
 
 // ─── BOARDING PASS ────────────────────────────────────────────────
 function BoardingPassScreen({ t, user, pairing, onGenerate, onBack, isPremiumNeeded }) {
+  console.log("boarding-pass pairing:", pairing);
   const mergedUser = { ...(user || {}), ...pairing };
   const allDiets = mergedUser.diets || (mergedUser.diet ? [mergedUser.diet] : []);
   const filteredDiets = allDiets.filter(d => d && d !== "none");
@@ -2193,11 +2194,14 @@ function BoardingPassScreen({ t, user, pairing, onGenerate, onBack, isPremiumNee
           {Math.abs(parseInt(pairing.timezone||0)) >= 4 && (
             <BPField label="JET LAG" value={`${pairing.timezone}H DIFF ⚠️`} highlight/>
           )}
+          {pairing.report_time && (
+            <div style={{ gridColumn: "1 / -1", background: C.navyMid, padding: "12px 16px" }}>
+              <div style={{ fontSize: 9, color: C.muted, letterSpacing: "2px", marginBottom: 4 }}>DUTY MODE</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.gold }}>🧠 COGNITIVE MODE | DUTY OPTIMIZED</div>
+            </div>
+          )}
           {pairing.going_usa === "yes" && (
             <BPField label="USA RULES" value="⚠️ FOOD RESTRICTIONS" highlight/>
-          )}
-          {pairing.report_time && (
-            <BPField label="🧠 COGNITIVE MODE" value="DUTY OPTIMIZED" highlight/>
           )}
         </div>
 
