@@ -1,7 +1,9 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
-import { visualizer } from 'rollup-plugin-visualizer'
+
+let visualizer;
+try { ({ visualizer } = await import('rollup-plugin-visualizer')); } catch {}
 
 export default defineConfig({
   build: {
@@ -15,9 +17,8 @@ export default defineConfig({
   },
   plugins: [
     react(),
-    // Generates dist/stats.html after every build — open it to see
-    // a treemap of bundle contents and gzip sizes.
-    visualizer({ filename: 'dist/stats.html', gzipSize: true, open: false }),
+    // Generates dist/stats.html after every build (if rollup-plugin-visualizer is installed).
+    ...(visualizer ? [visualizer({ filename: 'dist/stats.html', gzipSize: true, open: false })] : []),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'pwa-192.svg', 'pwa-512.svg', 'pwa-maskable-512.svg'],

@@ -961,6 +961,55 @@ export default function NutriCrew() {
     return false;
   });
 
+  // Navigate to the premium success screen once the app finishes loading.
+  const premiumNavDone = useRef(false);
+  useEffect(() => {
+    if (!premiumSuccess || premiumNavDone.current || screen === "loading") return;
+    premiumNavDone.current = true;
+    // If no active pairing exists, "Continue" should go back to splash rather
+    // than the boarding pass (which would be empty).
+    if (!pairing?.pairing_days && !pairing?.departure) setPremiumReturnScreen("splash");
+    setScreen("premium");
+  }, [premiumSuccess, screen]); // eslint-disable-line
+
+  // Poll verify-session after a Stripe payment until the webhook has written
+  // isPremium=true to MongoDB (webhook fires ~1–3s after redirect; page may
+  // load before it arrives). Persists to localStorage so next open is seamless.
+  useEffect(() => {
+    if (!premiumSuccess) return;
+    const sess = storage.get(SESSION_KEY);
+    if (!sess?.token) return;
+    let cancelled = false;
+    let attempts = 0;
+    const poll = async () => {
+      if (cancelled || attempts >= 6) return;
+      attempts++;
+      try {
+        const r = await fetch(`${API_BASE}/api/auth/verify-session`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: sess.token }),
+        });
+        if (r.ok) {
+          const data = await r.json();
+          if (data.isPremium) {
+            setUser(prev => {
+              const u = prev?.email
+                ? { ...prev, isPremium: true }
+                : { email: data.email, name: data.name || "", isPremium: true };
+              storage.set(USER_KEY, u);
+              return u;
+            });
+            return;
+          }
+        }
+      } catch {}
+      setTimeout(poll, 2000);
+    };
+    setTimeout(poll, 1500); // First check after 1.5s — webhook needs ~1s to fire
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line
+
   const pairingCount = storage.get(PAIRING_COUNT_KEY) || 0;
   const isPremiumNeeded = premiumSuccess ? false : pairingCount >= FREE_PAIRING_LIMIT;
   // Real subscription status (server-authoritative) — true right after Stripe
@@ -2750,7 +2799,7 @@ function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess, onGenerate, retur
         </div>
       )}
       <button style={styles.primaryBtn} onClick={handleClick} disabled={loading}>
-        {loading ? "…" : billing === "annual" ? `${t.upgrade} — $62.32/year` : `${t.upgrade} — $7.99/month`}
+        {loading ? "Taking you to secure checkout…" : billing === "annual" ? `${t.upgrade} — $62.32/year` : `${t.upgrade} — $7.99/month`}
       </button>
       <button style={{...styles.backBtn, flex: "none"}} onClick={onBack}>{t.back}</button>
     </div>
