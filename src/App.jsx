@@ -789,6 +789,7 @@ const SESSION_KEY = "nutricrew_session";
 const PASSWORD_PROMPT_DISMISSED_KEY = "nutricrew_password_prompt_dismissed";
 const SAVED_PLANS_KEY = "nutricrew_saved_plans";
 const FEEDBACK_KEY = "nutricrew_plan_feedback";
+const CHECKIN_DRAFT_KEY = "nutricrew_checkin_draft";
 const MAX_SAVED_PLANS = 10;
 
 // Generated plans are cached by their exact input parameters (and language),
@@ -848,14 +849,18 @@ export default function NutriCrew() {
     if (storage.get(SESSION_KEY)?.token) {
       // If we already have a cached user profile, skip the loading spinner and
       // render immediately — verify-session will update isPremium in background.
-      if (storage.get(USER_KEY)?.email) return "splash";
+      if (storage.get(USER_KEY)?.email) {
+        // Resume in-progress onboarding if a draft was saved at step ≥ 1.
+        if ((storage.get(CHECKIN_DRAFT_KEY)?.step ?? 0) >= 1) return "checkin";
+        return "splash";
+      }
       return "loading";
     }
     if (storage.get(USER_KEY)?.email) return "login"; // returning user, session expired
     return "splash"; // first time — show the welcome screen before check-in
   }); // login | otp | set-password | loading | splash | checkin | boarding | plan | premium
   const [pendingOtpEmail, setPendingOtpEmail] = useState("");
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(() => storage.get(CHECKIN_DRAFT_KEY)?.step ?? 0);
   const [pairing, setPairing] = useState(() => {
     const pending = storage.get(PENDING_PAIRING_KEY);
     if (pending) {
@@ -866,6 +871,8 @@ export default function NutriCrew() {
       const saved = getSavedPlans()[0];
       if (saved) return saved.data;
     }
+    const draft = storage.get(CHECKIN_DRAFT_KEY);
+    if (draft?.pairing) return draft.pairing;
     return {};
   });
   const [plan, setPlan] = useState(() => {
@@ -899,7 +906,10 @@ export default function NutriCrew() {
   // starts — without it, finishing the profile questions mid-flow would flip
   // returningUser to true and yank the step list shorter while the user is
   // still answering it, skipping kitchen/diet/goals/budget on a first run.
-  const [checkinReturning, setCheckinReturning] = useState(returningUser);
+  const [checkinReturning, setCheckinReturning] = useState(() => {
+    const draft = storage.get(CHECKIN_DRAFT_KEY);
+    return draft?.checkinReturning ?? returningUser;
+  });
   const [showRoster, setShowRoster] = useState(false);
   const [showGymPlan, setShowGymPlan] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -982,6 +992,12 @@ export default function NutriCrew() {
       }
     })();
   }, [screen, user?.email]); // eslint-disable-line
+
+  // Persist in-progress check-in so a refresh or return resumes at the same step.
+  useEffect(() => {
+    if (screen !== "checkin") return;
+    storage.set(CHECKIN_DRAFT_KEY, { step, pairing, checkinReturning });
+  }, [screen, step, pairing, checkinReturning]); // eslint-disable-line
 
   useEffect(() => {
     const sess = storage.get(SESSION_KEY);
@@ -1154,7 +1170,7 @@ export default function NutriCrew() {
 
   const handleBack = () => {
     if (step > 0) startTransition(() => setStep(s => s - 1));
-    else setScreen("splash");
+    else { storage.set(CHECKIN_DRAFT_KEY, null); setScreen("splash"); }
   };
 
   const needsPremiumForDiet = (pairing.diets || []).includes("calorie_deficit") && !isPremium;
@@ -1168,6 +1184,7 @@ export default function NutriCrew() {
     const cacheKey = planCacheKey(data, lang);
     const cached = findSavedPlan(cacheKey);
     if (cached) {
+      storage.set(CHECKIN_DRAFT_KEY, null);
       setPlan(cached.plan);
       return;
     }
@@ -1179,6 +1196,7 @@ export default function NutriCrew() {
       storage.set(PAIRING_COUNT_KEY, result.pairingCount ?? pairingCount + 1);
       if (!result.failedDays?.length) {
         saveSavedPlan(cacheKey, data, result);
+        storage.set(CHECKIN_DRAFT_KEY, null);
       }
     } catch (e) {
       if (e.code === "premium_required") {
@@ -1228,6 +1246,7 @@ export default function NutriCrew() {
   };
 
   const startNewPairing = () => {
+    storage.set(CHECKIN_DRAFT_KEY, null);
     setPairing({});
     setPlan(null);
     setStep(0);
@@ -2250,7 +2269,7 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
           <PlaneIcon size={18} color={C.gold}/>
           <span style={styles.checkinBrand}>NutriCrew</span>
         </div>
-        <div style={styles.stepCounter}>{step+1}/{totalSteps}</div>
+        <div style={styles.stepCounter}>Step {step+1} of {totalSteps}</div>
       </div>
 
       {/* Progress bar */}
