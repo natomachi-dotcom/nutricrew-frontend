@@ -70,6 +70,9 @@ const T = {
     soy_free: "Soy-Free", lactose_free: "Lactose-Free", fodmap: "Low-FODMAP",
     offline_banner: "Offline — showing last saved plan",
     offline_generate: "No connection — generating a new plan requires internet.",
+    history_btn: "Plan History", history_title: "Plan History",
+    history_empty: "No saved plans yet. Generate your first plan to see it here.",
+    history_open: "Open",
     feedback_prompt: "How did this plan work for you?",
     feedback_energy: "Energy", feedback_satiety: "Satiety", feedback_jetlag: "Jet Lag",
     feedback_comment_placeholder: "Any notes? What worked or didn't... (optional)",
@@ -270,6 +273,9 @@ const T = {
     soy_free: "Sans Soja", lactose_free: "Sans Lactose", fodmap: "FODMAP Faible",
     offline_banner: "Hors ligne — affichage du dernier plan sauvegardé",
     offline_generate: "Hors ligne — générer un nouveau plan nécessite une connexion internet.",
+    history_btn: "Historique", history_title: "Historique des plans",
+    history_empty: "Aucun plan sauvegardé. Générez votre premier plan pour le voir ici.",
+    history_open: "Ouvrir",
     feedback_prompt: "Comment ce plan a-t-il fonctionné?",
     feedback_energy: "Énergie", feedback_satiety: "Satiété", feedback_jetlag: "Décalage Horaire",
     feedback_comment_placeholder: "Des notes? Ce qui a fonctionné ou non... (optionnel)",
@@ -470,6 +476,9 @@ const T = {
     soy_free: "Sin Soja", lactose_free: "Sin Lactosa", fodmap: "Bajo-FODMAP",
     offline_banner: "Sin conexión — mostrando el último plan guardado",
     offline_generate: "Sin conexión — generar un nuevo plan requiere internet.",
+    history_btn: "Historial", history_title: "Historial de planes",
+    history_empty: "Aún no hay planes guardados. Genera tu primer plan para verlo aquí.",
+    history_open: "Abrir",
     feedback_prompt: "¿Cómo funcionó este plan?",
     feedback_energy: "Energía", feedback_satiety: "Saciedad", feedback_jetlag: "Jet Lag",
     feedback_comment_placeholder: "¿Algún comentario? ¿Qué funcionó o no... (opcional)",
@@ -893,6 +902,7 @@ export default function NutriCrew() {
   const [checkinReturning, setCheckinReturning] = useState(returningUser);
   const [showRoster, setShowRoster] = useState(false);
   const [showGymPlan, setShowGymPlan] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [premiumReturnScreen, setPremiumReturnScreen] = useState("boarding");
 
   const openRoster = (fromScreen) => {
@@ -1237,6 +1247,14 @@ export default function NutriCrew() {
     setScreen("plan");
   };
 
+  const viewPlan = (saved) => {
+    setPairing(saved.data);
+    setPlan(saved.plan);
+    setActiveTab("plan");
+    setActiveDay(0);
+    setScreen("plan");
+  };
+
   const handleLoginSuccess = (sessionData) => {
     storage.set(SESSION_KEY, { token: sessionData.token, email: sessionData.email });
     const hasPassword = sessionData.hasPassword !== false;
@@ -1290,11 +1308,15 @@ export default function NutriCrew() {
           hasSavedPlan={getSavedPlans().length > 0}
           onStart={() => { setCheckinReturning(returningUser); setScreen("checkin"); }}
           onNewPairing={startNewPairing}
-          onViewLastPlan={viewLastPlan}
+          onOpenHistory={() => setShowHistory(true)}
           onOpenSavedMeals={() => setShowSavedMeals(true)}
           onOpenProfile={() => setShowProfile(true)}
           onOpenRoster={() => openRoster("splash")}
         />
+      )}
+
+      {showHistory && (
+        <PlanHistoryModal t={t} onClose={() => setShowHistory(false)} onOpen={(saved) => { setShowHistory(false); viewPlan(saved); }} />
       )}
 
       {showRoster && (
@@ -1734,7 +1756,7 @@ function OTPScreen({ email, onSuccess, onBack }) {
 }
 
 // ─── SPLASH SCREEN ────────────────────────────────────────────────
-function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onStart, onNewPairing, onViewLastPlan, onOpenSavedMeals, onOpenProfile, onOpenRoster, isPremium }) {
+function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onStart, onNewPairing, onOpenHistory, onOpenSavedMeals, onOpenProfile, onOpenRoster, isPremium }) {
   return (
     <div style={styles.splash}>
       {user && (
@@ -1774,8 +1796,8 @@ function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onS
               <PlaneIcon size={16} color={C.navy}/> {t.new_pairing}
             </button>
             {hasSavedPlan && (
-              <button style={styles.secondaryBtn} onClick={onViewLastPlan}>
-                {t.view_last_plan}
+              <button style={styles.secondaryBtn} onClick={onOpenHistory}>
+                📋 {t.history_btn}
               </button>
             )}
             <button style={styles.secondaryBtn} onClick={onOpenSavedMeals}>
@@ -4212,6 +4234,66 @@ function SavedMealsModal({ t, favorites, onToggleFavorite, onClose }) {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PlanHistoryModal({ t, onClose, onOpen }) {
+  const plans = getSavedPlans();
+  return (
+    <div style={styles.modalOverlay}>
+      <div style={{ ...styles.modal, maxHeight: "88vh" }}>
+        <div style={styles.modalHeader}>
+          <span style={styles.modalTitle}>📋 {t.history_title}</span>
+          <button style={styles.closeBtn} onClick={onClose}>✕</button>
+        </div>
+
+        {plans.length === 0 ? (
+          <div style={styles.restrictCard}>
+            <div style={styles.restrictText}>{t.history_empty}</div>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: "65vh", overflowY: "auto", paddingRight: 2 }}>
+            {plans.map((saved, i) => {
+              const dep = saved.data?.departure || "";
+              const dests = saved.data?.destinations || [];
+              const days = saved.data?.pairing_days || 1;
+              const depCode = dep.match(/\(([A-Z]{3})\)/)?.[1] || dep.slice(0, 3).toUpperCase() || "—";
+              const dst = dests[0] || "";
+              const dstCode = dst.match(/\(([A-Z]{3})\)/)?.[1] || dst.slice(0, 3).toUpperCase() || "—";
+              const extraStops = dests.length - 1;
+              const date = saved.createdAt
+                ? new Date(saved.createdAt).toLocaleDateString("en", { month: "short", day: "numeric", year: "numeric" })
+                : "—";
+              return (
+                <div
+                  key={saved.key || i}
+                  onClick={() => onOpen(saved)}
+                  style={{ background: C.navyCard, borderRadius: 12, padding: "14px 16px", border: `1px solid ${C.navyBorder}`, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", gap: 12 }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 11, color: C.muted, marginBottom: 4, letterSpacing: "0.5px" }}>{date}</div>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: C.white, letterSpacing: "1px", fontFamily: "'Orbitron', sans-serif" }}>
+                      {depCode} → {dstCode}
+                    </div>
+                    {extraStops > 0 && (
+                      <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>
+                        +{extraStops} more stop{extraStops > 1 ? "s" : ""}
+                      </div>
+                    )}
+                    <div style={{ fontSize: 12, color: C.sky, marginTop: 4, fontWeight: 600 }}>
+                      {days} {days === 1 ? t.day : t.days}
+                    </div>
+                  </div>
+                  <div style={{ color: C.gold, fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
+                    {t.history_open} →
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
