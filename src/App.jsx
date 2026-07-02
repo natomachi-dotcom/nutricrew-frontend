@@ -207,6 +207,21 @@ const T = {
     tab_performance: "Performance",
     perf_advisory_title: "Duty Performance Advisory",
     perf_badge: "🧠 Cognitive Mode",
+    val_enter_name: "Enter your name to continue.",
+    val_enter_email: "Enter your email to continue.",
+    val_select_one: "Pick one to continue.",
+    val_enter_weight: "Enter your weight to continue.",
+    val_select_dob: "Select your date of birth to continue.",
+    val_dob_young: "You must be at least 16 to use NutriCrew.",
+    val_dob_old: "Must be 80 or under to continue.",
+    val_select_kitchen: "Select at least one kitchen option to continue.",
+    val_select_diet: "Select at least one diet option to continue.",
+    val_diet_describe: "Describe your diet above to continue.",
+    val_select_goal: "Pick at least one goal to continue.",
+    val_enter_budget: "Enter your budget to continue.",
+    val_select_days: "Choose your pairing length to continue.",
+    val_fill_dest: "Fill in all destinations to continue.",
+    val_select_usa: "Select yes or no to continue.",
   },
   fr: {
     tagline: "Alimentez Votre Vol",
@@ -391,6 +406,21 @@ const T = {
     tab_performance: "Performance",
     perf_advisory_title: "Avis Performance de Service",
     perf_badge: "🧠 Mode Cognitif",
+    val_enter_name: "Entrez votre nom pour continuer.",
+    val_enter_email: "Entrez votre email pour continuer.",
+    val_select_one: "Choisissez une option pour continuer.",
+    val_enter_weight: "Entrez votre poids pour continuer.",
+    val_select_dob: "Sélectionnez votre date de naissance pour continuer.",
+    val_dob_young: "Vous devez avoir au moins 16 ans pour utiliser NutriCrew.",
+    val_dob_old: "Vous devez avoir 80 ans ou moins pour continuer.",
+    val_select_kitchen: "Sélectionnez au moins une option de cuisine pour continuer.",
+    val_select_diet: "Sélectionnez au moins un régime pour continuer.",
+    val_diet_describe: "Décrivez votre régime ci-dessus pour continuer.",
+    val_select_goal: "Choisissez au moins un objectif pour continuer.",
+    val_enter_budget: "Entrez votre budget pour continuer.",
+    val_select_days: "Choisissez la durée de votre pairing pour continuer.",
+    val_fill_dest: "Remplissez toutes les destinations pour continuer.",
+    val_select_usa: "Sélectionnez oui ou non pour continuer.",
   },
   es: {
     tagline: "Combustible Para Tu Vuelo",
@@ -575,6 +605,21 @@ const T = {
     tab_performance: "Rendimiento",
     perf_advisory_title: "Aviso de Rendimiento de Servicio",
     perf_badge: "🧠 Modo Cognitivo",
+    val_enter_name: "Ingresa tu nombre para continuar.",
+    val_enter_email: "Ingresa tu correo para continuar.",
+    val_select_one: "Elige una opción para continuar.",
+    val_enter_weight: "Ingresa tu peso para continuar.",
+    val_select_dob: "Selecciona tu fecha de nacimiento para continuar.",
+    val_dob_young: "Debes tener al menos 16 años para usar NutriCrew.",
+    val_dob_old: "Debes tener 80 años o menos para continuar.",
+    val_select_kitchen: "Selecciona al menos una opción de cocina para continuar.",
+    val_select_diet: "Selecciona al menos una opción de dieta para continuar.",
+    val_diet_describe: "Describe tu dieta arriba para continuar.",
+    val_select_goal: "Elige al menos un objetivo para continuar.",
+    val_enter_budget: "Ingresa tu presupuesto para continuar.",
+    val_select_days: "Elige la duración de tu pairing para continuar.",
+    val_fill_dest: "Completa todos los destinos para continuar.",
+    val_select_usa: "Selecciona sí o no para continuar.",
   }
 };
 
@@ -1817,6 +1862,38 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
 
   const progress = ((step + 1) / totalSteps) * 100;
 
+  const validationHint = () => {
+    if (canContinue()) return null;
+    switch (currentStep) {
+      case "name":         return t.val_enter_name;
+      case "email":        return t.val_enter_email;
+      case "gender":       return t.val_select_one;
+      case "weight":       return t.val_enter_weight;
+      case "dob": {
+        const dob = pairing.dob ?? user?.dob;
+        if (!dob) return t.val_select_dob;
+        const age = Math.floor((Date.now() - new Date(dob)) / (365.25 * 24 * 60 * 60 * 1000));
+        if (age < 16) return t.val_dob_young;
+        if (age > 80) return t.val_dob_old;
+        return t.val_select_dob;
+      }
+      case "position":     return t.val_select_one;
+      case "kitchen":      return t.val_select_kitchen;
+      case "lunch_bag":    return t.val_select_one;
+      case "cooking_pref": return t.val_select_one;
+      case "diet":
+        if (!pairing.diets || pairing.diets.length === 0) return t.val_select_diet;
+        if (pairing.diets.includes("other") && !pairing.diet_other?.trim()) return t.val_diet_describe;
+        return null;
+      case "goals":        return t.val_select_goal;
+      case "budget":       return t.val_enter_budget;
+      case "pairing_days": return t.val_select_days;
+      case "destination":  return t.val_fill_dest;
+      case "going_usa":    return t.val_select_usa;
+      default:             return null;
+    }
+  };
+
   const stepContent = () => {
     switch (currentStep) {
       case "name":
@@ -2155,6 +2232,13 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
           <div style={styles.mrzLine}>{"NCR" + docNumber.slice(-9) + "<<<<<<<<<<<<<<<<<<<"}</div>
         </div>
       </div>
+
+      {/* Validation hint */}
+      {validationHint() && (
+        <div style={{ color: "#b0a080", fontSize: 12, textAlign: "center", marginTop: 10, marginBottom: -2, padding: "0 16px" }}>
+          {validationHint()}
+        </div>
+      )}
 
       {/* Nav */}
       <div style={styles.navRow}>
