@@ -226,6 +226,10 @@ const T = {
     val_select_days: "Choose your pairing length to continue.",
     val_fill_dest: "Fill in all destinations to continue.",
     val_select_usa: "Select yes or no to continue.",
+    hydration_target: "Daily Water Target",
+    hydration_longhauul: "Long-haul pairing — cabin altitude accelerates dehydration",
+    hydration_medium: "Medium-haul pairing — drink more than you would on the ground",
+    hydration_domestic: "Keep sipping steadily through your duty",
     share_btn: "Share Plan",
     share_copied: "Link copied to clipboard!",
     share_title: "My NutriCrew Nutrition Plan",
@@ -438,6 +442,10 @@ const T = {
     val_select_days: "Choisissez la durée de votre pairing pour continuer.",
     val_fill_dest: "Remplissez toutes les destinations pour continuer.",
     val_select_usa: "Sélectionnez oui ou non pour continuer.",
+    hydration_target: "Objectif Hydratation Journalier",
+    hydration_longhauul: "Vol long-courrier — l'altitude déshydrate plus vite",
+    hydration_medium: "Vol moyen-courrier — buvez plus qu'au sol",
+    hydration_domestic: "Buvez régulièrement tout au long de votre service",
     share_btn: "Partager le Plan",
     share_copied: "Lien copié dans le presse-papiers !",
     share_title: "Mon Plan Nutritionnel NutriCrew",
@@ -650,6 +658,10 @@ const T = {
     val_select_days: "Elige la duración de tu pairing para continuar.",
     val_fill_dest: "Completa todos los destinos para continuar.",
     val_select_usa: "Selecciona sí o no para continuar.",
+    hydration_target: "Objetivo Diario de Hidratación",
+    hydration_longhauul: "Vuelo de largo recorrido — la altitud de cabina deshidrata más rápido",
+    hydration_medium: "Vuelo de medio recorrido — bebe más que en tierra",
+    hydration_domestic: "Mantén una hidratación constante durante tu servicio",
     share_btn: "Compartir Plan",
     share_copied: "¡Enlace copiado al portapapeles!",
     share_title: "Mi Plan Nutricional NutriCrew",
@@ -2692,6 +2704,25 @@ function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, 
         </div>
       )}
 
+      {/* Hydration target banner */}
+      {plan.hydration && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#081A2E", border: `1px solid #2A6090`, borderRadius: 10, padding: "8px 14px", marginBottom: 12 }}>
+          <span style={{ fontSize: 20, flexShrink: 0 }}>💧</span>
+          <div>
+            <div style={{ color: C.skyLight, fontWeight: 700, fontSize: 13 }}>
+              {t.hydration_target}: <span style={{ fontFamily: "'Orbitron', monospace", fontSize: 15 }}>{plan.hydration.dailyTargetLiters}L</span>
+            </div>
+            <div style={{ color: C.muted, fontSize: 11, marginTop: 1 }}>
+              {(plan.hydration.category === "ultra-long-haul" || plan.hydration.category === "long-haul")
+                ? t.hydration_longhauul
+                : plan.hydration.category === "medium-haul"
+                  ? t.hydration_medium
+                  : t.hydration_domestic}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Tabs */}
       <div style={styles.tabBar}>
         {["plan","grocery","restrictions","nearby",...(plan.performanceAdvisory ? ["performance"] : [])].map(tab => (
@@ -2852,6 +2883,11 @@ function DayPlan({ day, t, favorites, onToggleFavorite, onOpenAirplaneMeal }) {
       <div style={styles.dayLabel2}>{day.label}</div>
       {day.jetlagNote && (
         <div style={styles.jetlagMealNote}>😴 {day.jetlagNote}</div>
+      )}
+      {day.hydrationNote && (
+        <div style={{ background: "#081A2E", border: "1px solid #2A6090", borderRadius: 8, padding: "6px 12px", marginBottom: 10, fontSize: 12, color: "#7BBFE0", display: "flex", alignItems: "center", gap: 7 }}>
+          <span>💧</span><span>{day.hydrationNote}</span>
+        </div>
       )}
       {day.meals?.map((meal, i) => {
         const mealId = `${meal.type}-${meal.name}`;
