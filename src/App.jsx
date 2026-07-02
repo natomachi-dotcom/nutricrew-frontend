@@ -69,6 +69,7 @@ const T = {
     nut_free: "Nut-Free", egg_free: "Egg-Free", shellfish_free: "Shellfish-Free",
     soy_free: "Soy-Free", lactose_free: "Lactose-Free", fodmap: "Low-FODMAP",
     offline_banner: "Offline — showing last saved plan",
+    offline_generate: "No connection — generating a new plan requires internet.",
     feedback_prompt: "How did this plan work for you?",
     feedback_energy: "Energy", feedback_satiety: "Satiety", feedback_jetlag: "Jet Lag",
     feedback_comment_placeholder: "Any notes? What worked or didn't... (optional)",
@@ -268,6 +269,7 @@ const T = {
     nut_free: "Sans Noix", egg_free: "Sans Œufs", shellfish_free: "Sans Fruits de Mer",
     soy_free: "Sans Soja", lactose_free: "Sans Lactose", fodmap: "FODMAP Faible",
     offline_banner: "Hors ligne — affichage du dernier plan sauvegardé",
+    offline_generate: "Hors ligne — générer un nouveau plan nécessite une connexion internet.",
     feedback_prompt: "Comment ce plan a-t-il fonctionné?",
     feedback_energy: "Énergie", feedback_satiety: "Satiété", feedback_jetlag: "Décalage Horaire",
     feedback_comment_placeholder: "Des notes? Ce qui a fonctionné ou non... (optionnel)",
@@ -467,6 +469,7 @@ const T = {
     nut_free: "Sin Frutos Secos", egg_free: "Sin Huevo", shellfish_free: "Sin Mariscos",
     soy_free: "Sin Soja", lactose_free: "Sin Lactosa", fodmap: "Bajo-FODMAP",
     offline_banner: "Sin conexión — mostrando el último plan guardado",
+    offline_generate: "Sin conexión — generar un nuevo plan requiere internet.",
     feedback_prompt: "¿Cómo funcionó este plan?",
     feedback_energy: "Energía", feedback_satiety: "Saciedad", feedback_jetlag: "Jet Lag",
     feedback_comment_placeholder: "¿Algún comentario? ¿Qué funcionó o no... (opcional)",
@@ -831,6 +834,8 @@ export default function NutriCrew() {
   const [screen, setScreen] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("premium") === "true") return "premium";
+    // Offline with a saved plan: bypass auth flow and show the plan immediately.
+    if (!navigator.onLine && getSavedPlans().length > 0) return "plan";
     if (storage.get(SESSION_KEY)?.token) {
       // If we already have a cached user profile, skip the loading spinner and
       // render immediately — verify-session will update isPremium in background.
@@ -848,9 +853,19 @@ export default function NutriCrew() {
       storage.set(PENDING_PAIRING_KEY, null);
       return pending;
     }
+    if (!navigator.onLine) {
+      const saved = getSavedPlans()[0];
+      if (saved) return saved.data;
+    }
     return {};
   });
-  const [plan, setPlan] = useState(null);
+  const [plan, setPlan] = useState(() => {
+    if (!navigator.onLine) {
+      const saved = getSavedPlans()[0];
+      if (saved) return saved.plan;
+    }
+    return null;
+  });
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("plan");
   const [activeDay, setActiveDay] = useState(0);
@@ -1135,6 +1150,7 @@ export default function NutriCrew() {
   const needsPremiumForDiet = (pairing.diets || []).includes("calorie_deficit") && !isPremium;
 
   const handleGenerate = async () => {
+    if (!isOnline) return; // blocked by UI; boarding pass shows offline banner
     if (isPremiumNeeded || needsPremiumForDiet) { setScreen("premium"); return; }
     setScreen("plan");
 
@@ -1298,7 +1314,7 @@ export default function NutriCrew() {
       {screen === "boarding" && (
         <BoardingPassScreen t={t} user={user} pairing={pairing}
           onGenerate={handleGenerate} onBack={() => setScreen("checkin")}
-          isPremiumNeeded={isPremiumNeeded}
+          isPremiumNeeded={isPremiumNeeded} isOnline={isOnline}
         />
       )}
 
@@ -2282,7 +2298,7 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
 }
 
 // ─── BOARDING PASS ────────────────────────────────────────────────
-function BoardingPassScreen({ t, user, pairing, onGenerate, onBack, isPremiumNeeded }) {
+function BoardingPassScreen({ t, user, pairing, onGenerate, onBack, isPremiumNeeded, isOnline }) {
   const mergedUser = { ...(user || {}), ...pairing };
   const allDiets = mergedUser.diets || (mergedUser.diet ? [mergedUser.diet] : []);
   const filteredDiets = allDiets.filter(d => d && d !== "none");
@@ -2364,9 +2380,16 @@ function BoardingPassScreen({ t, user, pairing, onGenerate, onBack, isPremiumNee
         )}
       </div>
 
+      {!isOnline && (
+        <div style={{ background: "#3A2A00", border: `1px solid ${C.gold}`, borderRadius: 10, padding: "8px 14px", margin: "12px 0 0", display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 16 }}>📵</span>
+          <span style={{ color: C.gold, fontSize: 13 }}>{t.offline_generate}</span>
+        </div>
+      )}
+
       <div style={styles.navRow}>
         <button style={styles.backBtn} onClick={onBack}>{t.back}</button>
-        <button style={styles.primaryBtn} onClick={onGenerate}>
+        <button style={{ ...styles.primaryBtn, ...(isOnline === false ? { opacity: 0.5, cursor: "not-allowed" } : {}) }} onClick={onGenerate}>
           <PlaneIcon size={16} color={C.navy}/> {t.generate}
         </button>
       </div>
