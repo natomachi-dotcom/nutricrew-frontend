@@ -2767,6 +2767,12 @@ function GroceryList({ list }) {
 function FoodRestrictions({ data, pairing }) {
   return (
     <div>
+      {data.carried && (
+        <div style={{...styles.restrictCard, borderLeft: "3px solid #e8a020"}}>
+          <div style={styles.restrictTitle}>⚠️ Packed & Carried Food Rules</div>
+          <div style={styles.restrictText}>{data.carried}</div>
+        </div>
+      )}
       {pairing.going_usa === "yes" && (
         <div style={styles.restrictCard}>
           <div style={styles.restrictTitle}>🇺🇸 USA Customs Rules</div>
