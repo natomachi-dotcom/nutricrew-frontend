@@ -1129,6 +1129,7 @@ export default function NutriCrew() {
 
   const handleBack = () => {
     if (step > 0) startTransition(() => setStep(s => s - 1));
+    else setScreen("splash");
   };
 
   const needsPremiumForDiet = (pairing.diets || []).includes("calorie_deficit") && !isPremium;
@@ -2242,9 +2243,7 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
 
       {/* Nav */}
       <div style={styles.navRow}>
-        {step > 0 && (
-          <button style={styles.backBtn} onClick={handleBack}>{t.back}</button>
-        )}
+        <button style={styles.backBtn} onClick={handleBack}>{t.back}</button>
         <button
           style={{...styles.continueBtn, ...(canContinue()?{}:styles.continueBtnDisabled)}}
           disabled={!canContinue()}
