@@ -2974,6 +2974,7 @@ function RosterModal({ t, user, onClose, onRequirePremium }) {
         diets: user?.diets || ["none"], goals: user?.goals || ["energy"],
         budgetAmount: user?.budget_amount || "30", budgetType: user?.budget_type || "day",
         lang: user?.lang || "en", lunchBag: user?.lunch_bag || null,
+        kitchen: user?.kitchen || [],
       };
       const res = await fetch(`${API_BASE}/api/roster/store-pairings`, {
         method: "POST",
