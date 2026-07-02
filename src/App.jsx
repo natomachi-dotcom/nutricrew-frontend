@@ -2806,6 +2806,104 @@ function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess, onGenerate, retur
   );
 }
 
+// ─── ROSTER TEXT PARSER ───────────────────────────────────────────
+const MONTH_IDX = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 };
+const USA_IATA = new Set(["JFK","EWR","LGA","LAX","ORD","ATL","DFW","DEN","SFO","SEA","BOS","MIA","PHX","LAS","MCO","IAH","MSP","DTW","CLT","PHL","BWI","SAN","TPA","MDW","HNL","SLC","AUS","SNA","OAK","SMF","MSY","STL","RDU","BNA","PIT","CLE","CMH","IND","FLL","SJC","HOU","DAL","PDX","MKE","CVG","RSW","FLL","BUR","ONT"]);
+
+function parseRosterText(text, homeBase) {
+  const y = new Date().getFullYear();
+
+  function parseOneDate(s) {
+    s = s.replace(/\b(\d+)(st|nd|rd|th)\b/i, "$1").trim();
+    let m;
+    m = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+    if (m) return new Date(+m[1], +m[2]-1, +m[3]);
+    m = s.match(/^(\d{1,2})[\/\-](\d{1,2})$/);
+    if (m) return new Date(y, +m[1]-1, +m[2]);
+    m = s.match(/^([A-Za-z]{3,9})\s+(\d{1,2})$/);
+    if (m) { const mo = MONTH_IDX[m[1].slice(0,3).toLowerCase()]; if (mo !== undefined) return new Date(y, mo, +m[2]); }
+    m = s.match(/^(\d{1,2})\s+([A-Za-z]{3,9})$/);
+    if (m) { const mo = MONTH_IDX[m[2].slice(0,3).toLowerCase()]; if (mo !== undefined) return new Date(y, mo, +m[1]); }
+    return null;
+  }
+
+  function toYMD(d) {
+    if (!d) return null;
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  }
+
+  // Split by newline; also split by comma when all comma-segments contain a route pattern
+  const rawLines = text.split(/\n/).map(s => s.trim()).filter(Boolean);
+  const lines = [];
+  for (const l of rawLines) {
+    const parts = l.split(/,\s*/);
+    if (parts.length > 1 && parts.every(p => /[A-Z]{3}\s*[-–]\s*[A-Z]{3}/i.test(p))) {
+      lines.push(...parts.map(p => p.trim()));
+    } else {
+      lines.push(l);
+    }
+  }
+
+  const pairings = [], errors = [];
+
+  for (const rawLine of lines) {
+    const line = rawLine.replace(/\s+/g, " ").trim();
+
+    // Extract route: 2+ IATA codes joined by dashes (spaces around dashes OK)
+    const routeMatch = line.match(/([A-Z]{3}(?:\s*[-–]\s*[A-Z]{3})+)/i);
+    if (!routeMatch) {
+      errors.push({ line: rawLine, message: `No airport route found — expected format: YUL-CDG-YUL` });
+      continue;
+    }
+    const routeRaw = routeMatch[1];
+    const codes = routeRaw.split(/\s*[-–]\s*/).map(c => c.toUpperCase()).filter(c => /^[A-Z]{3}$/.test(c));
+    if (codes.length < 2) {
+      errors.push({ line: rawLine, message: `Route needs at least 2 airport codes` });
+      continue;
+    }
+
+    const departure = homeBase || codes[0];
+    // YUL-CDG-YUL: destinations=[CDG]; YUL-CDG-LHR-YUL: destinations=[CDG,LHR]; YUL-CDG: destinations=[CDG]
+    const destinations = codes.length === 2 ? [codes[1]] : codes.slice(1, -1);
+
+    // Date part: everything before the route, strip trailing punctuation
+    const routeIdx = line.search(/[A-Z]{3}\s*[-–]\s*[A-Z]{3}/i);
+    const datePart = line.slice(0, routeIdx).trim().replace(/[,;:\s]+$/, "");
+
+    // Check for a date range "Jun 30-Jul 2" or "Jun 30 - Jul 2"
+    // Range: first part ends in a digit, separator is dash, second part starts with letter or digit
+    let pairingDate, returnDate;
+    const rangeMatch = datePart.match(/^(.+?\d)\s*[-–]\s*([A-Za-z\d].+)$/);
+    if (rangeMatch) {
+      pairingDate = parseOneDate(rangeMatch[1].trim());
+      returnDate = parseOneDate(rangeMatch[2].trim());
+    } else {
+      pairingDate = parseOneDate(datePart);
+    }
+
+    if (!pairingDate) {
+      errors.push({ line: rawLine, message: `Can't read date "${datePart || "(empty)"}" — try: "Jul 2", "07/02", or "2026-07-02"` });
+      continue;
+    }
+
+    const effectiveReturn = returnDate || pairingDate;
+    const pairingDays = returnDate && returnDate > pairingDate
+      ? Math.round((returnDate - pairingDate) / 864e5) + 1 : 1;
+
+    pairings.push({
+      pairingDate: toYMD(pairingDate),
+      returnDate: toYMD(effectiveReturn),
+      pairingDays,
+      departure,
+      destinations,
+      goingUsa: destinations.some(d => USA_IATA.has(d)) ? "yes" : "no",
+      timezone: 0,
+    });
+  }
+
+  return { pairings, errors };
+}
+
 // ─── ROSTER MODAL ─────────────────────────────────────────────────
 function RosterModal({ t, user, onClose, onRequirePremium }) {
   const [phase, setPhase] = useState("upload"); // upload | parsing | confirm | saving | done | error
@@ -2816,6 +2914,9 @@ function RosterModal({ t, user, onClose, onRequirePremium }) {
   const [showGymPlan, setShowGymPlan] = useState(false);
   const [editingIdx, setEditingIdx] = useState(null);
   const [editDraft, setEditDraft] = useState(null);
+  const [inputMode, setInputMode] = useState("photo");
+  const [rosterText, setRosterText] = useState("");
+  const [parseErrors, setParseErrors] = useState([]);
 
   const handleFiles = (e) => {
     const files = Array.from(e.target.files).slice(0, 4);
@@ -2847,6 +2948,21 @@ function RosterModal({ t, user, onClose, onRequirePremium }) {
       setErrMsg(t.roster_error);
       setPhase("error");
     }
+  };
+
+  const handleTextParse = () => {
+    const { pairings: parsed, errors } = parseRosterText(rosterText, homeBase);
+    setParseErrors(errors);
+    if (parsed.length === 0) {
+      setErrMsg(errors.length > 0
+        ? `Could not parse any pairings. See errors below and check your format.`
+        : `No pairings found. Each line should look like: "Jul 2 YUL-LHR-YUL"`
+      );
+      setPhase("error");
+      return;
+    }
+    setPairings(parsed);
+    setPhase("confirm");
   };
 
   const handleConfirm = async () => {
@@ -2891,8 +3007,18 @@ function RosterModal({ t, user, onClose, onRequirePremium }) {
 
         {phase === "upload" && (
           <div>
-            <div style={{ color: C.gold, fontWeight: 700, fontSize: 17, marginBottom: 8 }}>📅 {t.roster_title}</div>
-            <div style={{ color: C.muted, fontSize: 13, marginBottom: 20, lineHeight: 1.6 }}>{t.roster_hint}</div>
+            <div style={{ color: C.gold, fontWeight: 700, fontSize: 17, marginBottom: 14 }}>📅 {t.roster_title}</div>
+
+            {/* Input mode tabs */}
+            <div style={{ display: "flex", gap: 4, marginBottom: 18, background: C.navy, borderRadius: 10, padding: 4 }}>
+              {[["photo", "📷 Photos"], ["text", "📝 Paste Text"]].map(([mode, label]) => (
+                <button key={mode} onClick={() => setInputMode(mode)}
+                  style={{ flex: 1, padding: "8px 4px", borderRadius: 7, border: "none", fontWeight: 600, fontSize: 13, cursor: "pointer",
+                    background: inputMode === mode ? C.gold : "transparent",
+                    color: inputMode === mode ? C.navy : C.muted }}
+                >{label}</button>
+              ))}
+            </div>
 
             <div style={{ color: C.white, fontSize: 13, fontWeight: 600, marginBottom: 6 }}>{t.roster_home_base}</div>
             <input
@@ -2902,24 +3028,43 @@ function RosterModal({ t, user, onClose, onRequirePremium }) {
               style={{ width: "100%", boxSizing: "border-box", background: C.navy, border: `1px solid ${C.navyBorder}`, borderRadius: 10, color: C.white, padding: "11px 14px", fontSize: 14, outline: "none", marginBottom: 16, fontFamily: "inherit" }}
             />
 
-            <label style={{ display: "block", padding: "16px", background: C.navy, border: `2px dashed ${C.navyBorder}`, borderRadius: 12, textAlign: "center", cursor: "pointer", marginBottom: 16 }}>
-              <input type="file" accept="image/*" multiple onChange={handleFiles} style={{ display: "none" }} />
-              <div style={{ fontSize: 32, marginBottom: 8 }}>📷</div>
-              <div style={{ color: C.gold, fontWeight: 600, marginBottom: 4 }}>{t.roster_upload_btn}</div>
-              <div style={{ color: C.muted, fontSize: 12 }}>Up to 4 photos</div>
-            </label>
-
-            {images.length > 0 && (
-              <div style={{ color: C.green, fontSize: 13, marginBottom: 16 }}>✓ {images.length} photo{images.length > 1 ? "s" : ""} selected: {images.map(f => f.name).join(", ")}</div>
+            {inputMode === "photo" && (
+              <>
+                <div style={{ color: C.muted, fontSize: 13, marginBottom: 14, lineHeight: 1.6 }}>{t.roster_hint}</div>
+                <label style={{ display: "block", padding: "16px", background: C.navy, border: `2px dashed ${C.navyBorder}`, borderRadius: 12, textAlign: "center", cursor: "pointer", marginBottom: 16 }}>
+                  <input type="file" accept="image/*" multiple onChange={handleFiles} style={{ display: "none" }} />
+                  <div style={{ fontSize: 32, marginBottom: 8 }}>📷</div>
+                  <div style={{ color: C.gold, fontWeight: 600, marginBottom: 4 }}>{t.roster_upload_btn}</div>
+                  <div style={{ color: C.muted, fontSize: 12 }}>Up to 4 photos</div>
+                </label>
+                {images.length > 0 && (
+                  <div style={{ color: C.green, fontSize: 13, marginBottom: 16 }}>✓ {images.length} photo{images.length > 1 ? "s" : ""} selected: {images.map(f => f.name).join(", ")}</div>
+                )}
+                <button onClick={handleParse} disabled={images.length === 0}
+                  style={{ width: "100%", padding: "14px", background: images.length > 0 ? C.gold : C.navyBorder, color: images.length > 0 ? C.navy : C.muted, border: "none", borderRadius: 12, fontWeight: 700, fontSize: 15, cursor: images.length > 0 ? "pointer" : "default" }}
+                >{t.roster_upload_btn} →</button>
+              </>
             )}
 
-            <button
-              onClick={handleParse}
-              disabled={images.length === 0}
-              style={{ width: "100%", padding: "14px", background: images.length > 0 ? C.gold : C.navyBorder, color: images.length > 0 ? C.navy : C.muted, border: "none", borderRadius: 12, fontWeight: 700, fontSize: 15, cursor: images.length > 0 ? "pointer" : "default" }}
-            >
-              {t.roster_upload_btn} →
-            </button>
+            {inputMode === "text" && (
+              <>
+                <div style={{ color: C.muted, fontSize: 12, marginBottom: 10, lineHeight: 1.7 }}>
+                  One pairing per line, or comma-separated.<br />
+                  Format: <span style={{ color: C.gold, fontFamily: "monospace" }}>Jul 2 YUL-LHR-YUL</span><br />
+                  Multi-day: <span style={{ color: C.gold, fontFamily: "monospace" }}>Jul 2-Jul 5 YUL-LHR-YUL</span>
+                </div>
+                <textarea
+                  value={rosterText}
+                  onChange={e => setRosterText(e.target.value)}
+                  placeholder={"Jun 30 YUL-CDG-YUL\nJul 2 YUL-LHR-YUL"}
+                  rows={5}
+                  style={{ width: "100%", boxSizing: "border-box", background: C.navy, border: `1px solid ${C.navyBorder}`, borderRadius: 10, color: C.white, padding: "11px 14px", fontSize: 13, outline: "none", marginBottom: 12, fontFamily: "monospace", resize: "vertical" }}
+                />
+                <button onClick={handleTextParse} disabled={!rosterText.trim()}
+                  style={{ width: "100%", padding: "14px", background: rosterText.trim() ? C.gold : C.navyBorder, color: rosterText.trim() ? C.navy : C.muted, border: "none", borderRadius: 12, fontWeight: 700, fontSize: 15, cursor: rosterText.trim() ? "pointer" : "default" }}
+                >Parse Pairings →</button>
+              </>
+            )}
           </div>
         )}
 
@@ -2935,6 +3080,18 @@ function RosterModal({ t, user, onClose, onRequirePremium }) {
           <div>
             <div style={{ color: C.gold, fontWeight: 700, fontSize: 16, marginBottom: 4 }}>✈️ {t.roster_confirm_title}</div>
             <div style={{ color: C.muted, fontSize: 13, marginBottom: 16 }}>{t.roster_confirm_hint}</div>
+
+            {parseErrors.length > 0 && (
+              <div style={{ background: "rgba(255,100,100,0.08)", border: "1px solid rgba(255,100,100,0.2)", borderRadius: 10, padding: "10px 14px", marginBottom: 14 }}>
+                <div style={{ color: "#ff8080", fontWeight: 600, fontSize: 12, marginBottom: 6 }}>⚠️ {parseErrors.length} line{parseErrors.length > 1 ? "s" : ""} couldn&apos;t be parsed:</div>
+                {parseErrors.map((e, i) => (
+                  <div key={i} style={{ fontSize: 11, marginBottom: 4 }}>
+                    <span style={{ color: C.white, fontFamily: "monospace" }}>{e.line}</span><br />
+                    <span style={{ color: "#ff8080" }}>↳ {e.message}</span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {pairings.map((p, i) => {
               const isEditing = editingIdx === i;
@@ -3139,8 +3296,18 @@ function RosterModal({ t, user, onClose, onRequirePremium }) {
         {phase === "error" && (
           <div style={{ textAlign: "center", padding: "24px 0" }}>
             <div style={{ fontSize: 40, marginBottom: 12 }}>⚠️</div>
-            <div style={{ color: C.red, fontWeight: 600, marginBottom: 20 }}>{errMsg}</div>
-            <button onClick={() => setPhase("upload")} style={{ padding: "12px 32px", background: C.navy, border: `1px solid ${C.navyBorder}`, color: C.white, borderRadius: 12, cursor: "pointer" }}>Try Again</button>
+            <div style={{ color: C.red, fontWeight: 600, marginBottom: parseErrors.length > 0 ? 12 : 20 }}>{errMsg}</div>
+            {parseErrors.length > 0 && (
+              <div style={{ background: "rgba(255,100,100,0.08)", border: "1px solid rgba(255,100,100,0.2)", borderRadius: 10, padding: "10px 14px", marginBottom: 20, textAlign: "left" }}>
+                {parseErrors.map((e, i) => (
+                  <div key={i} style={{ fontSize: 11, marginBottom: 6 }}>
+                    <span style={{ color: C.white, fontFamily: "monospace" }}>{e.line}</span><br />
+                    <span style={{ color: "#ff8080" }}>↳ {e.message}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button onClick={() => { setPhase("upload"); setParseErrors([]); }} style={{ padding: "12px 32px", background: C.navy, border: `1px solid ${C.navyBorder}`, color: C.white, borderRadius: 12, cursor: "pointer" }}>Try Again</button>
           </div>
         )}
       </div>

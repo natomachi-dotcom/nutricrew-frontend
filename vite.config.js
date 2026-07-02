@@ -9,9 +9,7 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        // Split React into its own long-cached chunk — it changes rarely,
-        // so returning users only re-download the app chunk on updates.
-        manualChunks: { vendor: ['react', 'react-dom'] },
+        manualChunks: (id) => id.includes('node_modules/react') ? 'vendor' : undefined,
       },
     },
   },
