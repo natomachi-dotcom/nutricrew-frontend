@@ -226,6 +226,15 @@ const T = {
     val_select_days: "Choose your pairing length to continue.",
     val_fill_dest: "Fill in all destinations to continue.",
     val_select_usa: "Select yes or no to continue.",
+    share_btn: "Share Plan",
+    share_copied: "Link copied to clipboard!",
+    share_title: "My NutriCrew Nutrition Plan",
+    share_text: "Check out my crew nutrition plan from NutriCrew!",
+    referral_title: "Invite Crew",
+    referral_desc: "Share your link — you both get a free extra pairing.",
+    referral_copy: "Copy Invite Link",
+    referral_copied: "Copied!",
+    referral_applied: "Referral applied — you get a free extra pairing!",
   },
   fr: {
     tagline: "Alimentez Votre Vol",
@@ -429,6 +438,15 @@ const T = {
     val_select_days: "Choisissez la durée de votre pairing pour continuer.",
     val_fill_dest: "Remplissez toutes les destinations pour continuer.",
     val_select_usa: "Sélectionnez oui ou non pour continuer.",
+    share_btn: "Partager le Plan",
+    share_copied: "Lien copié dans le presse-papiers !",
+    share_title: "Mon Plan Nutritionnel NutriCrew",
+    share_text: "Découvrez mon plan nutritionnel d'équipage NutriCrew !",
+    referral_title: "Inviter l'Équipage",
+    referral_desc: "Partagez votre lien — vous recevez tous les deux un pairing gratuit.",
+    referral_copy: "Copier le Lien",
+    referral_copied: "Copié !",
+    referral_applied: "Parrainage appliqué — vous obtenez un pairing gratuit !",
   },
   es: {
     tagline: "Combustible Para Tu Vuelo",
@@ -632,6 +650,15 @@ const T = {
     val_select_days: "Elige la duración de tu pairing para continuar.",
     val_fill_dest: "Completa todos los destinos para continuar.",
     val_select_usa: "Selecciona sí o no para continuar.",
+    share_btn: "Compartir Plan",
+    share_copied: "¡Enlace copiado al portapapeles!",
+    share_title: "Mi Plan Nutricional NutriCrew",
+    share_text: "¡Mira mi plan de nutrición de tripulación de NutriCrew!",
+    referral_title: "Invitar Tripulación",
+    referral_desc: "Comparte tu enlace — ambos reciben un pairing extra gratis.",
+    referral_copy: "Copiar Enlace",
+    referral_copied: "¡Copiado!",
+    referral_applied: "¡Referido aplicado — obtienes un pairing extra gratis!",
   }
 };
 
@@ -790,7 +817,22 @@ const PASSWORD_PROMPT_DISMISSED_KEY = "nutricrew_password_prompt_dismissed";
 const SAVED_PLANS_KEY = "nutricrew_saved_plans";
 const FEEDBACK_KEY = "nutricrew_plan_feedback";
 const CHECKIN_DRAFT_KEY = "nutricrew_checkin_draft";
+const PENDING_REFERRAL_KEY = "nutricrew_pending_referral";
 const MAX_SAVED_PLANS = 10;
+
+// Capture ?ref=CODE from the URL immediately on load so it survives navigation/login.
+(function capturePendingReferral() {
+  try {
+    const p = new URLSearchParams(window.location.search);
+    const ref = p.get("ref");
+    if (ref && ref.length === 8) {
+      storage.set(PENDING_REFERRAL_KEY, ref.toUpperCase());
+      // Clean the URL so it doesn't re-apply on subsequent visits
+      const clean = window.location.pathname + (p.toString().replace(/[?&]?ref=[^&]*/g, "").replace(/^&/, "?").replace(/^/, p.size > 1 ? "?" : ""));
+      window.history.replaceState({}, "", clean);
+    }
+  } catch {}
+})();
 
 // Generated plans are cached by their exact input parameters (and language),
 // so re-submitting the same pairing reuses the saved result instead of
@@ -913,6 +955,9 @@ export default function NutriCrew() {
   const [showRoster, setShowRoster] = useState(false);
   const [showGymPlan, setShowGymPlan] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showReferral, setShowReferral] = useState(false);
+  const [referralCode, setReferralCode] = useState(null);
+  const [shareCopied, setShareCopied] = useState(false);
   const [premiumReturnScreen, setPremiumReturnScreen] = useState("boarding");
 
   const openRoster = (fromScreen) => {
@@ -1013,8 +1058,8 @@ export default function NutriCrew() {
           const data = await r.json();
           setUser(prev => {
             const u = prev?.email
-              ? { ...prev, isPremium: !!data.isPremium }
-              : { email: data.email, name: data.name || "", isPremium: !!data.isPremium };
+              ? { ...prev, isPremium: !!data.isPremium, bonusPairings: data.bonusPairings ?? prev?.bonusPairings ?? 0 }
+              : { email: data.email, name: data.name || "", isPremium: !!data.isPremium, bonusPairings: data.bonusPairings ?? 0 };
             storage.set(USER_KEY, u);
             return u;
           });
@@ -1097,7 +1142,8 @@ export default function NutriCrew() {
   }, []); // eslint-disable-line
 
   const pairingCount = storage.get(PAIRING_COUNT_KEY) || 0;
-  const isPremiumNeeded = premiumSuccess ? false : pairingCount >= FREE_PAIRING_LIMIT;
+  const bonusPairings = user?.bonusPairings || 0;
+  const isPremiumNeeded = premiumSuccess ? false : pairingCount >= FREE_PAIRING_LIMIT + bonusPairings;
   // Real subscription status (server-authoritative) — true right after Stripe
   // checkout returns, or once verify-session/login confirms it from the DB.
   const isPremium = premiumSuccess || !!user?.isPremium;
@@ -1209,6 +1255,47 @@ export default function NutriCrew() {
     setLoading(false);
   };
 
+  const handleShare = async () => {
+    const email = user?.email;
+    // Lazily fetch referral code on first share tap
+    let code = referralCode;
+    if (!code && email) {
+      try {
+        const r = await fetch(`${API_BASE}/api/referral/code?email=${encodeURIComponent(email)}`);
+        if (r.ok) { const d = await r.json(); code = d.referralCode; setReferralCode(code); }
+      } catch {}
+    }
+    const origin = window.location.origin;
+    const shareUrl = code ? `${origin}/?ref=${code}` : origin;
+    const shareText = t.share_text;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: t.share_title, text: shareText, url: shareUrl });
+        return;
+      } catch (e) {
+        if (e.name === "AbortError") return; // user cancelled — no fallback needed
+      }
+    }
+    // Clipboard fallback
+    try {
+      await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 3000);
+    } catch {}
+  };
+
+  const openReferralModal = async () => {
+    const email = user?.email;
+    if (!email) return;
+    if (!referralCode) {
+      try {
+        const r = await fetch(`${API_BASE}/api/referral/code?email=${encodeURIComponent(email)}`);
+        if (r.ok) { const d = await r.json(); setReferralCode(d.referralCode); }
+      } catch {}
+    }
+    setShowReferral(true);
+  };
+
   const handleEstimateCalories = async () => {
     if (!calorieText.trim()) return;
     setCalorieLoading(true);
@@ -1279,11 +1366,29 @@ export default function NutriCrew() {
     const hasPassword = sessionData.hasPassword !== false;
     setUser(prev => {
       const u = prev?.email
-        ? { ...prev, isPremium: !!sessionData.isPremium, hasPassword }
-        : { email: sessionData.email, name: sessionData.name || "", isPremium: !!sessionData.isPremium, hasPassword };
+        ? { ...prev, isPremium: !!sessionData.isPremium, hasPassword, bonusPairings: sessionData.bonusPairings ?? prev?.bonusPairings ?? 0 }
+        : { email: sessionData.email, name: sessionData.name || "", isPremium: !!sessionData.isPremium, hasPassword, bonusPairings: sessionData.bonusPairings ?? 0 };
       storage.set(USER_KEY, u);
       return u;
     });
+    // Apply any pending referral code — fire-and-forget, non-blocking
+    const pendingRef = storage.get(PENDING_REFERRAL_KEY);
+    if (pendingRef && sessionData.email) {
+      storage.set(PENDING_REFERRAL_KEY, null);
+      fetch(`${API_BASE}/api/referral/use`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: sessionData.email, referralCode: pendingRef }),
+      }).then(r => r.json()).then(d => {
+        if (d.success) {
+          setUser(prev => {
+            const u = { ...(prev || {}), bonusPairings: (prev?.bonusPairings || 0) + 1 };
+            storage.set(USER_KEY, u);
+            return u;
+          });
+        }
+      }).catch(() => {});
+    }
     if (!hasPassword) {
       setScreen("set-password");
     } else {
@@ -1331,11 +1436,20 @@ export default function NutriCrew() {
           onOpenSavedMeals={() => setShowSavedMeals(true)}
           onOpenProfile={() => setShowProfile(true)}
           onOpenRoster={() => openRoster("splash")}
+          onOpenReferral={openReferralModal}
         />
       )}
 
       {showHistory && (
         <PlanHistoryModal t={t} onClose={() => setShowHistory(false)} onOpen={(saved) => { setShowHistory(false); viewPlan(saved); }} />
+      )}
+
+      {showReferral && (
+        <ReferralModal
+          t={t}
+          referralCode={referralCode}
+          onClose={() => setShowReferral(false)}
+        />
       )}
 
       {showRoster && (
@@ -1370,6 +1484,9 @@ export default function NutriCrew() {
           isPremium={plan?.isPremium ?? false}
           isOnline={isOnline}
           planKey={planCacheKey({ ...user, ...pairing }, lang)}
+          onShare={handleShare}
+          shareCopied={shareCopied}
+          onOpenReferral={openReferralModal}
         />
       )}
 
@@ -1775,7 +1892,7 @@ function OTPScreen({ email, onSuccess, onBack }) {
 }
 
 // ─── SPLASH SCREEN ────────────────────────────────────────────────
-function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onStart, onNewPairing, onOpenHistory, onOpenSavedMeals, onOpenProfile, onOpenRoster, isPremium }) {
+function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onStart, onNewPairing, onOpenHistory, onOpenSavedMeals, onOpenProfile, onOpenRoster, onOpenReferral, isPremium }) {
   return (
     <div style={styles.splash}>
       {user && (
@@ -1824,6 +1941,9 @@ function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onS
             </button>
             <button style={styles.secondaryBtn} onClick={onOpenRoster}>
               📅 {t.roster_btn} {!isPremium && <span style={{...styles.premiumLockBadge, fontSize: 14}}>👑</span>}
+            </button>
+            <button style={{ ...styles.secondaryBtn, border: `1px solid ${C.gold}`, color: C.gold }} onClick={onOpenReferral}>
+              ✈️ {t.referral_title}
             </button>
           </div>
         ) : (
@@ -2456,7 +2576,7 @@ const PLAN_LOAD_STEPS = [
   "Finalizing your plan...",
 ];
 
-function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, activeDay, setActiveDay, onNewPairing, onRetry, favorites, onToggleFavorite, onOpenAirplaneMeal, isPremium, isOnline, planKey }) {
+function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, activeDay, setActiveDay, onNewPairing, onRetry, favorites, onToggleFavorite, onOpenAirplaneMeal, isPremium, isOnline, planKey, onShare, shareCopied, onOpenReferral }) {
   const days = pairing.pairing_days || 1;
   const hasJetlag = Math.abs(parseInt(pairing.timezone||0)) >= 4;
   const [loadStep, setLoadStep] = React.useState(0);
@@ -2512,10 +2632,24 @@ function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, 
           <div style={styles.planTitle}>NutriCrew</div>
           <div style={styles.planSub}>{user?.name?.split(" ")[0]} · {days} {t.days}</div>
         </div>
-        <button style={styles.newPairingBtn} onClick={onNewPairing}>
-          + {t.new_pairing}
-        </button>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <button
+            style={{ background: "transparent", border: `1px solid ${C.gold}`, color: C.gold, borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}
+            onClick={onShare}
+            title={t.share_btn}
+          >
+            📤 {shareCopied ? t.share_copied : t.share_btn}
+          </button>
+          <button style={styles.newPairingBtn} onClick={onNewPairing}>
+            + {t.new_pairing}
+          </button>
+        </div>
       </div>
+      {shareCopied && (
+        <div style={{ background: "#0F2A10", border: `1px solid ${C.green}`, borderRadius: 8, padding: "7px 14px", marginBottom: 10, color: C.green, fontSize: 13, textAlign: "center" }}>
+          {t.share_copied}
+        </div>
+      )}
 
       {/* Nutritionist disclaimer */}
       <div style={styles.disclaimerBanner}>
@@ -4315,6 +4449,55 @@ function PlanHistoryModal({ t, onClose, onOpen }) {
             })}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function ReferralModal({ t, referralCode, onClose }) {
+  const [copied, setCopied] = React.useState(false);
+  const shareUrl = referralCode
+    ? `${window.location.origin}/?ref=${referralCode}`
+    : window.location.origin;
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 3000);
+    } catch {}
+  };
+
+  return (
+    <div style={styles.modalOverlay}>
+      <div style={{ ...styles.modal }}>
+        <div style={styles.modalHeader}>
+          <span style={styles.modalTitle}>✈️ {t.referral_title}</span>
+          <button style={styles.closeBtn} onClick={onClose}>✕</button>
+        </div>
+
+        <div style={{ textAlign: "center", padding: "8px 0 16px" }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>🎁</div>
+          <div style={{ color: C.white, fontSize: 15, fontWeight: 600, marginBottom: 8 }}>{t.referral_title}</div>
+          <div style={{ color: C.muted, fontSize: 13, marginBottom: 20, lineHeight: 1.5 }}>{t.referral_desc}</div>
+
+          {referralCode && (
+            <div style={{ background: C.navyCard, border: `1px solid ${C.gold}`, borderRadius: 10, padding: "12px 16px", marginBottom: 16, fontFamily: "'Orbitron', monospace", fontSize: 22, fontWeight: 800, color: C.gold, letterSpacing: "4px" }}>
+              {referralCode}
+            </div>
+          )}
+
+          <div style={{ background: C.navyMid, border: `1px solid ${C.navyBorder}`, borderRadius: 8, padding: "8px 12px", marginBottom: 16, fontSize: 12, color: C.muted, wordBreak: "break-all", textAlign: "left" }}>
+            {shareUrl}
+          </div>
+
+          <button
+            style={{ ...styles.primaryBtn, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+            onClick={copyLink}
+          >
+            {copied ? `✓ ${t.referral_copied}` : `📋 ${t.referral_copy}`}
+          </button>
+        </div>
       </div>
     </div>
   );
