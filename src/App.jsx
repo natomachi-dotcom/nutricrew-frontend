@@ -1793,7 +1793,8 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
   const [localDests, setLocalDests] = useState(() => pairing.destinations || []);
   const depTimerRef = useRef(null);
   const tzTimerRef = useRef(null);
-  useEffect(() => { return () => { clearTimeout(depTimerRef.current); clearTimeout(tzTimerRef.current); }; }, []);
+  const textSaveTimerRef = useRef(null);
+  useEffect(() => { return () => { clearTimeout(depTimerRef.current); clearTimeout(tzTimerRef.current); clearTimeout(textSaveTimerRef.current); }; }, []);
 
   // Auto-initialize defaults so pre-filled/default values work immediately with Continue
   useEffect(() => {
@@ -1834,6 +1835,9 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
   };
 
   const canContinue = () => {
+    // Text fields debounce their parent writes — check localVal directly so the
+    // Continue button responds instantly as the user types, not 250ms later.
+    if (currentStep === "name" || currentStep === "email") return !!localVal.trim();
     if (currentStep === "budget") return !!((pairing.budget_type || user?.budget_type) && (pairing.budget_amount || user?.budget_amount));
     if (currentStep === "duty_schedule") return true;
     // departure is optional — placeholder looks identical to a real value and crews
@@ -1899,12 +1903,12 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
     switch (currentStep) {
       case "name":
         return <TextInput label={t.step_name} value={localVal}
-          onChange={v => { setLocalVal(v); save(v); }}
+          onChange={v => { setLocalVal(v); clearTimeout(textSaveTimerRef.current); textSaveTimerRef.current = setTimeout(() => save(v), 250); }}
           placeholder="John Smith" icon="✈️"/>;
 
       case "email":
         return <TextInput label={t.step_email} value={localVal} type="email"
-          onChange={v => { setLocalVal(v); save(v); }}
+          onChange={v => { setLocalVal(v); clearTimeout(textSaveTimerRef.current); textSaveTimerRef.current = setTimeout(() => save(v), 250); }}
           placeholder="john@airline.com" icon="📧"/>;
 
       case "gender":
@@ -1939,7 +1943,7 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
               ))}
             </div>
             <TextInput value={localVal} type="number"
-              onChange={v => { setLocalVal(v); save(v + weightUnit); }}
+              onChange={v => { setLocalVal(v); clearTimeout(textSaveTimerRef.current); textSaveTimerRef.current = setTimeout(() => save(v + weightUnit), 250); }}
               placeholder={weightUnit === "kg" ? "70" : "154"} icon="⚖️"/>
           </div>
         );
@@ -2248,6 +2252,14 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
           style={{...styles.continueBtn, ...(canContinue()?{}:styles.continueBtnDisabled)}}
           disabled={!canContinue()}
           onClick={() => {
+            if (currentStep === "name" || currentStep === "email") {
+              clearTimeout(textSaveTimerRef.current);
+              save(localVal);
+            }
+            if (currentStep === "weight") {
+              clearTimeout(textSaveTimerRef.current);
+              save(localVal + weightUnit);
+            }
             if (currentStep === "departure") {
               clearTimeout(depTimerRef.current);
               save(localVal);
@@ -4433,12 +4445,12 @@ function ProfileModal({ t, user, onSave, onClose }) {
 
 // ─── DUTY SCHEDULE STEP ───────────────────────────────────────────
 const DUTY_HOURS = Array.from({ length: 11 }, (_, i) => String(i + 6));
+const DUTY_BTN_BASE = { padding: "9px 14px", borderRadius: 10, cursor: "pointer", fontSize: 13, fontWeight: 600, border: `1.5px solid ${C.navyBorder}`, background: "transparent", color: C.muted };
+const DUTY_BTN_ACTIVE = { ...DUTY_BTN_BASE, background: C.gold, color: C.navy, border: `1.5px solid ${C.gold}` };
+const DUTY_HR_BTN = { padding: "7px 10px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600, border: `1.5px solid ${C.navyBorder}`, background: "transparent", color: C.muted };
+const DUTY_HR_BTN_ACTIVE = { ...DUTY_HR_BTN, background: C.gold, color: C.navy, border: `1.5px solid ${C.gold}` };
 
 function DutyScheduleStep({ t, pairing, upd }) {
-  const btnBase = { padding: "9px 14px", borderRadius: 10, cursor: "pointer", fontSize: 13, fontWeight: 600, border: `1.5px solid ${C.navyBorder}`, background: "transparent", color: C.muted };
-  const btnActive = { ...btnBase, background: C.gold, color: C.navy, border: `1.5px solid ${C.gold}` };
-  const hrBtn = { padding: "7px 10px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600, border: `1.5px solid ${C.navyBorder}`, background: "transparent", color: C.muted };
-  const hrBtnActive = { ...hrBtn, background: C.gold, color: C.navy, border: `1.5px solid ${C.gold}` };
 
   return (
     <div>
@@ -4459,7 +4471,7 @@ function DutyScheduleStep({ t, pairing, upd }) {
         <div style={{ ...styles.hint, marginBottom: 6 }}>{t.duty_length}</div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
           {DUTY_HOURS.map(h => (
-            <button key={h} style={pairing.duty_hours === h ? hrBtnActive : hrBtn}
+            <button key={h} style={pairing.duty_hours === h ? DUTY_HR_BTN_ACTIVE : DUTY_HR_BTN}
               onClick={() => upd("duty_hours", h)}>{h}h</button>
           ))}
         </div>
@@ -4469,7 +4481,7 @@ function DutyScheduleStep({ t, pairing, upd }) {
         <div style={{ ...styles.hint, marginBottom: 6 }}>{t.duty_layover}</div>
         <div style={{ display: "flex", gap: 8 }}>
           {[["short", t.layover_short], ["standard", t.layover_standard], ["long", t.layover_long]].map(([v, l]) => (
-            <button key={v} style={pairing.layover_type === v ? btnActive : btnBase}
+            <button key={v} style={pairing.layover_type === v ? DUTY_BTN_ACTIVE : DUTY_BTN_BASE}
               onClick={() => upd("layover_type", v)}>{l}</button>
           ))}
         </div>
@@ -4479,7 +4491,7 @@ function DutyScheduleStep({ t, pairing, upd }) {
         <div style={{ ...styles.hint, marginBottom: 6 }}>{t.duty_direction}</div>
         <div style={{ display: "flex", gap: 8 }}>
           {[["east", t.dir_east, "→"], ["west", t.dir_west, "←"], ["ns", t.dir_ns, "↕"]].map(([v, l, ic]) => (
-            <button key={v} style={pairing.flight_direction === v ? btnActive : btnBase}
+            <button key={v} style={pairing.flight_direction === v ? DUTY_BTN_ACTIVE : DUTY_BTN_BASE}
               onClick={() => upd("flight_direction", v)}>{ic} {l}</button>
           ))}
         </div>
