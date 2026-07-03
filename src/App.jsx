@@ -1167,15 +1167,20 @@ export default function NutriCrew() {
   // trip — answered once, then only editable via the profile icon. Only
   // pairing_days onward (plus the airplane meal description, which depends
   // on what catering THIS specific flight has) varies trip to trip.
+  const numPairingDays = parseInt(pairing.pairing_days, 10) || 1;
+  const kitchenDaySteps = Array.from({ length: numPairingDays }, (_, i) => `kitchen_day_${i + 1}`);
+  const anyDayHasAirplaneFood = kitchenDaySteps.some(s => (pairing[s] || []).includes("airplane_food"));
   const allSteps = [
     "name", "email", "gender", "weight", "dob", "position",
-    "kitchen", "lunch_bag", "cooking_pref", "diet",
+    "lunch_bag", "cooking_pref", "diet",
     ...((pairing.diets || user?.diets || []).includes("calorie_deficit") ? ["calorie_target"] : []),
     "goals", "budget",
-    "pairing_days", "departure", "destination", "going_usa", "duty_schedule",
-    ...((pairing.kitchen || user?.kitchen || []).includes("airplane_food") ? ["airplane_meal_plan"] : []),
+    "pairing_days", "departure", "destination",
+    ...kitchenDaySteps,
+    "going_usa", "duty_schedule",
+    ...(anyDayHasAirplaneFood ? ["airplane_meal_plan"] : []),
   ];
-  const personalSteps = ["name","email","gender","weight","dob","position","kitchen","lunch_bag","cooking_pref","diet","calorie_target","goals","budget"];
+  const personalSteps = ["name","email","gender","weight","dob","position","lunch_bag","cooking_pref","diet","calorie_target","goals","budget"];
   const steps = checkinReturning
     ? allSteps.filter(s => !personalSteps.includes(s))
     : allSteps;
@@ -1187,7 +1192,7 @@ export default function NutriCrew() {
   // budget, and departure are profile data — mirror them into the user profile
   // so they're never re-asked. departure is a home-airport — crews almost
   // always depart from the same airport every pairing.
-  const PROFILE_FIELDS = ["kitchen", "lunch_bag", "cooking_pref", "diets", "diet_other", "calorie_target", "calorie_deficit_amount", "calorie_deficit_preset", "goals", "budget_type", "budget_amount", "departure"];
+  const PROFILE_FIELDS = ["lunch_bag", "cooking_pref", "diets", "diet_other", "calorie_target", "calorie_deficit_amount", "calorie_deficit_preset", "goals", "budget_type", "budget_amount", "departure"];
   const upd = (k, v) => {
     setPairing(p => ({ ...p, [k]: v }));
     if (PROFILE_FIELDS.includes(k)) {
@@ -1245,6 +1250,12 @@ export default function NutriCrew() {
       Object.entries(pairing).filter(([, v]) => !(Array.isArray(v) && v.length === 0))
     );
     const data = { ...user, ...cleanPairing };
+    // Build per-day kitchen array; fall back to legacy data.kitchen if not set
+    const nDays = parseInt(data.pairing_days, 10) || 1;
+    data.kitchen_by_day = Array.from({ length: nDays }, (_, i) =>
+      data[`kitchen_day_${i + 1}`] || data.kitchen || []
+    );
+    data.kitchen = data.kitchen_by_day[0];
     const cacheKey = planCacheKey(data, lang);
     const cached = findSavedPlan(cacheKey);
     if (cached) {
@@ -2043,6 +2054,9 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
       const numDays = pairing.pairing_days || 1;
       return localDests.length >= numDays && localDests.slice(0, numDays).every(d => d && d.trim());
     }
+    if (currentStep?.startsWith("kitchen_day_")) {
+      return (pairing[currentStep] || []).length > 0;
+    }
     if (currentStep === "diet") {
       if (!pairing.diets || pairing.diets.length === 0) return false;
       if (pairing.diets.includes("other") && !pairing.diet_other?.trim()) return false;
@@ -2064,6 +2078,7 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
 
   const validationHint = () => {
     if (canContinue()) return null;
+    if (currentStep?.startsWith("kitchen_day_")) return t.val_select_kitchen;
     switch (currentStep) {
       case "name":         return t.val_enter_name;
       case "email":        return t.val_enter_email;
@@ -2094,7 +2109,26 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
     }
   };
 
+  const kitchenOptions = [
+    {v:"full_kitchen", l:t.full_kitchen,       icon:"🏠"},
+    {v:"hotel",        l:t.hotel_no_kitchen,   icon:"🏨"},
+    {v:"fridge",       l:t.fridge,             icon:"🧊"},
+    {v:"microwave",    l:t.microwave,          icon:"📦"},
+    {v:"airplane_food",l:t.airplane_food,      icon:"✈️"},
+  ];
+
   const stepContent = () => {
+    if (currentStep?.startsWith("kitchen_day_")) {
+      const dayNum = parseInt(currentStep.replace("kitchen_day_", ""), 10);
+      const dest = (pairing.destinations || [])[dayNum - 1];
+      const destLabel = dest ? ` — ${dest.replace(/\s*\([A-Z]{2,4}\)/, "").trim()}` : "";
+      return <CheckGroup
+        label={`${t.day} ${dayNum}${destLabel}: ${t.step_kitchen}`}
+        options={kitchenOptions}
+        values={pairing[currentStep] || []}
+        onChange={v => upd(currentStep, v)}/>;
+    }
+
     switch (currentStep) {
       case "name":
         return <TextInput label={t.step_name} value={localVal}
@@ -2244,13 +2278,7 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
 
       case "kitchen":
         return <CheckGroup label={t.step_kitchen}
-          options={[
-            {v:"full_kitchen",l:t.full_kitchen,icon:"🏠"},
-            {v:"hotel",l:t.hotel_no_kitchen,icon:"🏨"},
-            {v:"fridge",l:t.fridge,icon:"🧊"},
-            {v:"microwave",l:t.microwave,icon:"📦"},
-            {v:"airplane_food",l:t.airplane_food,icon:"✈️"},
-          ]}
+          options={kitchenOptions}
           values={pairing.kitchen || []}
           onChange={v => upd("kitchen", v)}/>;
 
@@ -4552,7 +4580,6 @@ function ProfileModal({ t, user, onSave, onClose }) {
   const [weightVal, setWeightVal] = useState(initialWeight ? String(initialWeight) : "");
   const [weightUnit, setWeightUnit] = useState(initialUnit);
   const [position, setPosition] = useState(user?.position || "");
-  const [kitchen, setKitchen] = useState(user?.kitchen || []);
   const [lunchBag, setLunchBag] = useState(user?.lunch_bag || "");
   const [cookingPref, setCookingPref] = useState(user?.cooking_pref || "");
   const [diets, setDiets] = useState(user?.diets || []);
@@ -4605,7 +4632,6 @@ function ProfileModal({ t, user, onSave, onClose }) {
       gender,
       weight: weightVal ? `${weightVal}${weightUnit}` : user?.weight,
       position,
-      kitchen,
       lunch_bag: lunchBag,
       cooking_pref: cookingPref,
       diets,
@@ -4693,17 +4719,6 @@ function ProfileModal({ t, user, onSave, onClose }) {
           ]}
           value={position}
           onChange={setPosition}/>
-
-        <CheckGroup label={t.step_kitchen}
-          options={[
-            {v:"full_kitchen",l:t.full_kitchen,icon:"🏠"},
-            {v:"hotel",l:t.hotel_no_kitchen,icon:"🏨"},
-            {v:"fridge",l:t.fridge,icon:"🧊"},
-            {v:"microwave",l:t.microwave,icon:"📦"},
-            {v:"airplane_food",l:t.airplane_food,icon:"✈️"},
-          ]}
-          values={kitchen}
-          onChange={setKitchen}/>
 
         <RadioGroup label={t.step_lunch_bag}
           options={[
