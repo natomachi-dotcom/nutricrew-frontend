@@ -1231,14 +1231,20 @@ export default function NutriCrew() {
     else { storage.set(CHECKIN_DRAFT_KEY, null); setScreen("splash"); }
   };
 
-  const needsPremiumForDiet = (pairing.diets || []).includes("calorie_deficit") && !isPremium;
+  const mergedDiets = pairing.diets?.length ? pairing.diets : (user?.diets || []);
+  const needsPremiumForDiet = mergedDiets.includes("calorie_deficit") && !isPremium;
 
   const handleGenerate = async () => {
     if (!isOnline) return; // blocked by UI; boarding pass shows offline banner
     if (isPremiumNeeded || needsPremiumForDiet) { setScreen("premium"); return; }
     setScreen("plan");
 
-    const data = { ...user, ...pairing };
+    // Strip empty arrays so a stale draft (e.g. goals: []) doesn't silently
+    // overwrite the user's saved profile values from a prior session.
+    const cleanPairing = Object.fromEntries(
+      Object.entries(pairing).filter(([, v]) => !(Array.isArray(v) && v.length === 0))
+    );
+    const data = { ...user, ...cleanPairing };
     const cacheKey = planCacheKey(data, lang);
     const cached = findSavedPlan(cacheKey);
     if (cached) {
@@ -1481,7 +1487,7 @@ export default function NutriCrew() {
       {screen === "boarding" && (
         <BoardingPassScreen t={t} user={user} pairing={pairing}
           onGenerate={handleGenerate} onBack={() => setScreen("checkin")}
-          isPremiumNeeded={isPremiumNeeded} isOnline={isOnline}
+          isPremiumNeeded={isPremiumNeeded || needsPremiumForDiet} isOnline={isOnline}
         />
       )}
 
@@ -1495,7 +1501,7 @@ export default function NutriCrew() {
           onOpenAirplaneMeal={() => setShowAirplaneMeal(true)}
           isPremium={plan?.isPremium ?? false}
           isOnline={isOnline}
-          planKey={planCacheKey({ ...user, ...pairing }, lang)}
+          planKey={planCacheKey({ ...user, ...Object.fromEntries(Object.entries(pairing).filter(([, v]) => !(Array.isArray(v) && v.length === 0))) }, lang)}
           onShare={handleShare}
           shareCopied={shareCopied}
           onOpenReferral={openReferralModal}
@@ -2523,8 +2529,8 @@ function BoardingPassScreen({ t, user, pairing, onGenerate, onBack, isPremiumNee
             <BPField label="ITINERARY" value={dests.map(d => d || "—").join(" → ")}/>
           )}
           <BPField label="DIET" value={dietDisplay}/>
-          <BPField label="GOALS" value={(pairing.goals||[]).slice(0,2).join(", ").replace(/_/g," ").toUpperCase() || "—"}/>
-          <BPField label="BUDGET" value={pairing.budget_amount ? `$${pairing.budget_amount}/${pairing.budget_type==="day"?"DAY":"TRIP"}` : "—"}/>
+          <BPField label="GOALS" value={(mergedUser.goals||[]).slice(0,2).join(", ").replace(/_/g," ").toUpperCase() || "—"}/>
+          <BPField label="BUDGET" value={mergedUser.budget_amount ? `$${mergedUser.budget_amount}/${mergedUser.budget_type==="day"?"DAY":"TRIP"}` : "—"}/>
           {Math.abs(parseInt(pairing.timezone||0)) >= 4 && (
             <BPField label="JET LAG" value={`${pairing.timezone}H DIFF ⚠️`} highlight/>
           )}
