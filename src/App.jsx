@@ -831,6 +831,11 @@ const storage = {
 };
 
 const PAIRING_COUNT_KEY = "nutricrew_pairing_count";
+const PAIRING_COUNT_MONTH_KEY = "nutricrew_pairing_count_month";
+const currentMonthKey = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+};
 const PENDING_PAIRING_KEY = "nutricrew_pending_pairing";
 const FAVORITES_KEY = "nutricrew_favorites";
 const USER_KEY = "nutricrew_user";
@@ -1115,6 +1120,7 @@ export default function NutriCrew() {
     if (params.get("premium") === "true") {
       window.history.replaceState({}, "", window.location.pathname);
       storage.set(PAIRING_COUNT_KEY, 0);
+      storage.set(PAIRING_COUNT_MONTH_KEY, currentMonthKey());
       return true;
     }
     return false;
@@ -1169,7 +1175,12 @@ export default function NutriCrew() {
     return () => { cancelled = true; };
   }, []); // eslint-disable-line
 
-  const pairingCount = storage.get(PAIRING_COUNT_KEY) || 0;
+  // Free-tier count is per calendar month — a stale count from a prior month
+  // (before the server resets it) must not gate a user who is actually eligible
+  // again; treat it as 0 locally until the server's response confirms otherwise.
+  const pairingCount = storage.get(PAIRING_COUNT_MONTH_KEY) === currentMonthKey()
+    ? (storage.get(PAIRING_COUNT_KEY) || 0)
+    : 0;
   const bonusPairings = user?.bonusPairings || 0;
   const isPremiumNeeded = premiumSuccess ? false : pairingCount >= FREE_PAIRING_LIMIT + bonusPairings;
   // Real subscription status (server-authoritative) — true right after Stripe
@@ -1285,6 +1296,7 @@ export default function NutriCrew() {
       const result = await generatePlan(data, lang);
       setPlan(result);
       storage.set(PAIRING_COUNT_KEY, result.pairingCount ?? pairingCount + 1);
+      storage.set(PAIRING_COUNT_MONTH_KEY, currentMonthKey());
       if (!result.failedDays?.length) {
         saveSavedPlan(cacheKey, data, result);
         storage.set(CHECKIN_DRAFT_KEY, null);
@@ -1292,6 +1304,7 @@ export default function NutriCrew() {
     } catch (e) {
       if (e.code === "premium_required") {
         storage.set(PAIRING_COUNT_KEY, e.pairingCount ?? FREE_PAIRING_LIMIT);
+        storage.set(PAIRING_COUNT_MONTH_KEY, currentMonthKey());
         setScreen("premium");
       } else {
         setPlan({ error: true });
