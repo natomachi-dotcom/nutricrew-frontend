@@ -2651,9 +2651,9 @@ const PLAN_LOAD_STEPS = [
 function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, activeDay, setActiveDay, onNewPairing, onRetry, favorites, onToggleFavorite, onOpenAirplaneMeal, isPremium, isOnline, planKey, onShare, shareCopied, onOpenReferral }) {
   const days = pairing.pairing_days || 1;
   const hasJetlag = Math.abs(parseInt(pairing.timezone||0)) >= 4;
-  const [loadStep, setLoadStep] = React.useState(0);
+  const [loadStep, setLoadStep] = useState(0);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!loading) { setLoadStep(0); return; }
     const id = setInterval(() => setLoadStep(s => (s + 1) % PLAN_LOAD_STEPS.length), 2500);
     return () => clearInterval(id);
@@ -2722,6 +2722,26 @@ function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, 
           {t.share_copied}
         </div>
       )}
+
+      {/* Your selections — confirms what this plan was generated for */}
+      {(() => {
+        const mergedUser = { ...(user || {}), ...pairing };
+        const allDiets = mergedUser.diets || (mergedUser.diet ? [mergedUser.diet] : []);
+        const filteredDiets = allDiets.filter(d => d !== "none");
+        const dietDisplay = filteredDiets.length === 0
+          ? t.no_restrictions
+          : filteredDiets.map(d => d === "other" ? (mergedUser.diet_other || "OTHER").toUpperCase() : d.replace(/_/g, " ").toUpperCase()).join(" + ");
+        const goalsDisplay = (mergedUser.goals || []).slice(0, 2).join(", ").replace(/_/g, " ").toUpperCase();
+        return (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+            <span style={styles.selectionChip}>🍽️ {dietDisplay}</span>
+            {goalsDisplay && <span style={styles.selectionChip}>🎯 {goalsDisplay}</span>}
+            {mergedUser.budget_amount && (
+              <span style={styles.selectionChip}>💰 ${mergedUser.budget_amount}/{mergedUser.budget_type === "day" ? "DAY" : "TRIP"}</span>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Nutritionist disclaimer */}
       <div style={styles.disclaimerBanner}>
@@ -4551,7 +4571,7 @@ function PlanHistoryModal({ t, onClose, onOpen }) {
 }
 
 function ReferralModal({ t, referralCode, onClose }) {
-  const [copied, setCopied] = React.useState(false);
+  const [copied, setCopied] = useState(false);
   const shareUrl = referralCode
     ? `${window.location.origin}/?ref=${referralCode}`
     : window.location.origin;
@@ -5443,6 +5463,10 @@ const styles = {
   },
   planTitle: { fontSize: 16, fontWeight: 800, letterSpacing: "2px", color: C.gold },
   planSub: { fontSize: 11, color: C.muted, marginTop: 2 },
+  selectionChip: {
+    background: C.navyCard, border: `1px solid ${C.navyBorder}`, borderRadius: 20,
+    padding: "5px 12px", fontSize: 11, fontWeight: 700, letterSpacing: "0.5px", color: C.muted,
+  },
   newPairingBtn: {
     padding: "7px 12px", borderRadius: 8, border: `1px solid ${C.navyBorder}`,
     background: "transparent", color: C.muted, fontSize: 11, cursor: "pointer",
