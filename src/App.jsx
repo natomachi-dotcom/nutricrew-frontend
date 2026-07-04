@@ -26,6 +26,7 @@ const T = {
   en: {
     tagline: "Fuel Your Flight",
     tagline_sub: "Nutrition, jet lag, and meal planning built for flight crews",
+    contact_us: "Questions? Contact us",
     start: "Begin Check-In",
     step_lang: "Select Language",
     step_name: "Full Name",
@@ -243,6 +244,7 @@ const T = {
   fr: {
     tagline: "Alimentez Votre Vol",
     tagline_sub: "Nutrition, décalage horaire et planification des repas pour le personnel de cabine",
+    contact_us: "Des questions ? Contactez-nous",
     start: "Commencer l'Enregistrement",
     step_lang: "Choisir la Langue",
     step_name: "Nom Complet",
@@ -459,6 +461,7 @@ const T = {
   es: {
     tagline: "Combustible Para Tu Vuelo",
     tagline_sub: "Nutrición, jet lag y planificación de comidas para tripulaciones de vuelo",
+    contact_us: "¿Preguntas? Contáctanos",
     start: "Comenzar Check-In",
     step_lang: "Seleccionar Idioma",
     step_name: "Nombre Completo",
@@ -1983,6 +1986,10 @@ function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onS
             </button>
           </div>
         )}
+
+        <a href="mailto:crewmealplans@nutricrew.ca" style={styles.contactLink}>
+          {t.contact_us}
+        </a>
       </div>
     </div>
   );
@@ -5170,6 +5177,10 @@ const styles = {
     position: "relative", zIndex: 1,
   },
   splashInner: { textAlign: "center", padding: "32px 24px" },
+  contactLink: {
+    display: "block", marginTop: 28, fontSize: 13, color: C.muted,
+    textDecoration: "underline", textUnderlineOffset: 3,
+  },
   langRow: { display: "flex", gap: 8, justifyContent: "center", marginBottom: 40 },
   langBtn: {
     padding: "6px 14px", borderRadius: 20, border: `1px solid ${C.navyBorder}`,
