@@ -52,6 +52,13 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
         navigateFallback: '/index.html',
+        // Without these, a new deploy's service worker sits "waiting" until every
+        // open tab/PWA instance is fully closed — testers who keep the app open
+        // across a deploy keep running the old cached bundle indefinitely.
+        // skipWaiting + clientsClaim let the new SW activate and take over open
+        // tabs immediately; registerType: 'autoUpdate' below then reloads them.
+        skipWaiting: true,
+        clientsClaim: true,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
