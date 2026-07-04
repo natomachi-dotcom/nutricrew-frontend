@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, startTransition } from "react";
+import { FAQ } from "./faq.js";
 
 // AI backend base URL. Empty in local dev (Vite proxies /api to localhost:3001);
 // set VITE_API_BASE_URL on Vercel to point at the deployed nutricrew-backend.
@@ -27,6 +28,8 @@ const T = {
     tagline: "Fuel Your Flight",
     tagline_sub: "Nutrition, jet lag, and meal planning built for flight crews",
     contact_us: "Questions? Contact us",
+    faq_title: "FAQ",
+    faq_heading: "Frequently Asked Questions",
     start: "Begin Check-In",
     step_lang: "Select Language",
     step_name: "Full Name",
@@ -245,6 +248,8 @@ const T = {
     tagline: "Alimentez Votre Vol",
     tagline_sub: "Nutrition, décalage horaire et planification des repas pour le personnel de cabine",
     contact_us: "Des questions ? Contactez-nous",
+    faq_title: "FAQ",
+    faq_heading: "Foire Aux Questions",
     start: "Commencer l'Enregistrement",
     step_lang: "Choisir la Langue",
     step_name: "Nom Complet",
@@ -462,6 +467,8 @@ const T = {
     tagline: "Combustible Para Tu Vuelo",
     tagline_sub: "Nutrición, jet lag y planificación de comidas para tripulaciones de vuelo",
     contact_us: "¿Preguntas? Contáctanos",
+    faq_title: "FAQ",
+    faq_heading: "Preguntas Frecuentes",
     start: "Comenzar Check-In",
     step_lang: "Seleccionar Idioma",
     step_name: "Nombre Completo",
@@ -972,6 +979,7 @@ export default function NutriCrew() {
   const [showHistory, setShowHistory] = useState(false);
   const [showReferral, setShowReferral] = useState(false);
   const [referralCode, setReferralCode] = useState(null);
+  const [showFAQ, setShowFAQ] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const [premiumReturnScreen, setPremiumReturnScreen] = useState("boarding");
 
@@ -1469,6 +1477,7 @@ export default function NutriCrew() {
           onOpenProfile={() => setShowProfile(true)}
           onOpenRoster={() => openRoster("splash")}
           onOpenReferral={openReferralModal}
+          onOpenFAQ={() => setShowFAQ(true)}
         />
       )}
 
@@ -1482,6 +1491,10 @@ export default function NutriCrew() {
           referralCode={referralCode}
           onClose={() => setShowReferral(false)}
         />
+      )}
+
+      {showFAQ && (
+        <FAQModal t={t} lang={lang} onClose={() => setShowFAQ(false)} />
       )}
 
       {showRoster && (
@@ -1924,7 +1937,7 @@ function OTPScreen({ email, onSuccess, onBack }) {
 }
 
 // ─── SPLASH SCREEN ────────────────────────────────────────────────
-function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onStart, onNewPairing, onOpenHistory, onOpenSavedMeals, onOpenProfile, onOpenRoster, onOpenReferral, isPremium }) {
+function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onStart, onNewPairing, onOpenHistory, onOpenSavedMeals, onOpenProfile, onOpenRoster, onOpenReferral, onOpenFAQ, isPremium }) {
   return (
     <div style={styles.splash}>
       {user && (
@@ -1987,9 +2000,15 @@ function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onS
           </div>
         )}
 
-        <a href="mailto:crewmealplans@nutricrew.ca" style={styles.contactLink}>
-          {t.contact_us}
-        </a>
+        <div style={styles.footerLinksRow}>
+          <button style={styles.contactLink} onClick={onOpenFAQ}>
+            {t.faq_title}
+          </button>
+          <span style={styles.contactLink}>·</span>
+          <a href="mailto:crewmealplans@nutricrew.ca" style={styles.contactLink}>
+            {t.contact_us}
+          </a>
+        </div>
       </div>
     </div>
   );
@@ -4580,6 +4599,37 @@ function ReferralModal({ t, referralCode, onClose }) {
   );
 }
 
+function FAQModal({ t, lang, onClose }) {
+  const [openIndex, setOpenIndex] = useState(null);
+  const items = FAQ[lang] || FAQ.en;
+
+  return (
+    <div style={styles.modalOverlay}>
+      <div style={{ ...styles.modal }}>
+        <div style={styles.modalHeader}>
+          <span style={styles.modalTitle}>❓ {t.faq_heading}</span>
+          <button style={styles.closeBtn} onClick={onClose}>✕</button>
+        </div>
+
+        <div style={{ padding: "8px 0 16px" }}>
+          {items.map((item, i) => {
+            const isOpen = openIndex === i;
+            return (
+              <div key={i} style={styles.faqItem}>
+                <button style={styles.faqQuestion} onClick={() => setOpenIndex(isOpen ? null : i)}>
+                  <span>{item.q}</span>
+                  <span style={{ color: C.gold }}>{isOpen ? "−" : "+"}</span>
+                </button>
+                {isOpen && <div style={styles.faqAnswer}>{item.a}</div>}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ProfileModal({ t, user, onSave, onClose }) {
   const initialUnit = (user?.weight || "").toString().includes("lbs") ? "lbs" : "kg";
   const initialWeight = parseFloat(user?.weight) || "";
@@ -5177,8 +5227,12 @@ const styles = {
     position: "relative", zIndex: 1,
   },
   splashInner: { textAlign: "center", padding: "32px 24px" },
+  footerLinksRow: {
+    display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 28,
+  },
   contactLink: {
-    display: "block", marginTop: 28, fontSize: 13, color: C.muted,
+    background: "none", border: "none", padding: 0, cursor: "pointer",
+    fontSize: 13, color: C.muted, fontFamily: "inherit",
     textDecoration: "underline", textUnderlineOffset: 3,
   },
   langRow: { display: "flex", gap: 8, justifyContent: "center", marginBottom: 40 },
@@ -5649,6 +5703,18 @@ const styles = {
   closeBtn: {
     background: "transparent", border: "none", color: C.muted,
     fontSize: 18, cursor: "pointer",
+  },
+  faqItem: {
+    borderBottom: `1px solid ${C.navyBorder}`, padding: "12px 0",
+  },
+  faqQuestion: {
+    width: "100%", background: "none", border: "none", cursor: "pointer",
+    display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12,
+    textAlign: "left", fontSize: 14, fontWeight: 600, color: C.white,
+    fontFamily: "inherit", padding: 0,
+  },
+  faqAnswer: {
+    marginTop: 10, fontSize: 13, color: C.muted, lineHeight: 1.5, textAlign: "left",
   },
   calorieInput: {
     background: C.navyCard, border: `1px solid ${C.navyBorder}`,
