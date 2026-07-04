@@ -920,6 +920,11 @@ export default function NutriCrew() {
       }
       return "loading";
     }
+    // No session token. A first-time user who got interrupted mid-checkin (app
+    // backgrounded/reloaded right after typing name+email) also has USER_KEY.email
+    // set at this point, even though they never signed up — resume their draft
+    // instead of throwing them onto an unexpected sign-in wall.
+    if ((storage.get(CHECKIN_DRAFT_KEY)?.step ?? 0) >= 1) return "checkin";
     if (storage.get(USER_KEY)?.email) return "login"; // returning user, session expired
     return "splash"; // first time — show the welcome screen before check-in
   }); // login | otp | set-password | loading | splash | checkin | boarding | plan | premium
