@@ -111,6 +111,14 @@ const T = {
     premium_msg: "You've used your free pairing. Upgrade to continue.",
     upgrade: "Upgrade to Premium",
     free_trial: "First Pairing Free",
+    start_trial_cta: "Start Your Free Month",
+    checkout_redirecting: "Taking you to secure checkout…",
+    trial_disclaimer: "Card required. Free for 30 days, cancel anytime — after that you'll be charged",
+    per_month: "month",
+    per_year: "year",
+    trial_active_until: "Free until",
+    subscription_active: "Premium — Active",
+    manage_subscription: "Manage Subscription",
     calorie_title: "Calorie Estimator",
     calorie_placeholder: "Describe what you ate (e.g. chicken sandwich, coffee with milk)...",
     calorie_btn: "Estimate Calories",
@@ -330,6 +338,14 @@ const T = {
     premium_msg: "Vous avez utilisé votre pairing gratuit. Passez au Premium.",
     upgrade: "Passer au Premium",
     free_trial: "Premier Pairing Gratuit",
+    start_trial_cta: "Commencer Votre Mois Gratuit",
+    checkout_redirecting: "Redirection vers le paiement sécurisé…",
+    trial_disclaimer: "Carte requise. Gratuit pendant 30 jours, annulez à tout moment — ensuite vous serez facturé",
+    per_month: "mois",
+    per_year: "an",
+    trial_active_until: "Gratuit jusqu'au",
+    subscription_active: "Premium — Actif",
+    manage_subscription: "Gérer l'Abonnement",
     calorie_title: "Estimateur de Calories",
     calorie_placeholder: "Décrivez ce que vous avez mangé...",
     calorie_btn: "Estimer les Calories",
@@ -549,6 +565,14 @@ const T = {
     premium_msg: "Usaste tu pairing gratuito. Actualiza para continuar.",
     upgrade: "Actualizar a Premium",
     free_trial: "Primer Pairing Gratis",
+    start_trial_cta: "Comienza Tu Mes Gratis",
+    checkout_redirecting: "Te llevamos al pago seguro…",
+    trial_disclaimer: "Se requiere tarjeta. Gratis por 30 días, cancela cuando quieras — luego se te cobrará",
+    per_month: "mes",
+    per_year: "año",
+    trial_active_until: "Gratis hasta",
+    subscription_active: "Premium — Activo",
+    manage_subscription: "Administrar Suscripción",
     calorie_title: "Estimador de Calorías",
     calorie_placeholder: "Describe lo que comiste (ej: sándwich de pollo, café con leche)...",
     calorie_btn: "Estimar Calorías",
@@ -1091,8 +1115,8 @@ export default function NutriCrew() {
           const data = await r.json();
           setUser(prev => {
             const u = prev?.email
-              ? { ...prev, isPremium: !!data.isPremium, bonusPairings: data.bonusPairings ?? prev?.bonusPairings ?? 0 }
-              : { email: data.email, name: data.name || "", isPremium: !!data.isPremium, bonusPairings: data.bonusPairings ?? 0 };
+              ? { ...prev, isPremium: !!data.isPremium, trialEnd: data.trialEnd ?? null, bonusPairings: data.bonusPairings ?? prev?.bonusPairings ?? 0 }
+              : { email: data.email, name: data.name || "", isPremium: !!data.isPremium, trialEnd: data.trialEnd ?? null, bonusPairings: data.bonusPairings ?? 0 };
             storage.set(USER_KEY, u);
             return u;
           });
@@ -1160,8 +1184,8 @@ export default function NutriCrew() {
           if (data.isPremium) {
             setUser(prev => {
               const u = prev?.email
-                ? { ...prev, isPremium: true }
-                : { email: data.email, name: data.name || "", isPremium: true };
+                ? { ...prev, isPremium: true, trialEnd: data.trialEnd ?? null }
+                : { email: data.email, name: data.name || "", isPremium: true, trialEnd: data.trialEnd ?? null };
               storage.set(USER_KEY, u);
               return u;
             });
@@ -1246,6 +1270,24 @@ export default function NutriCrew() {
     } else {
       storage.set(PENDING_PAIRING_KEY, null);
       throw new Error(data.error || "Could not start checkout");
+    }
+  };
+
+  // Redirects to Stripe's hosted billing portal — self-service cancel/update
+  // card/view invoices, no custom subscription-management UI to build.
+  const handleManageSubscription = async () => {
+    const email = user?.email;
+    if (!email) return;
+    const res = await fetch(`${API_BASE}/api/create-portal-session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (data.url) {
+      window.location.href = data.url;
+    } else {
+      throw new Error(data.error || "Could not open billing portal");
     }
   };
 
@@ -1424,8 +1466,8 @@ export default function NutriCrew() {
     const hasPassword = sessionData.hasPassword !== false;
     setUser(prev => {
       const u = prev?.email
-        ? { ...prev, isPremium: !!sessionData.isPremium, hasPassword, bonusPairings: sessionData.bonusPairings ?? prev?.bonusPairings ?? 0 }
-        : { email: sessionData.email, name: sessionData.name || "", isPremium: !!sessionData.isPremium, hasPassword, bonusPairings: sessionData.bonusPairings ?? 0 };
+        ? { ...prev, isPremium: !!sessionData.isPremium, trialEnd: sessionData.trialEnd ?? null, hasPassword, bonusPairings: sessionData.bonusPairings ?? prev?.bonusPairings ?? 0 }
+        : { email: sessionData.email, name: sessionData.name || "", isPremium: !!sessionData.isPremium, trialEnd: sessionData.trialEnd ?? null, hasPassword, bonusPairings: sessionData.bonusPairings ?? 0 };
       storage.set(USER_KEY, u);
       return u;
     });
@@ -1554,7 +1596,7 @@ export default function NutriCrew() {
       )}
 
       {screen === "premium" && (
-        <PremiumScreen t={t} onBack={() => setScreen(premiumReturnScreen)} onUpgrade={handleUpgrade} premiumSuccess={premiumSuccess} onGenerate={handleGenerate} returnScreen={premiumReturnScreen}/>
+        <PremiumScreen t={t} onBack={() => setScreen(premiumReturnScreen)} onUpgrade={handleUpgrade} premiumSuccess={premiumSuccess} onGenerate={handleGenerate} returnScreen={premiumReturnScreen} trialEnd={user?.trialEnd}/>
       )}
 
       {/* Floating calorie button */}
@@ -1644,6 +1686,7 @@ export default function NutriCrew() {
           user={user}
           onSave={updateProfile}
           onClose={() => setShowProfile(false)}
+          onManageSubscription={handleManageSubscription}
         />
       )}
 
@@ -3192,7 +3235,7 @@ function NearbyPlaces({ t, pairing, user, isPremium }) {
 }
 
 // ─── PREMIUM SCREEN ───────────────────────────────────────────────
-function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess, onGenerate, returnScreen }) {
+function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess, onGenerate, returnScreen, trialEnd }) {
   const [loading, setLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState(null);
   const [billing, setBilling] = useState("monthly"); // monthly | annual
@@ -3211,6 +3254,7 @@ function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess, onGenerate, retur
 
   if (premiumSuccess) {
     const ctaBack = returnScreen === "splash" || returnScreen === "plan";
+    const trialEndDate = trialEnd ? new Date(trialEnd) : null;
     return (
       <div style={styles.premiumScreen}>
         <div style={styles.premiumIcon}>🎉</div>
@@ -3220,6 +3264,11 @@ function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess, onGenerate, retur
             ? "Your account is now active. Gym Plans, Roster Automation, Calorie Deficit plans, Jetlag Meal Plans, Cognitive Performance meal timing, and Nearby Places are all unlocked."
             : "Your account is now active. Tap below to generate your plan."}
         </div>
+        {trialEndDate && (
+          <div style={{ background: C.navyCard, border: `1px solid ${C.gold}`, borderRadius: 10, padding: "10px 14px", marginBottom: 16, color: C.gold, fontSize: 13, fontWeight: 600, textAlign: "center" }}>
+            {t.trial_active_until} {trialEndDate.toLocaleDateString()}
+          </div>
+        )}
         <button style={styles.primaryBtn} onClick={ctaBack ? onBack : onGenerate}>
           {ctaBack ? "Continue" : "Generate My Plan"}
         </button>
@@ -3286,8 +3335,13 @@ function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess, onGenerate, retur
         </div>
       )}
       <button style={styles.primaryBtn} onClick={handleClick} disabled={loading}>
-        {loading ? "Taking you to secure checkout…" : billing === "annual" ? `${t.upgrade} — $62.32/year` : `${t.upgrade} — $7.99/month`}
+        {loading ? t.checkout_redirecting : t.start_trial_cta}
       </button>
+      <div style={{ color: C.muted, fontSize: 11, textAlign: "center", marginTop: 8, maxWidth: 280 }}>
+        {billing === "annual"
+          ? `${t.trial_disclaimer} $62.32/${t.per_year}.`
+          : `${t.trial_disclaimer} $7.99/${t.per_month}.`}
+      </div>
       <button style={{...styles.backBtn, flex: "none"}} onClick={onBack}>{t.back}</button>
     </div>
   );
@@ -4668,7 +4722,7 @@ function FAQModal({ t, lang, onClose }) {
   );
 }
 
-function ProfileModal({ t, user, onSave, onClose }) {
+function ProfileModal({ t, user, onSave, onClose, onManageSubscription }) {
   const initialUnit = (user?.weight || "").toString().includes("lbs") ? "lbs" : "kg";
   const initialWeight = parseFloat(user?.weight) || "";
   const [gender, setGender] = useState(user?.gender || "");
@@ -4688,6 +4742,19 @@ function ProfileModal({ t, user, onSave, onClose }) {
   const [pwError, setPwError] = useState("");
   const [pwSaving, setPwSaving] = useState(false);
   const [pwSuccess, setPwSuccess] = useState(false);
+  const [portalError, setPortalError] = useState("");
+
+  const trialEndDate = user?.trialEnd ? new Date(user.trialEnd) : null;
+  const isTrialing = trialEndDate && trialEndDate > new Date();
+
+  const handleManageClick = async () => {
+    setPortalError("");
+    try {
+      await onManageSubscription();
+    } catch (err) {
+      setPortalError(err.message || "Could not open billing portal.");
+    }
+  };
 
   const handleSetPassword = async () => {
     if (newPassword.length < 8) { setPwError("Password must be at least 8 characters."); return; }
@@ -4751,6 +4818,20 @@ function ProfileModal({ t, user, onSave, onClose }) {
           <div style={styles.restrictText}>{user?.email}</div>
           <div style={{...styles.restrictText, marginTop: 6, fontSize: 11}}>{t.profile_locked_note}</div>
         </div>
+
+        {user?.isPremium && (
+          <div style={{ background: C.navyCard, border: `1px solid ${C.gold}`, borderRadius: 10, padding: "12px 14px" }}>
+            <div style={{ color: C.gold, fontWeight: 700, fontSize: 13, marginBottom: 4 }}>
+              {isTrialing
+                ? `${t.trial_active_until} ${trialEndDate.toLocaleDateString()}`
+                : t.subscription_active}
+            </div>
+            {portalError && <div style={{ color: "#e55", fontSize: 12, marginBottom: 6 }}>{portalError}</div>}
+            <button style={{ ...styles.secondaryBtn, marginTop: 4 }} onClick={handleManageClick}>
+              {t.manage_subscription}
+            </button>
+          </div>
+        )}
 
         <div>
           <div style={styles.inputLabel}>Password</div>
