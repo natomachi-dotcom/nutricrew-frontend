@@ -28,6 +28,19 @@ const T = {
     tagline: "Fuel Your Flight",
     tagline_sub: "Nutrition, jet lag, and meal planning built for flight crews",
     contact_us: "Questions? Contact us",
+    contact_heading: "Contact Us",
+    contact_intro: "Send us a message and we'll get back to you by email.",
+    contact_name_placeholder: "Your name",
+    contact_message_placeholder: "How can we help?",
+    contact_send: "Send Message",
+    contact_sending: "Sending…",
+    contact_success_title: "Message sent!",
+    contact_success_body: "Thanks for reaching out — we'll reply to your email soon.",
+    contact_err_name: "Please enter your name.",
+    contact_err_email: "Please enter a valid email address.",
+    contact_err_message: "Please enter a message.",
+    contact_err_generic: "Could not send your message. Please try again.",
+    contact_err_network: "Network error. Please try again.",
     faq_title: "FAQ",
     faq_heading: "Frequently Asked Questions",
     start: "Begin Check-In",
@@ -256,6 +269,19 @@ const T = {
     tagline: "Alimentez Votre Vol",
     tagline_sub: "Nutrition, décalage horaire et planification des repas pour le personnel de cabine",
     contact_us: "Des questions ? Contactez-nous",
+    contact_heading: "Contactez-nous",
+    contact_intro: "Envoyez-nous un message et nous vous répondrons par e-mail.",
+    contact_name_placeholder: "Votre nom",
+    contact_message_placeholder: "Comment pouvons-nous vous aider ?",
+    contact_send: "Envoyer",
+    contact_sending: "Envoi…",
+    contact_success_title: "Message envoyé !",
+    contact_success_body: "Merci de nous avoir contactés — nous répondrons bientôt à votre e-mail.",
+    contact_err_name: "Veuillez entrer votre nom.",
+    contact_err_email: "Veuillez entrer une adresse e-mail valide.",
+    contact_err_message: "Veuillez entrer un message.",
+    contact_err_generic: "Impossible d'envoyer votre message. Veuillez réessayer.",
+    contact_err_network: "Erreur réseau. Veuillez réessayer.",
     faq_title: "FAQ",
     faq_heading: "Foire Aux Questions",
     start: "Commencer l'Enregistrement",
@@ -483,6 +509,19 @@ const T = {
     tagline: "Combustible Para Tu Vuelo",
     tagline_sub: "Nutrición, jet lag y planificación de comidas para tripulaciones de vuelo",
     contact_us: "¿Preguntas? Contáctanos",
+    contact_heading: "Contáctanos",
+    contact_intro: "Envíanos un mensaje y te responderemos por correo electrónico.",
+    contact_name_placeholder: "Tu nombre",
+    contact_message_placeholder: "¿Cómo podemos ayudarte?",
+    contact_send: "Enviar Mensaje",
+    contact_sending: "Enviando…",
+    contact_success_title: "¡Mensaje enviado!",
+    contact_success_body: "Gracias por contactarnos — responderemos a tu correo pronto.",
+    contact_err_name: "Por favor ingresa tu nombre.",
+    contact_err_email: "Por favor ingresa un correo electrónico válido.",
+    contact_err_message: "Por favor ingresa un mensaje.",
+    contact_err_generic: "No se pudo enviar tu mensaje. Inténtalo de nuevo.",
+    contact_err_network: "Error de red. Inténtalo de nuevo.",
     faq_title: "FAQ",
     faq_heading: "Preguntas Frecuentes",
     start: "Comenzar Check-In",
@@ -958,6 +997,9 @@ export default function NutriCrew() {
     return "splash"; // first time — show the welcome screen before check-in
   }); // login | otp | set-password | loading | splash | checkin | boarding | plan | premium
   const [pendingOtpEmail, setPendingOtpEmail] = useState("");
+  // Holds a just-generated plan while a brand-new/passwordless account verifies
+  // its email and sets a real password — the plan is revealed once that's done.
+  const [pendingFirstPlan, setPendingFirstPlan] = useState(null);
   const [step, setStep] = useState(() => storage.get(CHECKIN_DRAFT_KEY)?.step ?? 0);
   const [pairing, setPairing] = useState(() => {
     const pending = storage.get(PENDING_PAIRING_KEY);
@@ -1014,6 +1056,7 @@ export default function NutriCrew() {
   const [showReferral, setShowReferral] = useState(false);
   const [referralCode, setReferralCode] = useState(null);
   const [showFAQ, setShowFAQ] = useState(false);
+  const [showContact, setShowContact] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const [premiumReturnScreen, setPremiumReturnScreen] = useState("boarding");
 
@@ -1336,6 +1379,31 @@ export default function NutriCrew() {
     setLoading(true);
     try {
       const result = await generatePlan(data, lang);
+      if (!result.hasPassword) {
+        // No real password on file (brand-new account, or one that never set
+        // one) — verify the email and require a password before revealing
+        // the plan, so every account has a credential only its owner knows.
+        setPendingFirstPlan({ result, cacheKey, data });
+        setPendingOtpEmail(data.email);
+        try {
+          const otpRes = await fetch(`${API_BASE}/api/auth/send-otp`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: data.email }),
+          });
+          const otpData = await otpRes.json().catch(() => ({}));
+          if (otpData.alreadyVerified) {
+            handleLoginSuccess(otpData);
+            if (otpData.hasPassword) finalizePendingFirstPlan({ result, cacheKey, data });
+          } else {
+            setScreen("otp");
+          }
+        } catch {
+          setScreen("otp"); // OTPScreen's own resend covers a transient send failure
+        }
+        setLoading(false);
+        return;
+      }
       setPlan(result);
       storage.set(PAIRING_COUNT_KEY, result.pairingCount ?? pairingCount + 1);
       storage.set(PAIRING_COUNT_MONTH_KEY, currentMonthKey());
@@ -1353,6 +1421,22 @@ export default function NutriCrew() {
       }
     }
     setLoading(false);
+  };
+
+  // Reveals a plan that was held back pending mandatory email verification +
+  // password setup, then proceeds exactly as a normal successful generation would.
+  const finalizePendingFirstPlan = (pending) => {
+    const { result, cacheKey, data } = pending || pendingFirstPlan || {};
+    if (!result) { setScreen("splash"); return; }
+    setPlan(result);
+    storage.set(PAIRING_COUNT_KEY, result.pairingCount ?? 0);
+    storage.set(PAIRING_COUNT_MONTH_KEY, currentMonthKey());
+    if (!result.failedDays?.length) {
+      saveSavedPlan(cacheKey, data, result);
+      storage.set(CHECKIN_DRAFT_KEY, null);
+    }
+    setPendingFirstPlan(null);
+    setScreen("plan");
   };
 
   const handleShare = async () => {
@@ -1515,14 +1599,22 @@ export default function NutriCrew() {
         <OTPScreen
           email={pendingOtpEmail}
           onSuccess={handleLoginSuccess}
-          onBack={() => setScreen("login")}
+          onBack={() => {
+            if (pendingFirstPlan) { setPendingFirstPlan(null); setScreen("boarding"); }
+            else setScreen("login");
+          }}
         />
       )}
 
       {screen === "set-password" && (
         <SetPasswordScreen
           email={user?.email}
-          onDone={() => { updateProfile({ hasPassword: true }); setScreen("splash"); }}
+          mandatory={!!pendingFirstPlan}
+          onDone={() => {
+            updateProfile({ hasPassword: true });
+            if (pendingFirstPlan) finalizePendingFirstPlan();
+            else setScreen("splash");
+          }}
         />
       )}
 
@@ -1538,6 +1630,7 @@ export default function NutriCrew() {
           onOpenRoster={() => openRoster("splash")}
           onOpenReferral={openReferralModal}
           onOpenFAQ={() => setShowFAQ(true)}
+          onOpenContact={() => setShowContact(true)}
         />
       )}
 
@@ -1555,6 +1648,10 @@ export default function NutriCrew() {
 
       {showFAQ && (
         <FAQModal t={t} lang={lang} onClose={() => setShowFAQ(false)} />
+      )}
+
+      {showContact && (
+        <ContactModal t={t} user={user} onClose={() => setShowContact(false)} />
       )}
 
       {showRoster && (
@@ -1818,7 +1915,7 @@ function LoginScreen({ onSent, onSuccess }) {
 }
 
 // ─── SET PASSWORD SCREEN ──────────────────────────────────────────
-function SetPasswordScreen({ email, onDone }) {
+function SetPasswordScreen({ email, onDone, mandatory }) {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
@@ -1855,8 +1952,12 @@ function SetPasswordScreen({ email, onDone }) {
         </div>
 
         <div style={{ background: C.card, border: `1px solid ${C.navyBorder}`, borderRadius: 16, padding: "28px 24px" }}>
-          <div style={{ fontSize: 18, fontWeight: "bold", color: C.white, marginBottom: 6 }}>Set a password</div>
-          <div style={{ fontSize: 13, color: C.muted, marginBottom: 24 }}>Skip the email code next time — add a password to your account now.</div>
+          <div style={{ fontSize: 18, fontWeight: "bold", color: C.white, marginBottom: 6 }}>{mandatory ? "Secure your account" : "Set a password"}</div>
+          <div style={{ fontSize: 13, color: C.muted, marginBottom: 24 }}>
+            {mandatory
+              ? "Your account needs a password before you can continue — this keeps your plan and profile yours alone."
+              : "Skip the email code next time — add a password to your account now."}
+          </div>
 
           <div style={styles.inputWrap}>
             <span style={styles.inputIcon}>🔒</span>
@@ -1998,7 +2099,7 @@ function OTPScreen({ email, onSuccess, onBack }) {
 }
 
 // ─── SPLASH SCREEN ────────────────────────────────────────────────
-function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onStart, onNewPairing, onOpenHistory, onOpenSavedMeals, onOpenProfile, onOpenRoster, onOpenReferral, onOpenFAQ, isPremium }) {
+function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onStart, onNewPairing, onOpenHistory, onOpenSavedMeals, onOpenProfile, onOpenRoster, onOpenReferral, onOpenFAQ, onOpenContact, isPremium }) {
   return (
     <div style={styles.splash}>
       {user && (
@@ -2066,9 +2167,9 @@ function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onS
             {t.faq_title}
           </button>
           <span style={styles.contactLink}>·</span>
-          <a href="mailto:crewmealplans@nutricrew.ca" style={styles.contactLink}>
+          <button style={styles.contactLink} onClick={onOpenContact}>
             {t.contact_us}
-          </a>
+          </button>
         </div>
       </div>
     </div>
@@ -4717,6 +4818,87 @@ function FAQModal({ t, lang, onClose }) {
             );
           })}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ContactModal({ t, user, onClose }) {
+  const [name, setName] = useState(user?.name || "");
+  const [email, setEmail] = useState(user?.email || "");
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
+  const [sent, setSent] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!name.trim()) { setError(t.contact_err_name); return; }
+    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setError(t.contact_err_email); return; }
+    if (!message.trim()) { setError(t.contact_err_message); return; }
+    setSending(true);
+    setError("");
+    try {
+      const res = await fetch(`${API_BASE}/api/contact`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), email: email.trim(), message: message.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setError(data.error || t.contact_err_generic); return; }
+      setSent(true);
+    } catch {
+      setError(t.contact_err_network);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div style={styles.modalOverlay}>
+      <div style={{ ...styles.modal, maxWidth: 420 }}>
+        <div style={styles.modalHeader}>
+          <span style={styles.modalTitle}>✉️ {t.contact_heading}</span>
+          <button style={styles.closeBtn} onClick={onClose}>✕</button>
+        </div>
+
+        {sent ? (
+          <div style={{ padding: "24px 4px", textAlign: "center" }}>
+            <div style={{ fontSize: 32, marginBottom: 12 }}>✅</div>
+            <div style={{ color: C.white, fontWeight: 700, marginBottom: 6 }}>{t.contact_success_title}</div>
+            <div style={{ color: C.muted, fontSize: 13 }}>{t.contact_success_body}</div>
+          </div>
+        ) : (
+          <div style={{ padding: "8px 0 4px" }}>
+            <div style={{ color: C.muted, fontSize: 13, marginBottom: 16 }}>{t.contact_intro}</div>
+
+            <div style={styles.inputWrap}>
+              <span style={styles.inputIcon}>👤</span>
+              <input style={styles.input} type="text" placeholder={t.contact_name_placeholder}
+                value={name} onChange={e => setName(e.target.value)} autoFocus/>
+            </div>
+
+            <div style={{ ...styles.inputWrap, marginTop: 12 }}>
+              <span style={styles.inputIcon}>✉️</span>
+              <input style={styles.input} type="email" placeholder="you@email.com"
+                value={email} onChange={e => setEmail(e.target.value)} />
+            </div>
+
+            <div style={{ ...styles.inputWrap, marginTop: 12, alignItems: "flex-start" }}>
+              <span style={{ ...styles.inputIcon, marginTop: 2 }}>💬</span>
+              <textarea
+                style={{ ...styles.input, minHeight: 90, resize: "vertical", paddingTop: 2 }}
+                placeholder={t.contact_message_placeholder}
+                value={message} onChange={e => setMessage(e.target.value)} />
+            </div>
+
+            {error && <div style={{ color: "#F87171", fontSize: 13, marginTop: 8 }}>{error}</div>}
+
+            <button style={{ ...styles.primaryBtn, width: "100%", justifyContent: "center", marginTop: 16 }}
+              onClick={handleSubmit} disabled={sending}>
+              {sending ? t.contact_sending : t.contact_send}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
