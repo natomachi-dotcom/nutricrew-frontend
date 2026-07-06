@@ -148,15 +148,6 @@ const T = {
     tab_plan: "Meal Plan",
     tab_grocery: "Grocery List",
     tab_restrictions: "Food Rules",
-    tab_nearby: "Nearby",
-    nearby_groceries: "Grocery Stores",
-    nearby_restaurants: "Healthy Restaurants",
-    nearby_premium_title: "Premium Feature",
-    nearby_premium_msg: "Upgrade to Premium to see nearby grocery stores and restaurants at your destination.",
-    nearby_loading: "Finding places near you…",
-    nearby_error: "Could not load nearby places. Try again later.",
-    nearby_open: "Open now",
-    nearby_closed: "Closed",
     new_pairing: "New Pairing",
     try_again: "Try Again",
     view_last_plan: "View Last Plan",
@@ -391,15 +382,6 @@ const T = {
     tab_plan: "Plan Repas",
     tab_grocery: "Liste de Courses",
     tab_restrictions: "Règles Alimentaires",
-    tab_nearby: "À Proximité",
-    nearby_groceries: "Épiceries",
-    nearby_restaurants: "Restaurants Sains",
-    nearby_premium_title: "Fonctionnalité Premium",
-    nearby_premium_msg: "Passez au Premium pour voir les épiceries et restaurants sains près de votre destination.",
-    nearby_loading: "Recherche de lieux à proximité…",
-    nearby_error: "Impossible de charger les lieux. Réessayez plus tard.",
-    nearby_open: "Ouvert maintenant",
-    nearby_closed: "Fermé",
     new_pairing: "Nouveau Pairing",
     try_again: "Réessayer",
     view_last_plan: "Voir le Dernier Plan",
@@ -634,15 +616,6 @@ const T = {
     tab_plan: "Plan de Comidas",
     tab_grocery: "Lista de Compras",
     tab_restrictions: "Reglas Alimentarias",
-    tab_nearby: "Cercano",
-    nearby_groceries: "Tiendas de Comestibles",
-    nearby_restaurants: "Restaurantes Saludables",
-    nearby_premium_title: "Función Premium",
-    nearby_premium_msg: "Actualiza a Premium para ver tiendas y restaurantes saludables cerca de tu destino.",
-    nearby_loading: "Buscando lugares cercanos…",
-    nearby_error: "No se pudieron cargar los lugares. Inténtalo más tarde.",
-    nearby_open: "Abierto ahora",
-    nearby_closed: "Cerrado",
     new_pairing: "Nuevo Pairing",
     try_again: "Intentar de Nuevo",
     view_last_plan: "Ver Último Plan",
@@ -1745,7 +1718,6 @@ export default function NutriCrew() {
           onNewPairing={startNewPairing} onRetry={handleGenerate} lang={lang}
           favorites={favorites} onToggleFavorite={toggleFavorite}
           onOpenAirplaneMeal={() => setShowAirplaneMeal(true)}
-          isPremium={plan?.isPremium ?? false}
           isOnline={isOnline}
           planKey={planCacheKey({ ...user, ...Object.fromEntries(Object.entries(pairing).filter(([, v]) => !(Array.isArray(v) && v.length === 0))) }, lang)}
           onShare={handleShare}
@@ -2994,7 +2966,7 @@ const PLAN_LOAD_STEPS = [
   "Finalizing your plan...",
 ];
 
-function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, activeDay, setActiveDay, onNewPairing, onRetry, favorites, onToggleFavorite, onOpenAirplaneMeal, isPremium, isOnline, planKey, onShare, shareCopied, onOpenReferral }) {
+function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, activeDay, setActiveDay, onNewPairing, onRetry, favorites, onToggleFavorite, onOpenAirplaneMeal, isOnline, planKey, onShare, shareCopied, onOpenReferral }) {
   const days = pairing.pairing_days || 1;
   const hasJetlag = Math.abs(parseInt(pairing.timezone||0)) >= 4;
   const [loadStep, setLoadStep] = useState(0);
@@ -3151,15 +3123,14 @@ function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, 
 
       {/* Tabs */}
       <div style={styles.tabBar}>
-        {["plan","grocery","restrictions","nearby",...(plan.performanceAdvisory ? ["performance"] : [])].map(tab => (
+        {["plan","grocery","restrictions",...(plan.performanceAdvisory ? ["performance"] : [])].map(tab => (
           <button key={tab}
             style={{...styles.tab, ...(activeTab===tab?styles.tabActive:{})}}
             onClick={() => setActiveTab(tab)}>
-            {tab === "plan" ? "🍽️" : tab === "grocery" ? "🛒" : tab === "restrictions" ? "🚫" : tab === "performance" ? "⚡" : "📍"}
+            {tab === "plan" ? "🍽️" : tab === "grocery" ? "🛒" : tab === "restrictions" ? "🚫" : "⚡"}
             <span style={styles.tabLabel}>
-              {tab === "plan" ? t.tab_plan : tab === "grocery" ? t.tab_grocery : tab === "restrictions" ? t.tab_restrictions : tab === "performance" ? t.tab_performance : t.tab_nearby}
+              {tab === "plan" ? t.tab_plan : tab === "grocery" ? t.tab_grocery : tab === "restrictions" ? t.tab_restrictions : t.tab_performance}
             </span>
-            {tab === "nearby" && !isPremium && <span style={styles.premiumLockBadge}>👑</span>}
           </button>
         ))}
       </div>
@@ -3206,9 +3177,6 @@ function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, 
         )}
         {activeTab === "restrictions" && plan.foodRestrictions && (
           <FoodRestrictions data={plan.foodRestrictions} pairing={pairing}/>
-        )}
-        {activeTab === "nearby" && (
-          <NearbyPlaces t={t} pairing={pairing} user={user} isPremium={isPremium}/>
         )}
         {activeTab === "performance" && plan.performanceAdvisory && (
           <div style={{ padding: "4px 0" }}>
@@ -3455,70 +3423,6 @@ function FoodRestrictions({ data, pairing }) {
   );
 }
 
-function NearbyPlaces({ t, pairing, user, isPremium }) {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const city = (pairing.destinations || [])[0] || "";
-
-  useEffect(() => {
-    if (!isPremium || !city || !user?.email) return;
-    setLoading(true);
-    setError(null);
-    fetch(`${API_BASE}/api/places`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ city, email: user.email }),
-    })
-      .then(r => r.json())
-      .then(d => { if (d.error) throw new Error(d.error); setData(d); })
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
-  }, [isPremium, city, user?.email]);
-
-  if (!isPremium) {
-    return (
-      <div style={styles.nearbyLock}>
-        <div style={{fontSize: 40, marginBottom: 12}}>👑</div>
-        <div style={styles.nearbyLockTitle}>{t.nearby_premium_title}</div>
-        <div style={styles.nearbyLockMsg}>{t.nearby_premium_msg}</div>
-      </div>
-    );
-  }
-
-  if (loading) return <div style={styles.nearbyLoading}>{t.nearby_loading}</div>;
-  if (error) return <div style={styles.nearbyLoading}>{t.nearby_error}</div>;
-  if (!data) return null;
-
-  const PlaceCard = ({ place, typeIcon }) => (
-    <div style={styles.placeCard}>
-      <div style={styles.placeName}>{typeIcon} {place.name}</div>
-      {place.rating != null && (
-        <div style={styles.placeRating}>⭐ {"★".repeat(Math.round(place.rating))}{"☆".repeat(5 - Math.round(place.rating))} {place.rating.toFixed(1)}</div>
-      )}
-      <div style={styles.placeAddress}>📍 {place.address}</div>
-      {place.open_now != null && (
-        <div style={{...styles.placeStatus, color: place.open_now ? C.green : C.red}}>
-          {place.open_now ? `🟢 ${t.nearby_open}` : `🔴 ${t.nearby_closed}`}
-        </div>
-      )}
-    </div>
-  );
-
-  return (
-    <div>
-      <div style={styles.nearbySection}>
-        <div style={styles.nearbySectionTitle}>🛒 {t.nearby_groceries}</div>
-        {data.groceries?.length ? data.groceries.map((p, i) => <PlaceCard key={i} place={p} typeIcon="🏪"/>) : <div style={styles.placeAddress}>No results found.</div>}
-      </div>
-      <div style={styles.nearbySection}>
-        <div style={styles.nearbySectionTitle}>🍽️ {t.nearby_restaurants}</div>
-        {data.restaurants?.length ? data.restaurants.map((p, i) => <PlaceCard key={i} place={p} typeIcon="🍴"/>) : <div style={styles.placeAddress}>No results found.</div>}
-      </div>
-    </div>
-  );
-}
-
 // ─── PREMIUM SCREEN ───────────────────────────────────────────────
 function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess, onGenerate, returnScreen, trialEnd }) {
   const [loading, setLoading] = useState(false);
@@ -3546,7 +3450,7 @@ function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess, onGenerate, retur
         <div style={styles.premiumTitle}>Welcome to Premium!</div>
         <div style={styles.premiumMsg}>
           {ctaBack
-            ? "Your account is now active. Gym Plans, Roster Automation, Calorie Deficit plans, Jetlag Meal Plans, Cognitive Performance meal timing, and Nearby Places are all unlocked."
+            ? "Your account is now active. Gym Plans, Roster Automation, Calorie Deficit plans, Jetlag Meal Plans, and Cognitive Performance meal timing are all unlocked."
             : "Your account is now active. Tap below to generate your plan."}
         </div>
         {trialEndDate && (
@@ -3579,11 +3483,6 @@ function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess, onGenerate, retur
         <div style={{ ...styles.premiumFeature, color: C.gold, fontWeight: 700, borderLeft: `3px solid ${C.gold}`, paddingLeft: 13 }}>
           ✓ 🧠 Cognitive Performance meal timing
         </div>
-        {[
-          "📍 Nearby stores & restaurants",
-        ].map(f => (
-          <div key={f} style={styles.premiumFeature}>✓ {f}</div>
-        ))}
       </div>
 
       <div style={{ display: "flex", gap: 8, width: "100%", maxWidth: 320, margin: "8px 0 16px" }}>
@@ -6069,24 +5968,13 @@ const styles = {
   },
   restrictTitle: { fontSize: 14, fontWeight: 700, color: C.gold, marginBottom: 8 },
   restrictText: { fontSize: 13, color: C.muted, lineHeight: 1.6 },
-  // NEARBY
+  // Shared premium-lock panel (used by the jetlag meal-timing lock)
   nearbyLock: {
     display: "flex", flexDirection: "column", alignItems: "center",
     justifyContent: "center", padding: "48px 24px", gap: 12, textAlign: "center",
   },
   nearbyLockTitle: { fontSize: 18, fontWeight: 700, color: C.gold },
   nearbyLockMsg: { fontSize: 14, color: C.muted, lineHeight: 1.6, maxWidth: 280 },
-  nearbyLoading: { padding: "40px 24px", textAlign: "center", color: C.muted, fontSize: 14 },
-  nearbySection: { marginBottom: 28 },
-  nearbySectionTitle: { fontSize: 15, fontWeight: 700, color: C.gold, marginBottom: 12 },
-  placeCard: {
-    background: C.navyMid, borderRadius: 12, padding: "14px 16px",
-    marginBottom: 10, border: `1px solid ${C.navyBorder}`,
-  },
-  placeName: { fontSize: 15, fontWeight: 700, color: C.white, marginBottom: 4 },
-  placeRating: { fontSize: 13, color: C.gold, marginBottom: 4 },
-  placeAddress: { fontSize: 13, color: C.muted, lineHeight: 1.5 },
-  placeStatus: { fontSize: 12, fontWeight: 600, marginTop: 6 },
   premiumLockBadge: { fontSize: 10, marginLeft: 3 },
   // PREMIUM
   premiumScreen: {
