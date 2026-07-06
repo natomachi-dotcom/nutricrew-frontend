@@ -57,7 +57,7 @@ async function walkToDutySchedule(page) {
   await continueBtn.click();
 
   // destination: required — at least one city must be filled
-  await page.getByPlaceholder("Paris (CDG)").fill("Paris (CDG)");
+  await page.getByPlaceholder("Where are you flying? (city or airport)").fill("Paris (CDG)");
   await continueBtn.click();
 
   // kitchen access (day 1): required — at least one option

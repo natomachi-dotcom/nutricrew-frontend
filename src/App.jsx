@@ -54,6 +54,7 @@ const T = {
     step_pairing: "Pairing Length",
     step_route: "Your Route",
     destination_label: "Destination",
+    destination_placeholder: "Where are you flying? (city or airport)",
     step_usa: "Flying to the USA?",
     step_kitchen: "Kitchen Access",
     step_lunch_bag: "Lunch Bag Size",
@@ -297,6 +298,7 @@ const T = {
     step_pairing: "Durée du Pairing",
     step_route: "Votre Route",
     destination_label: "Destination",
+    destination_placeholder: "Où allez-vous ? (ville ou aéroport)",
     step_usa: "Vol vers les États-Unis?",
     step_kitchen: "Accès Cuisine",
     step_lunch_bag: "Taille du Sac Repas",
@@ -539,6 +541,7 @@ const T = {
     step_pairing: "Duración del Pairing",
     step_route: "Tu Ruta",
     destination_label: "Destino",
+    destination_placeholder: "¿A dónde vuelas? (ciudad o aeropuerto)",
     step_usa: "¿Vuelo a EE.UU.?",
     step_kitchen: "Acceso a Cocina",
     step_lunch_bag: "Tamaño del Bolso",
@@ -2265,19 +2268,9 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
       upd("departure", user.departure);
       setLocalVal(user.departure);
     }
-    if (currentStep === "destination") {
-      const numDays = pairing.pairing_days || 1;
-      const current = pairing.destinations || [];
-      if (current.length < numDays) {
-        const lastDests = getSavedPlans()[0]?.data?.destinations || [];
-        const lastKnown = [...lastDests].reverse().find(d => d && d.trim()) || "";
-        if (lastKnown) {
-          const filled = Array.from({ length: numDays }, (_, i) => current[i] || lastDests[i] || lastKnown);
-          upd("destinations", filled);
-          setLocalDests(filled);
-        }
-      }
-    }
+    // Destination is intentionally never auto-filled — unlike departure (a
+    // stable home base), a pairing's destination is different every time by
+    // definition, so it must always start blank with just a placeholder.
   }, [currentStep]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = (v) => {
@@ -2490,7 +2483,7 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
                 <div style={styles.hint}>{t.day} {i+1}</div>
                 <TextInput value={localDests[i] || ""}
                   onChange={v => updDest(i, v)}
-                  placeholder="Paris (CDG)" icon="🛬"/>
+                  placeholder={t.destination_placeholder} icon="🛬"/>
               </div>
             ))}
             {tzDiff !== null && (

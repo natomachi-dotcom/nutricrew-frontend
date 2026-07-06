@@ -154,8 +154,8 @@ export async function completeCheckIn(page, { name = "Alex Pilot", email = "alex
   await page.getByPlaceholder("Montreal (YUL)").fill("Montreal (YUL)");
   await continueBtn.click();
 
-  // destination (1 day -> single field)
-  await page.getByPlaceholder("Paris (CDG)").fill("Paris (CDG)");
+  // destination (1 day -> single field) — starts empty, no default to clear
+  await page.getByPlaceholder("Where are you flying? (city or airport)").fill("Paris (CDG)");
   await continueBtn.click();
 
   // kitchen access (day 1)
