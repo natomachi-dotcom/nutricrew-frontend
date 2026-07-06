@@ -66,6 +66,8 @@ const T = {
     continue: "Continue →",
     back: "← Back",
     generate: "Generate My Plan",
+    edit: "Edit",
+    back_to_review: "Back to Review",
     boarding_title: "BOARDING PASS",
     day: "Day",
     days: "Days",
@@ -307,6 +309,8 @@ const T = {
     continue: "Continuer →",
     back: "← Retour",
     generate: "Générer Mon Plan",
+    edit: "Modifier",
+    back_to_review: "Retour à la revue",
     boarding_title: "CARTE D'EMBARQUEMENT",
     day: "Jour", days: "Jours",
     male: "Homme", female: "Femme", other: "Autre / Préfère ne pas dire",
@@ -547,6 +551,8 @@ const T = {
     continue: "Continuar →",
     back: "← Atrás",
     generate: "Generar Mi Plan",
+    edit: "Editar",
+    back_to_review: "Volver a la revisión",
     boarding_title: "TARJETA DE EMBARQUE",
     day: "Día", days: "Días",
     male: "Masculino", female: "Femenino", other: "Otro / Prefiero no decir",
@@ -968,6 +974,10 @@ function useOnlineStatus() {
   return isOnline;
 }
 
+// Personal/profile identity fields — out of scope for the review screen (they're
+// one-time setup, edited via the profile modal, not per-pairing choices).
+const IDENTITY_FIELDS = ["name", "email", "gender", "weight", "dob", "position"];
+
 // ─── MAIN APP ─────────────────────────────────────────────────────
 export default function NutriCrew() {
   const isOnline = useOnlineStatus();
@@ -1001,6 +1011,9 @@ export default function NutriCrew() {
   // its email and sets a real password — the plan is revealed once that's done.
   const [pendingFirstPlan, setPendingFirstPlan] = useState(null);
   const [step, setStep] = useState(() => storage.get(CHECKIN_DRAFT_KEY)?.step ?? 0);
+  // Non-null while editing a single field jumped to from the review/boarding
+  // screen — see `currentStep`/`jumpToReviewField` below.
+  const [reviewEditStep, setReviewEditStep] = useState(null);
   const [pairing, setPairing] = useState(() => {
     const pending = storage.get(PENDING_PAIRING_KEY);
     if (pending) {
@@ -1157,9 +1170,11 @@ export default function NutriCrew() {
         if (r.ok) {
           const data = await r.json();
           setUser(prev => {
+            const budget_type = data.budgetType ?? prev?.budget_type ?? null;
+            const budget_amount = data.budgetAmount ?? prev?.budget_amount ?? null;
             const u = prev?.email
-              ? { ...prev, isPremium: !!data.isPremium, trialEnd: data.trialEnd ?? null, bonusPairings: data.bonusPairings ?? prev?.bonusPairings ?? 0 }
-              : { email: data.email, name: data.name || "", isPremium: !!data.isPremium, trialEnd: data.trialEnd ?? null, bonusPairings: data.bonusPairings ?? 0 };
+              ? { ...prev, isPremium: !!data.isPremium, trialEnd: data.trialEnd ?? null, bonusPairings: data.bonusPairings ?? prev?.bonusPairings ?? 0, budget_type, budget_amount }
+              : { email: data.email, name: data.name || "", isPremium: !!data.isPremium, trialEnd: data.trialEnd ?? null, bonusPairings: data.bonusPairings ?? 0, budget_type, budget_amount };
             storage.set(USER_KEY, u);
             return u;
           });
@@ -1279,8 +1294,23 @@ export default function NutriCrew() {
     ? allSteps.filter(s => !personalSteps.includes(s))
     : allSteps;
 
-  const currentStep = steps[step];
+  // Every pairing-relevant field the review screen can edit, regardless of
+  // whether it's currently in `steps` — for a returning user, fields like
+  // diet/goals/budget are skipped from the linear flow entirely (already on
+  // file), but the review screen still needs to show and edit them.
+  const reviewFields = allSteps.filter(s => !IDENTITY_FIELDS.includes(s));
+
+  // Set while a single field is being edited from the review screen — takes
+  // over which step renders without touching the linear `step` index, so
+  // "Back to Review" always returns to review regardless of where `step`
+  // pointed before the detour.
+  const currentStep = reviewEditStep || steps[step];
   const totalSteps = steps.length;
+
+  const jumpToReviewField = (field) => {
+    setReviewEditStep(field);
+    setScreen("checkin");
+  };
 
   // Kitchen, lunch_bag, cooking_pref, diets/diet_other, calorie target, goals,
   // budget, and departure are profile data — mirror them into the user profile
@@ -1296,6 +1326,22 @@ export default function NutriCrew() {
         return updated;
       });
     }
+    if (k === "budget_type" || k === "budget_amount") {
+      syncBudgetToServer({ [k]: v });
+    }
+  };
+
+  // Budget is the one profile field also persisted server-side (not just
+  // localStorage) so it survives a cleared cache or a new device — fire and
+  // forget, localStorage already has it as the same-device fallback.
+  const syncBudgetToServer = (changes) => {
+    const email = user?.email || pairing?.email;
+    if (!email) return;
+    fetch(`${API_BASE}/api/profile/update`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, ...changes }),
+    }).catch(() => {});
   };
 
   const handleUpgrade = async (plan = "monthly") => {
@@ -1335,6 +1381,7 @@ export default function NutriCrew() {
   };
 
   const handleContinue = () => {
+    if (reviewEditStep) { setReviewEditStep(null); setScreen("boarding"); return; }
     if (step < totalSteps - 1) {
       startTransition(() => setStep(s => s + 1));
     } else {
@@ -1344,6 +1391,7 @@ export default function NutriCrew() {
   };
 
   const handleBack = () => {
+    if (reviewEditStep) { setReviewEditStep(null); setScreen("boarding"); return; }
     if (step > 0) startTransition(() => setStep(s => s - 1));
     else { storage.set(CHECKIN_DRAFT_KEY, null); setScreen("splash"); }
   };
@@ -1514,6 +1562,12 @@ export default function NutriCrew() {
     const updated = { ...(user || {}), ...changes };
     storage.set(USER_KEY, updated);
     setUser(updated);
+    if ("budget_type" in changes || "budget_amount" in changes) {
+      syncBudgetToServer({
+        budget_type: changes.budget_type ?? updated.budget_type,
+        budget_amount: changes.budget_amount ?? updated.budget_amount,
+      });
+    }
   };
 
   const startNewPairing = () => {
@@ -1549,9 +1603,13 @@ export default function NutriCrew() {
     storage.set(SESSION_KEY, { token: sessionData.token, email: sessionData.email });
     const hasPassword = sessionData.hasPassword !== false;
     setUser(prev => {
+      // Server is the source of truth for budget once set (survives a cleared
+      // cache / new device); fall back to whatever's already local otherwise.
+      const budget_type = sessionData.budgetType ?? prev?.budget_type ?? null;
+      const budget_amount = sessionData.budgetAmount ?? prev?.budget_amount ?? null;
       const u = prev?.email
-        ? { ...prev, isPremium: !!sessionData.isPremium, trialEnd: sessionData.trialEnd ?? null, hasPassword, bonusPairings: sessionData.bonusPairings ?? prev?.bonusPairings ?? 0 }
-        : { email: sessionData.email, name: sessionData.name || "", isPremium: !!sessionData.isPremium, trialEnd: sessionData.trialEnd ?? null, hasPassword, bonusPairings: sessionData.bonusPairings ?? 0 };
+        ? { ...prev, isPremium: !!sessionData.isPremium, trialEnd: sessionData.trialEnd ?? null, hasPassword, bonusPairings: sessionData.bonusPairings ?? prev?.bonusPairings ?? 0, budget_type, budget_amount }
+        : { email: sessionData.email, name: sessionData.name || "", isPremium: !!sessionData.isPremium, trialEnd: sessionData.trialEnd ?? null, hasPassword, bonusPairings: sessionData.bonusPairings ?? 0, budget_type, budget_amount };
       storage.set(USER_KEY, u);
       return u;
     });
@@ -1664,7 +1722,7 @@ export default function NutriCrew() {
           t={t} lang={lang} step={step} totalSteps={totalSteps}
           currentStep={currentStep} pairing={pairing} user={user}
           upd={upd} onContinue={handleContinue} onBack={handleBack}
-          setUser={setUser}
+          setUser={setUser} reviewMode={!!reviewEditStep}
         />
       )}
 
@@ -1672,6 +1730,7 @@ export default function NutriCrew() {
         <BoardingPassScreen t={t} user={user} pairing={pairing}
           onGenerate={handleGenerate} onBack={() => setScreen("checkin")}
           isPremiumNeeded={isPremiumNeeded || needsPremiumForDiet} isOnline={isOnline}
+          reviewFields={reviewFields} onEditField={jumpToReviewField}
         />
       )}
 
@@ -2177,7 +2236,7 @@ function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onS
 }
 
 // ─── CHECK-IN SCREEN ──────────────────────────────────────────────
-function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, upd, onContinue, onBack, setUser }) {
+function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, upd, onContinue, onBack, setUser, reviewMode }) {
   // key={currentStep} on this component (set in parent) guarantees a fresh mount
   // on every step — no stale localVal between steps.
   const [localVal, setLocalVal] = useState(() => pairing[currentStep] ?? user?.[currentStep] ?? "");
@@ -2196,9 +2255,11 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
       upd("weight", "70kg");
       setLocalVal("70");
     }
-    if (currentStep === "budget") {
-      if (!pairing.budget_type) upd("budget_type", user?.budget_type || "day");
-      if (!pairing.budget_amount && !user?.budget_amount) upd("budget_amount", "50");
+    if (currentStep === "budget" && !pairing.budget_type) {
+      // Type toggle always needs a selected state; the amount is left blank
+      // (not defaulted) so a user who's never set one is visibly prompted,
+      // per the "never silently guess a budget" requirement.
+      upd("budget_type", user?.budget_type || "day");
     }
     if (currentStep === "departure" && !pairing.departure && user?.departure) {
       upd("departure", user.departure);
@@ -2623,13 +2684,15 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
           <PlaneIcon size={18} color={C.gold}/>
           <span style={styles.checkinBrand}>NutriCrew</span>
         </div>
-        <div style={styles.stepCounter}>Step {step+1} of {totalSteps}</div>
+        <div style={styles.stepCounter}>{reviewMode ? `✏️ ${t.edit}` : `Step ${step+1} of ${totalSteps}`}</div>
       </div>
 
       {/* Progress bar */}
-      <div style={styles.progressTrack}>
-        <div style={{...styles.progressFill, width: `${progress}%`}}/>
-      </div>
+      {!reviewMode && (
+        <div style={styles.progressTrack}>
+          <div style={{...styles.progressFill, width: `${progress}%`}}/>
+        </div>
+      )}
 
       {/* Passport frame */}
       <div style={styles.passportFrame}>
@@ -2658,47 +2721,56 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
 
       {/* Nav */}
       <div style={styles.navRow}>
-        <button style={styles.backBtn} onClick={handleBack}>{t.back}</button>
-        <button
-          style={{...styles.continueBtn, ...(canContinue()?{}:styles.continueBtnDisabled)}}
-          disabled={!canContinue()}
-          onClick={() => {
-            if (currentStep === "name" || currentStep === "email") {
-              clearTimeout(textSaveTimerRef.current);
-              save(localVal);
-            }
-            if (currentStep === "weight") {
-              clearTimeout(textSaveTimerRef.current);
-              save(localVal + weightUnit);
-            }
-            if (currentStep === "departure") {
-              clearTimeout(depTimerRef.current);
-              save(localVal);
-              upd("timezone", computeTimezoneDiff(localVal, pairing.destinations) ?? 0);
-            }
-            if (currentStep === "destination") {
-              clearTimeout(tzTimerRef.current);
-              upd("destinations", localDests);
-              upd("timezone", computeTimezoneDiff(pairing.departure, localDests) ?? 0);
-            }
-            onContinue();
-          }}>
-          {t.continue}
-        </button>
+        {reviewMode ? (
+          <button
+            style={{...styles.continueBtn, flex: "none", width: "100%", ...(canContinue()?{}:styles.continueBtnDisabled)}}
+            disabled={!canContinue()}
+            onClick={commitAndAdvance}>
+            {t.back_to_review}
+          </button>
+        ) : (
+          <>
+            <button style={styles.backBtn} onClick={handleBack}>{t.back}</button>
+            <button
+              style={{...styles.continueBtn, ...(canContinue()?{}:styles.continueBtnDisabled)}}
+              disabled={!canContinue()}
+              onClick={commitAndAdvance}>
+              {t.continue}
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
+
+  function commitAndAdvance() {
+    if (currentStep === "name" || currentStep === "email") {
+      clearTimeout(textSaveTimerRef.current);
+      save(localVal);
+    }
+    if (currentStep === "weight") {
+      clearTimeout(textSaveTimerRef.current);
+      save(localVal + weightUnit);
+    }
+    if (currentStep === "departure") {
+      clearTimeout(depTimerRef.current);
+      save(localVal);
+      upd("timezone", computeTimezoneDiff(localVal, pairing.destinations) ?? 0);
+    }
+    if (currentStep === "destination") {
+      clearTimeout(tzTimerRef.current);
+      upd("destinations", localDests);
+      upd("timezone", computeTimezoneDiff(pairing.departure, localDests) ?? 0);
+    }
+    onContinue();
+  }
 
   function handleBack() { onBack(); }
 }
 
 // ─── BOARDING PASS ────────────────────────────────────────────────
-function BoardingPassScreen({ t, user, pairing, onGenerate, onBack, isPremiumNeeded, isOnline }) {
+function BoardingPassScreen({ t, user, pairing, onGenerate, onBack, isPremiumNeeded, isOnline, reviewFields, onEditField }) {
   const mergedUser = { ...(user || {}), ...pairing };
-  const allDiets = mergedUser.diets || (mergedUser.diet ? [mergedUser.diet] : []);
-  const filteredDiets = allDiets.filter(d => d && d !== "none");
-  const dietDisplay = filteredDiets.length === 0 ? "NONE"
-    : filteredDiets.map(d => d === "other" ? (mergedUser.diet_other || "OTHER").toUpperCase() : d.replace(/_/g," ").toUpperCase()).join(" + ");
   const dests = pairing.destinations || [];
   const dep = pairing.departure || "—";
   const dst = dests[0] || "—";
@@ -2706,6 +2778,12 @@ function BoardingPassScreen({ t, user, pairing, onGenerate, onBack, isPremiumNee
   const dstCode = dst.match(/\(([A-Z]{3})\)/)?.[1] || dst.slice(0,3).toUpperCase();
   const [ticketNumber] = useState(() => Date.now().toString());
   const [barcodeHeights] = useState(() => Array.from({ length: 40 }, () => Math.random()*20+20));
+
+  // A field must have a real value before a generation is spent — this is what
+  // catches a pairing_days edit that outgrew its destinations/kitchen-per-day
+  // answers, or any other edit that leaves a required field empty.
+  const incompleteFields = reviewFields.filter(f => !isFieldFilled(f, pairing, user));
+  const canGenerate = incompleteFields.length === 0;
 
   return (
     <div style={styles.boardingWrap}>
@@ -2736,29 +2814,27 @@ function BoardingPassScreen({ t, user, pairing, onGenerate, onBack, isPremiumNee
 
         <div style={styles.bpDividerDash}/>
 
-        {/* Info grid */}
+        {/* Identity + derived info (not user-editable choices) */}
         <div style={styles.bpGrid}>
           <BPField label="PASSENGER" value={mergedUser.name || "—"}/>
           <BPField label="POSITION" value={mergedUser.position?.toUpperCase() || "—"}/>
-          <BPField label="PAIRING" value={`${pairing.pairing_days || 1} ${t.days?.toUpperCase()}`}/>
-          {dests.length > 1 && (
-            <BPField label="ITINERARY" value={dests.map(d => d || "—").join(" → ")}/>
-          )}
-          <BPField label="DIET" value={dietDisplay}/>
-          <BPField label="GOALS" value={(mergedUser.goals||[]).slice(0,2).join(", ").replace(/_/g," ").toUpperCase() || "—"}/>
-          <BPField label="BUDGET" value={mergedUser.budget_amount ? `$${mergedUser.budget_amount}/${mergedUser.budget_type==="day"?"DAY":"TRIP"}` : "—"}/>
           {Math.abs(parseInt(pairing.timezone||0)) >= 4 && (
             <BPField label="JET LAG" value={`${pairing.timezone}H DIFF ⚠️`} highlight/>
           )}
-          {pairing.report_time && (
-            <div style={{ gridColumn: "1 / -1", background: C.navyMid, padding: "12px 16px" }}>
-              <div style={{ fontSize: 9, color: C.muted, letterSpacing: "2px", marginBottom: 4 }}>DUTY MODE</div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: C.gold }}>🧠 COGNITIVE MODE | DUTY OPTIMIZED</div>
-            </div>
-          )}
-          {pairing.going_usa === "yes" && (
-            <BPField label="USA RULES" value="⚠️ FOOD RESTRICTIONS" highlight/>
-          )}
+        </div>
+
+        <div style={styles.bpDividerDash}/>
+
+        {/* Review rows — every pairing choice the plan uses, each editable */}
+        <div style={styles.reviewRowGrid}>
+          {reviewFields.map(key => {
+            const { label, value, highlight } = describeReviewField(key, pairing, user, t);
+            return (
+              <ReviewRow key={key} label={label} value={value} highlight={highlight}
+                incomplete={!isFieldFilled(key, pairing, user)}
+                onEdit={() => onEditField(key)} t={t}/>
+            );
+          })}
         </div>
 
         {/* Barcode area */}
@@ -2775,6 +2851,12 @@ function BoardingPassScreen({ t, user, pairing, onGenerate, onBack, isPremiumNee
         )}
       </div>
 
+      {!canGenerate && (
+        <div style={{ background: "#3A0A0A", border: `1px solid ${C.red}`, borderRadius: 10, padding: "8px 14px", margin: "12px 0 0", color: C.red, fontSize: 13 }}>
+          ⚠️ Please complete: {incompleteFields.map(f => describeReviewField(f, pairing, user, t).label).join(", ")}
+        </div>
+      )}
+
       {!isOnline && (
         <div style={{ background: "#3A2A00", border: `1px solid ${C.gold}`, borderRadius: 10, padding: "8px 14px", margin: "12px 0 0", display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 16 }}>📵</span>
@@ -2784,10 +2866,119 @@ function BoardingPassScreen({ t, user, pairing, onGenerate, onBack, isPremiumNee
 
       <div style={styles.navRow}>
         <button style={styles.backBtn} onClick={onBack}>{t.back}</button>
-        <button style={{ ...styles.primaryBtn, ...(isOnline === false ? { opacity: 0.5, cursor: "not-allowed" } : {}) }} onClick={onGenerate}>
+        <button
+          style={{ ...styles.primaryBtn, ...(isOnline === false || !canGenerate ? { opacity: 0.5, cursor: "not-allowed" } : {}) }}
+          onClick={onGenerate}
+          disabled={!canGenerate}>
           <PlaneIcon size={16} color={C.navy}/> {t.generate}
         </button>
       </div>
+    </div>
+  );
+}
+
+// Label + display value for one review-screen field. Shared between the row
+// list and the incomplete-fields banner so both always agree on wording.
+function describeReviewField(key, pairing, user, t) {
+  const v = (k) => pairing[k] ?? user?.[k];
+  if (key === "diet") {
+    const diets = pairing.diets?.length ? pairing.diets : (user?.diets || []);
+    const filtered = diets.filter(d => d && d !== "none");
+    const value = filtered.length === 0 ? "—"
+      : filtered.map(d => d === "other" ? (v("diet_other") || "Other") : d.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())).join(", ");
+    return { label: "DIET", value };
+  }
+  if (key === "calorie_target") {
+    const target = v("calorie_target");
+    return { label: "CALORIE TARGET", value: target ? `${target} kcal/day` : "—" };
+  }
+  if (key === "goals") {
+    const goals = pairing.goals?.length ? pairing.goals : (user?.goals || []);
+    return { label: "GOALS", value: goals.length ? goals.map(g => g.replace(/_/g, " ")).join(", ") : "—" };
+  }
+  if (key === "budget") {
+    const amt = v("budget_amount"), type = v("budget_type");
+    return { label: "BUDGET", value: amt ? `$${amt}/${type === "day" ? "DAY" : "TRIP"}` : "—" };
+  }
+  if (key === "cooking_pref") {
+    const map = { enjoys_cooking: t.cooking_enjoy, simple_recipes: t.cooking_simple };
+    return { label: "COOKING PREFERENCE", value: map[v("cooking_pref")] || "—" };
+  }
+  if (key === "lunch_bag") {
+    const map = { small: t.bag_small, medium: t.bag_medium, large: t.bag_large };
+    return { label: "LUNCH BAG", value: map[v("lunch_bag")] || "—" };
+  }
+  if (key === "pairing_days") {
+    return { label: "PAIRING LENGTH", value: `${pairing.pairing_days || 1} ${t.days?.toUpperCase()}` };
+  }
+  if (key === "departure") {
+    return { label: "DEPARTURE", value: pairing.departure || "—" };
+  }
+  if (key === "destination") {
+    const dests = pairing.destinations || [];
+    return { label: "DESTINATIONS", value: dests.length ? dests.join(" → ") : "—" };
+  }
+  if (key.startsWith("kitchen_day_")) {
+    const dayNum = key.replace("kitchen_day_", "");
+    const vals = pairing[key] || [];
+    const map = { full_kitchen: t.full_kitchen, hotel: t.hotel_no_kitchen, fridge: t.fridge, microwave: t.microwave, airplane_food: t.airplane_food };
+    return { label: `KITCHEN ACCESS — DAY ${dayNum}`, value: vals.length ? vals.map(x => map[x] || x).join(", ") : "—" };
+  }
+  if (key === "going_usa") {
+    return pairing.going_usa === "yes"
+      ? { label: "USA RULES", value: "⚠️ FOOD RESTRICTIONS", highlight: true }
+      : { label: "USA / CUSTOMS", value: pairing.going_usa === "no" ? t.no : "—" };
+  }
+  if (key === "duty_schedule") {
+    return pairing.report_time
+      ? { label: "DUTY MODE", value: "🧠 COGNITIVE MODE | DUTY OPTIMIZED", highlight: true }
+      : { label: "DUTY SCHEDULE", value: "—" };
+  }
+  if (key === "airplane_meal_plan") {
+    const desc = pairing.airplane_meal_description;
+    return { label: "AIRPLANE MEAL", value: desc ? (desc.length > 60 ? desc.slice(0, 60) + "…" : desc) : "—" };
+  }
+  return { label: key.toUpperCase(), value: "—" };
+}
+
+// Whether a review field has a usable value — gates the Generate button so an
+// edit (e.g. raising pairing_days) can't silently leave a now-required field
+// (an extra day's destination/kitchen access) empty going into generation.
+function isFieldFilled(key, pairing, user) {
+  const v = (k) => pairing[k] ?? user?.[k];
+  if (key === "diet") {
+    const diets = pairing.diets?.length ? pairing.diets : (user?.diets || []);
+    if (!diets.length) return false;
+    if (diets.includes("other") && !(pairing.diet_other || user?.diet_other || "").trim()) return false;
+    return true;
+  }
+  if (key === "calorie_target") return !!v("calorie_target");
+  if (key === "goals") return !!(pairing.goals?.length || user?.goals?.length);
+  if (key === "budget") return !!(v("budget_type") && v("budget_amount"));
+  if (key === "cooking_pref") return !!v("cooking_pref");
+  if (key === "lunch_bag") return !!v("lunch_bag");
+  if (key === "pairing_days") return !!pairing.pairing_days;
+  if (key === "departure") return true; // optional, same as the check-in step itself
+  if (key === "destination") {
+    const n = parseInt(pairing.pairing_days, 10) || 1;
+    const dests = pairing.destinations || [];
+    return dests.length >= n && dests.slice(0, n).every(d => d && d.trim());
+  }
+  if (key.startsWith("kitchen_day_")) return (pairing[key] || []).length > 0;
+  if (key === "going_usa") return pairing.going_usa === "yes" || pairing.going_usa === "no";
+  if (key === "duty_schedule") return true; // optional
+  if (key === "airplane_meal_plan") return true; // optional
+  return true;
+}
+
+function ReviewRow({ label, value, onEdit, highlight, incomplete, t }) {
+  return (
+    <div style={{...styles.reviewRow, ...(incomplete ? styles.reviewRowIncomplete : {})}}>
+      <div style={styles.reviewRowText}>
+        <div style={styles.reviewRowLabel}>{label}</div>
+        <div style={{...styles.reviewRowValue, ...(highlight ? {color: C.gold} : {})}}>{value}</div>
+      </div>
+      <button style={styles.editBtn} onClick={onEdit} aria-label={`${t.edit} ${label}`}>✏️ {t.edit}</button>
     </div>
   );
 }
@@ -5718,6 +5909,24 @@ const styles = {
   },
   bpFieldLabel: { fontSize: 9, color: C.muted, letterSpacing: "2px", marginBottom: 4 },
   bpFieldValue: { fontSize: 13, fontWeight: 700, color: C.white },
+  reviewRowGrid: {
+    display: "flex", flexDirection: "column", gap: 1,
+    background: C.navyBorder,
+  },
+  reviewRow: {
+    background: C.navyMid, padding: "12px 16px",
+    display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12,
+  },
+  reviewRowIncomplete: { borderLeft: `3px solid ${C.red}` },
+  reviewRowText: { flex: 1, minWidth: 0 },
+  reviewRowLabel: { fontSize: 9, color: C.muted, letterSpacing: "2px", marginBottom: 4 },
+  reviewRowValue: { fontSize: 13, fontWeight: 700, color: C.white, wordBreak: "break-word" },
+  editBtn: {
+    flexShrink: 0, display: "flex", alignItems: "center", gap: 4,
+    padding: "7px 12px", borderRadius: 8, border: `1px solid ${C.navyBorder}`,
+    background: "transparent", color: C.gold, fontSize: 12, fontWeight: 700,
+    cursor: "pointer", fontFamily: "inherit",
+  },
   bpBarcode: {
     display: "flex", gap: 2, padding: "16px 24px",
     alignItems: "flex-end", justifyContent: "center",
