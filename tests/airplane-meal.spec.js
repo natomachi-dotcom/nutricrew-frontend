@@ -21,7 +21,9 @@ test("airplane meal checker evaluates a served meal against the crew member's di
   await page.getByRole("button", { name: "Generate My Plan" }).click();
   await expect(page.getByText("Oatmeal with Berries")).toBeVisible();
 
-  // Open the checker from the first meal card (Breakfast).
+  // Meal cards are collapsed by default — expand the first one (Breakfast) to
+  // reveal its action buttons.
+  await page.getByText("Oatmeal with Berries").click();
   await page.getByRole("button", { name: "check airplane meal" }).first().click();
   await expect(page.getByText("Check Airplane Meal")).toBeVisible();
 

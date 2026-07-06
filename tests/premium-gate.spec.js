@@ -18,7 +18,7 @@ test("hitting the free pairing limit shows the premium upgrade screen", async ({
   await page.getByRole("button", { name: "Generate My Plan" }).click();
 
   await expect(page.getByText("Premium Feature")).toBeVisible();
-  await expect(page.getByText("Upgrade to Premium")).toBeVisible();
+  await expect(page.getByText("Start Your Free Month")).toBeVisible();
 
   // The free-pairing usage reported by the server is persisted locally.
   await expect.poll(() => page.evaluate(() => localStorage.getItem("nutricrew_pairing_count"))).toBe("3");

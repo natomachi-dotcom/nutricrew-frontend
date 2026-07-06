@@ -80,6 +80,10 @@ export const MOCK_PLAN = {
   },
   pairingCount: 1,
   isPremium: false,
+  // Bypasses the mandatory password-setup gate for brand-new accounts (added
+  // alongside server-side "Add mandatory password setup for new accounts") —
+  // that flow is out of scope for these onboarding tests.
+  hasPassword: true,
 };
 
 // Clears persisted app state so every test starts as a brand-new user on the splash screen.
@@ -89,7 +93,7 @@ export async function gotoFresh(page) {
   await expect(page.getByRole("button", { name: "Begin Check-In" })).toBeVisible();
 }
 
-// Walks through all 13 check-in steps for a new user (Montreal -> Paris, 1-day pairing,
+// Walks through all check-in steps for a new user (Montreal -> Paris, 1-day pairing,
 // no kitchen access, no diet restrictions, "stay focused" goal, $50/day budget) and
 // lands on the boarding pass screen.
 export async function completeCheckIn(page, { name = "Alex Pilot", email = "alex.pilot@example.com" } = {}) {
@@ -113,8 +117,33 @@ export async function completeCheckIn(page, { name = "Alex Pilot", email = "alex
   await page.getByPlaceholder("70").fill("75");
   await continueBtn.click();
 
+  // date of birth
+  await page.locator('input[type="date"]').fill("1990-01-01");
+  await continueBtn.click();
+
   // position
   await page.getByRole("button", { name: "Pilot" }).click();
+  await continueBtn.click();
+
+  // lunch bag size
+  await page.getByRole("button", { name: /Small/ }).click();
+  await continueBtn.click();
+
+  // cooking preference
+  await page.getByRole("button", { name: "I Need Simple Recipes" }).click();
+  await continueBtn.click();
+
+  // diet
+  await page.getByRole("button", { name: "No Restrictions" }).click();
+  await continueBtn.click();
+
+  // goals
+  await page.getByRole("button", { name: "Stay Focused & Alert" }).click();
+  await continueBtn.click();
+
+  // budget
+  await page.getByRole("button", { name: "Per Day" }).click();
+  await page.getByPlaceholder("50").fill("50");
   await continueBtn.click();
 
   // pairing length: 1 day
@@ -129,25 +158,15 @@ export async function completeCheckIn(page, { name = "Alex Pilot", email = "alex
   await page.getByPlaceholder("Paris (CDG)").fill("Paris (CDG)");
   await continueBtn.click();
 
-  // flying to the USA?
-  await page.getByRole("button", { name: "No", exact: false }).click();
-  await continueBtn.click();
-
-  // kitchen access
+  // kitchen access (day 1)
   await page.getByRole("button", { name: "Hotel (No Kitchen)" }).click();
   await continueBtn.click();
 
-  // diet
-  await page.getByRole("button", { name: "No Restrictions" }).click();
+  // flying to the USA?
+  await page.getByRole("button", { name: "🌍 No", exact: true }).click();
   await continueBtn.click();
 
-  // goals
-  await page.getByRole("button", { name: "Stay Focused & Alert" }).click();
-  await continueBtn.click();
-
-  // budget
-  await page.getByRole("button", { name: "Per Day" }).click();
-  await page.getByPlaceholder("50").fill("50");
+  // duty schedule (optional) — skip
   await continueBtn.click();
 
   // boarding pass screen

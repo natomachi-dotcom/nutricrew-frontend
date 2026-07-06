@@ -25,6 +25,10 @@ test("calorie estimator modal estimates calories for a described meal", async ({
   await page.getByRole("button", { name: "calorie estimator" }).click();
   await expect(page.getByText("Calorie Estimator")).toBeVisible();
 
+  // The AI text-description estimator is a collapsible fallback below the
+  // manual food log — expand it first.
+  await page.getByText("Can't find it? Estimate by description (AI)").click();
+
   const estimateBtn = page.getByRole("button", { name: "Estimate Calories" });
   await expect(estimateBtn).toBeDisabled();
 

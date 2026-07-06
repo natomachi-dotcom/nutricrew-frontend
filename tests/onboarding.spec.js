@@ -21,11 +21,14 @@ test("new crew member completes check-in, generates a plan, and explores it", as
   await expect(page.getByText("$50/DAY")).toBeVisible();
   await expect(page.getByText("6H DIFF ⚠️")).toBeVisible();
 
-  // Back navigation returns to the last check-in step without losing answers.
+  // Back navigation returns to the last check-in step (duty schedule) without
+  // losing earlier answers — confirmed by the budget still showing correctly
+  // once we're back on the boarding pass.
   await page.getByRole("button", { name: "← Back" }).click();
-  await expect(page.getByPlaceholder("50")).toHaveValue("50");
+  await expect(page.getByText("Your Duty Schedule")).toBeVisible();
   await page.getByRole("button", { name: "Continue →" }).click();
   await expect(page.getByRole("button", { name: "Generate My Plan" })).toBeVisible();
+  await expect(page.getByText("$50/DAY")).toBeVisible();
 
   // Generate the plan.
   await page.getByRole("button", { name: "Generate My Plan" }).click();
@@ -41,7 +44,9 @@ test("new crew member completes check-in, generates a plan, and explores it", as
   expect(generatePlanRequestBody.data.email).toBe("alex.pilot@example.com");
   expect(generatePlanRequestBody.data.pairing_days).toBe(1);
 
-  // Favoriting a meal toggles the heart icon.
+  // Meal cards are collapsed by default — expand the first one to reveal its
+  // favorite button.
+  await page.getByText("Oatmeal with Berries").click();
   const favoriteBtn = page.getByRole("button", { name: "favorite" }).first();
   await expect(favoriteBtn).toHaveText("🤍");
   await favoriteBtn.click();

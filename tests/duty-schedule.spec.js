@@ -5,6 +5,14 @@ import { test, expect } from "@playwright/test";
 // API call will fail (no backend in tests) but the catch handler only redirects
 // from "loading", so we stay on "splash".
 async function gotoReturningUser(page) {
+  // No real backend runs in tests. Left unmocked, Vite's dev-server proxy turns
+  // "nothing listening on :3001" into an HTTP error response (not a network
+  // exception), which the app's verify-session handler treats as "session
+  // invalid" and force-redirects to the login screen regardless of where the
+  // user already navigated. Mock a success response so verify-session is a no-op.
+  await page.route("**/api/auth/verify-session", (route) =>
+    route.fulfill({ json: { email: "renatogadeabi@gmail.com", isPremium: false } })
+  );
   await page.addInitScript(() => {
     localStorage.setItem(
       "nutricrew_session",
@@ -33,9 +41,9 @@ async function gotoReturningUser(page) {
   });
 }
 
-// Clicks through the 5 returning-user steps (pairing_days → departure →
-// destination → going_usa → duty_schedule) and leaves the caller on the
-// duty_schedule step, ready to fill in the time or skip it.
+// Clicks through the returning-user steps (pairing_days → departure →
+// destination → kitchen_day_1 → going_usa → duty_schedule) and leaves the
+// caller on the duty_schedule step, ready to fill in the time or skip it.
 async function walkToDutySchedule(page) {
   const continueBtn = page.getByRole("button", { name: "Continue →" });
 
@@ -52,8 +60,12 @@ async function walkToDutySchedule(page) {
   await page.getByPlaceholder("Paris (CDG)").fill("Paris (CDG)");
   await continueBtn.click();
 
+  // kitchen access (day 1): required — at least one option
+  await page.getByRole("button", { name: "Fridge, No Stove" }).click();
+  await continueBtn.click();
+
   // going_usa: No
-  await page.getByRole("button", { name: "No", exact: false }).click();
+  await page.getByRole("button", { name: "🌍 No", exact: true }).click();
   await continueBtn.click();
 
   // Now on duty_schedule step
