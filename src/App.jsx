@@ -989,6 +989,24 @@ function useOnlineStatus() {
 // one-time setup, edited via the profile modal, not per-pairing choices).
 const IDENTITY_FIELDS = ["name", "email", "gender", "weight", "dob", "position"];
 
+// Every one-time profile field that must survive login/session-restore, so a
+// returning user is never asked to re-enter it. The server is authoritative —
+// on the same device, an already-cached value is kept only until the server
+// responds; on a different device/account it's dropped, never inherited.
+const DURABLE_PROFILE_FIELDS = [
+  "gender", "weight", "dob", "position",
+  "lunch_bag", "cooking_pref", "diets", "diet_other", "goals",
+  "calorie_target", "calorie_deficit_amount", "calorie_deficit_preset",
+  "departure", "budget_type", "budget_amount", "kitchen",
+];
+function mergeDurableProfileFields(sessionData, prev, sameAccount) {
+  const out = {};
+  for (const f of DURABLE_PROFILE_FIELDS) {
+    out[f] = sessionData[f] ?? (sameAccount ? prev?.[f] : null) ?? null;
+  }
+  return out;
+}
+
 // Allergy/intolerance diet values — used to show the allergy-specific
 // disclaimer on the plan screen (a stronger warning than the general one,
 // since these are real allergen-avoidance requests, not just preferences).
@@ -1187,11 +1205,10 @@ export default function NutriCrew() {
           const data = await r.json();
           setUser(prev => {
             const sameAccount = prev?.email === data.email;
-            const budget_type = data.budgetType ?? (sameAccount ? prev?.budget_type : null) ?? null;
-            const budget_amount = data.budgetAmount ?? (sameAccount ? prev?.budget_amount : null) ?? null;
+            const profileFields = mergeDurableProfileFields(data, prev, sameAccount);
             const u = sameAccount
-              ? { ...prev, isPremium: !!data.isPremium, trialEnd: data.trialEnd ?? null, bonusPairings: data.bonusPairings ?? prev?.bonusPairings ?? 0, pairingCount: data.pairingCount ?? prev?.pairingCount ?? 0, budget_type, budget_amount }
-              : { email: data.email, name: data.name || "", isPremium: !!data.isPremium, trialEnd: data.trialEnd ?? null, bonusPairings: data.bonusPairings ?? 0, pairingCount: data.pairingCount ?? 0, budget_type, budget_amount };
+              ? { ...prev, ...profileFields, isPremium: !!data.isPremium, trialEnd: data.trialEnd ?? null, bonusPairings: data.bonusPairings ?? prev?.bonusPairings ?? 0, pairingCount: data.pairingCount ?? prev?.pairingCount ?? 0 }
+              : { email: data.email, name: data.name || "", ...profileFields, isPremium: !!data.isPremium, trialEnd: data.trialEnd ?? null, bonusPairings: data.bonusPairings ?? 0, pairingCount: data.pairingCount ?? 0 };
             storage.set(USER_KEY, u);
             return u;
           });
@@ -1304,7 +1321,10 @@ export default function NutriCrew() {
     "going_usa", "duty_schedule",
     ...(anyDayHasAirplaneFood ? ["airplane_meal_plan"] : []),
   ];
-  const personalSteps = ["name","email","gender","weight","dob","position","lunch_bag","cooking_pref","diet","calorie_target","goals","budget"];
+  // "budget" is deliberately NOT in this list — a returning user still gets
+  // an optional, pre-filled chance to adjust it for this specific trip
+  // (acceptance criterion: editable per-trip without altering the saved default).
+  const personalSteps = ["name","email","gender","weight","dob","position","lunch_bag","cooking_pref","diet","calorie_target","goals"];
   const steps = checkinReturning
     ? allSteps.filter(s => !personalSteps.includes(s))
     : allSteps;
@@ -1327,29 +1347,21 @@ export default function NutriCrew() {
     setScreen("checkin");
   };
 
-  // Kitchen, lunch_bag, cooking_pref, diets/diet_other, calorie target, goals,
-  // budget, and departure are profile data — mirror them into the user profile
-  // so they're never re-asked. departure is a home-airport — crews almost
-  // always depart from the same airport every pairing.
-  const PROFILE_FIELDS = ["lunch_bag", "cooking_pref", "diets", "diet_other", "calorie_target", "calorie_deficit_amount", "calorie_deficit_preset", "goals", "budget_type", "budget_amount", "departure"];
-  const upd = (k, v) => {
-    setPairing(p => ({ ...p, [k]: v }));
-    if (PROFILE_FIELDS.includes(k)) {
-      setUser(prev => {
-        const updated = { ...(prev || {}), [k]: v };
-        storage.set(USER_KEY, updated);
-        return updated;
-      });
-    }
-    if (k === "budget_type" || k === "budget_amount") {
-      syncBudgetToServer({ [k]: v });
-    }
-  };
+  // One-time fields: asked only during first-time onboarding, never shown
+  // again to a returning user — always safe to keep updating the saved
+  // default as they're being set (no returning-user overwrite risk).
+  const ONE_TIME_PROFILE_FIELDS = ["gender", "weight", "dob", "position", "lunch_bag", "cooking_pref", "diets", "diet_other", "calorie_target", "calorie_deficit_amount", "calorie_deficit_preset", "goals"];
+  // Adjustable fields: remain visible/editable on every pairing, including a
+  // returning user's. departure is a home-airport (crews almost always
+  // depart from the same one); budget can be tweaked per trip; kitchen
+  // access is asked per pairing-day (kitchen_day_1, kitchen_day_2, ...) but
+  // still rolls up into a single "kitchen" default. A per-trip edit to any
+  // of these must NOT silently overwrite the saved default.
+  const ADJUSTABLE_PROFILE_FIELDS = ["budget_type", "budget_amount", "departure"];
 
-  // Budget is the one profile field also persisted server-side (not just
-  // localStorage) so it survives a cleared cache or a new device — fire and
-  // forget, localStorage already has it as the same-device fallback.
-  const syncBudgetToServer = (changes) => {
+  // Persisted server-side (not just localStorage), so it survives a cleared
+  // cache or a new device — fire and forget.
+  const syncProfileToServer = (changes) => {
     const email = user?.email || pairing?.email;
     if (!email) return;
     fetch(`${API_BASE}/api/profile/update`, {
@@ -1357,6 +1369,34 @@ export default function NutriCrew() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, ...changes }),
     }).catch(() => {});
+  };
+
+  const isProfileFieldUnset = (k) => {
+    const v = user?.[k];
+    return v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0);
+  };
+
+  const upd = (k, v) => {
+    setPairing(p => ({ ...p, [k]: v }));
+    const isKitchenDay = k.startsWith("kitchen_day_");
+    const profileKey = isKitchenDay ? "kitchen" : k;
+    const isOneTime = ONE_TIME_PROFILE_FIELDS.includes(k);
+    const isAdjustable = ADJUSTABLE_PROFILE_FIELDS.includes(k) || isKitchenDay;
+    // Adjustable fields only update the saved default while still being
+    // established (this pairing's flow isn't a returning user's, or no
+    // default exists yet) — a returning user's per-trip tweak to an
+    // already-set default (e.g. this trip's budget) applies to THIS pairing
+    // only. Deliberate profile changes go through the dedicated Profile
+    // screen (updateProfile) instead.
+    const shouldPersist = isOneTime || (isAdjustable && (!checkinReturning || isProfileFieldUnset(profileKey)));
+    if (shouldPersist) {
+      setUser(prev => {
+        const updated = { ...(prev || {}), [profileKey]: v };
+        storage.set(USER_KEY, updated);
+        return updated;
+      });
+      syncProfileToServer({ [profileKey]: v });
+    }
   };
 
   const handleUpgrade = async (plan = "monthly") => {
@@ -1593,15 +1633,17 @@ export default function NutriCrew() {
     });
   };
 
+  // The dedicated Profile screen is the one place a deliberate default change
+  // is always persisted, regardless of whether a default already existed —
+  // unlike upd()'s per-trip fields (which only establish the default once).
   const updateProfile = (changes) => {
     const updated = { ...(user || {}), ...changes };
     storage.set(USER_KEY, updated);
     setUser(updated);
-    if ("budget_type" in changes || "budget_amount" in changes) {
-      syncBudgetToServer({
-        budget_type: changes.budget_type ?? updated.budget_type,
-        budget_amount: changes.budget_amount ?? updated.budget_amount,
-      });
+    // handleSetPassword also calls this with just { hasPassword: true } —
+    // that's not a profile field, so skip the no-op server round-trip.
+    if (!("hasPassword" in changes && Object.keys(changes).length === 1)) {
+      syncProfileToServer(changes);
     }
   };
 
@@ -1642,13 +1684,13 @@ export default function NutriCrew() {
       // otherwise (a different email logging in on this device) stale fields
       // like pairingCount/isPremium from the previous account must not leak in.
       const sameAccount = prev?.email === sessionData.email;
-      // Server is the source of truth for budget once set (survives a cleared
-      // cache / new device); fall back to whatever's already local otherwise.
-      const budget_type = sessionData.budgetType ?? (sameAccount ? prev?.budget_type : null) ?? null;
-      const budget_amount = sessionData.budgetAmount ?? (sameAccount ? prev?.budget_amount : null) ?? null;
+      // Server is the source of truth for every durable profile field once set
+      // (survives a cleared cache / new device); fall back to whatever's
+      // already local otherwise, but only for the SAME account.
+      const profileFields = mergeDurableProfileFields(sessionData, prev, sameAccount);
       const u = sameAccount
-        ? { ...prev, isPremium: !!sessionData.isPremium, trialEnd: sessionData.trialEnd ?? null, hasPassword, bonusPairings: sessionData.bonusPairings ?? prev?.bonusPairings ?? 0, pairingCount: sessionData.pairingCount ?? prev?.pairingCount ?? 0, budget_type, budget_amount }
-        : { email: sessionData.email, name: sessionData.name || "", isPremium: !!sessionData.isPremium, trialEnd: sessionData.trialEnd ?? null, hasPassword, bonusPairings: sessionData.bonusPairings ?? 0, pairingCount: sessionData.pairingCount ?? 0, budget_type, budget_amount };
+        ? { ...prev, ...profileFields, isPremium: !!sessionData.isPremium, trialEnd: sessionData.trialEnd ?? null, hasPassword, bonusPairings: sessionData.bonusPairings ?? prev?.bonusPairings ?? 0, pairingCount: sessionData.pairingCount ?? prev?.pairingCount ?? 0 }
+        : { email: sessionData.email, name: sessionData.name || "", ...profileFields, isPremium: !!sessionData.isPremium, trialEnd: sessionData.trialEnd ?? null, hasPassword, bonusPairings: sessionData.bonusPairings ?? 0, pairingCount: sessionData.pairingCount ?? 0 };
       storage.set(USER_KEY, u);
       return u;
     });
@@ -2304,12 +2346,19 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
       upd("departure", user.departure);
       setLocalVal(user.departure);
     }
+    if (currentStep?.startsWith("kitchen_day_") && !pairing[currentStep] && user?.kitchen?.length) {
+      upd(currentStep, user.kitchen);
+    }
     // Destination is intentionally never auto-filled — unlike departure (a
     // stable home base), a pairing's destination is different every time by
     // definition, so it must always start blank with just a placeholder.
   }, [currentStep]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = (v) => {
+    // upd() already mirrors + persists gender/weight/position/dob (they're
+    // one-time profile fields); this additionally stamps the current UI
+    // language and covers name/email, which aren't durable profile fields
+    // on the server.
     upd(currentStep, v);
     if (["name","email","gender","weight","position","dob"].includes(currentStep)) {
       const updated = { ...(user || {}), [currentStep]: v, lang };
