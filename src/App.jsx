@@ -130,8 +130,10 @@ const T = {
     upgrade: "Upgrade to Premium",
     free_trial: "First Pairing Free",
     start_trial_cta: "Start Your Free Month",
+    then_charged: "then",
     checkout_redirecting: "Taking you to secure checkout…",
     trial_disclaimer: "Card required. Free for 30 days, cancel anytime — after that you'll be charged",
+    first_charge_on: "First charge on",
     per_month: "month",
     per_year: "year",
     trial_active_until: "Free until",
@@ -371,8 +373,10 @@ const T = {
     upgrade: "Passer au Premium",
     free_trial: "Premier Pairing Gratuit",
     start_trial_cta: "Commencer Votre Mois Gratuit",
+    then_charged: "puis",
     checkout_redirecting: "Redirection vers le paiement sécurisé…",
     trial_disclaimer: "Carte requise. Gratuit pendant 30 jours, annulez à tout moment — ensuite vous serez facturé",
+    first_charge_on: "Premier prélèvement le",
     per_month: "mois",
     per_year: "an",
     trial_active_until: "Gratuit jusqu'au",
@@ -612,8 +616,10 @@ const T = {
     upgrade: "Actualizar a Premium",
     free_trial: "Primer Pairing Gratis",
     start_trial_cta: "Comienza Tu Mes Gratis",
+    then_charged: "luego",
     checkout_redirecting: "Te llevamos al pago seguro…",
     trial_disclaimer: "Se requiere tarjeta. Gratis por 30 días, cancela cuando quieras — luego se te cobrará",
+    first_charge_on: "Primer cobro el",
     per_month: "mes",
     per_year: "año",
     trial_active_until: "Gratis hasta",
@@ -897,12 +903,10 @@ const storage = {
   set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage unavailable */ } },
 };
 
-const PAIRING_COUNT_KEY = "nutricrew_pairing_count";
-const PAIRING_COUNT_MONTH_KEY = "nutricrew_pairing_count_month";
-const currentMonthKey = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-};
+// Mirrors the backend's TRIAL_DAYS (nutricrew-backend/server.js) — used only to
+// estimate the first-charge date shown on the paywall before checkout starts.
+const TRIAL_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
 const PENDING_PAIRING_KEY = "nutricrew_pending_pairing";
 const FAVORITES_KEY = "nutricrew_favorites";
 const USER_KEY = "nutricrew_user";
@@ -1173,11 +1177,12 @@ export default function NutriCrew() {
         if (r.ok) {
           const data = await r.json();
           setUser(prev => {
-            const budget_type = data.budgetType ?? prev?.budget_type ?? null;
-            const budget_amount = data.budgetAmount ?? prev?.budget_amount ?? null;
-            const u = prev?.email
-              ? { ...prev, isPremium: !!data.isPremium, trialEnd: data.trialEnd ?? null, bonusPairings: data.bonusPairings ?? prev?.bonusPairings ?? 0, budget_type, budget_amount }
-              : { email: data.email, name: data.name || "", isPremium: !!data.isPremium, trialEnd: data.trialEnd ?? null, bonusPairings: data.bonusPairings ?? 0, budget_type, budget_amount };
+            const sameAccount = prev?.email === data.email;
+            const budget_type = data.budgetType ?? (sameAccount ? prev?.budget_type : null) ?? null;
+            const budget_amount = data.budgetAmount ?? (sameAccount ? prev?.budget_amount : null) ?? null;
+            const u = sameAccount
+              ? { ...prev, isPremium: !!data.isPremium, trialEnd: data.trialEnd ?? null, bonusPairings: data.bonusPairings ?? prev?.bonusPairings ?? 0, pairingCount: data.pairingCount ?? prev?.pairingCount ?? 0, budget_type, budget_amount }
+              : { email: data.email, name: data.name || "", isPremium: !!data.isPremium, trialEnd: data.trialEnd ?? null, bonusPairings: data.bonusPairings ?? 0, pairingCount: data.pairingCount ?? 0, budget_type, budget_amount };
             storage.set(USER_KEY, u);
             return u;
           });
@@ -1204,8 +1209,6 @@ export default function NutriCrew() {
     const params = new URLSearchParams(window.location.search);
     if (params.get("premium") === "true") {
       window.history.replaceState({}, "", window.location.pathname);
-      storage.set(PAIRING_COUNT_KEY, 0);
-      storage.set(PAIRING_COUNT_MONTH_KEY, currentMonthKey());
       return true;
     }
     return false;
@@ -1260,12 +1263,12 @@ export default function NutriCrew() {
     return () => { cancelled = true; };
   }, []); // eslint-disable-line
 
-  // Free-tier count is per calendar month — a stale count from a prior month
-  // (before the server resets it) must not gate a user who is actually eligible
-  // again; treat it as 0 locally until the server's response confirms otherwise.
-  const pairingCount = storage.get(PAIRING_COUNT_MONTH_KEY) === currentMonthKey()
-    ? (storage.get(PAIRING_COUNT_KEY) || 0)
-    : 0;
+  // Pairing count lives on the per-account `user` record (server-authoritative,
+  // refreshed on every login/session-verify/generate response) rather than a
+  // device-global localStorage counter — a device-global counter would leak
+  // across accounts (e.g. a brand-new user paywalled immediately because a
+  // previous account on the same browser had already used its free pairing).
+  const pairingCount = user?.pairingCount || 0;
   const bonusPairings = user?.bonusPairings || 0;
   const isPremiumNeeded = premiumSuccess ? false : pairingCount >= FREE_PAIRING_LIMIT + bonusPairings;
   // Real subscription status (server-authoritative) — true right after Stripe
@@ -1402,6 +1405,16 @@ export default function NutriCrew() {
   const mergedDiets = pairing.diets?.length ? pairing.diets : (user?.diets || []);
   const needsPremiumForDiet = mergedDiets.includes("calorie_deficit") && !isPremium;
 
+  // Persists the server's authoritative pairingCount onto the per-account
+  // user record (not a device-global key), so it can never leak across accounts.
+  const setPairingCount = (count) => {
+    setUser(prev => {
+      const u = { ...(prev || {}), pairingCount: count };
+      storage.set(USER_KEY, u);
+      return u;
+    });
+  };
+
   const handleGenerate = async () => {
     if (!isOnline) return; // blocked by UI; boarding pass shows offline banner
     if (isPremiumNeeded || needsPremiumForDiet) { setScreen("premium"); return; }
@@ -1456,16 +1469,14 @@ export default function NutriCrew() {
         return;
       }
       setPlan(result);
-      storage.set(PAIRING_COUNT_KEY, result.pairingCount ?? pairingCount + 1);
-      storage.set(PAIRING_COUNT_MONTH_KEY, currentMonthKey());
+      setPairingCount(result.pairingCount ?? pairingCount + 1);
       if (!result.failedDays?.length) {
         saveSavedPlan(cacheKey, data, result);
         storage.set(CHECKIN_DRAFT_KEY, null);
       }
     } catch (e) {
       if (e.code === "premium_required") {
-        storage.set(PAIRING_COUNT_KEY, e.pairingCount ?? FREE_PAIRING_LIMIT);
-        storage.set(PAIRING_COUNT_MONTH_KEY, currentMonthKey());
+        setPairingCount(e.pairingCount ?? FREE_PAIRING_LIMIT);
         setScreen("premium");
       } else {
         setPlan({ error: true });
@@ -1480,8 +1491,7 @@ export default function NutriCrew() {
     const { result, cacheKey, data } = pending || pendingFirstPlan || {};
     if (!result) { setScreen("splash"); return; }
     setPlan(result);
-    storage.set(PAIRING_COUNT_KEY, result.pairingCount ?? 0);
-    storage.set(PAIRING_COUNT_MONTH_KEY, currentMonthKey());
+    setPairingCount(result.pairingCount ?? 0);
     if (!result.failedDays?.length) {
       saveSavedPlan(cacheKey, data, result);
       storage.set(CHECKIN_DRAFT_KEY, null);
@@ -1619,13 +1629,17 @@ export default function NutriCrew() {
     storage.set(SESSION_KEY, { token: sessionData.token, email: sessionData.email });
     const hasPassword = sessionData.hasPassword !== false;
     setUser(prev => {
+      // Only merge with `prev` when it's the SAME account continuing a session —
+      // otherwise (a different email logging in on this device) stale fields
+      // like pairingCount/isPremium from the previous account must not leak in.
+      const sameAccount = prev?.email === sessionData.email;
       // Server is the source of truth for budget once set (survives a cleared
       // cache / new device); fall back to whatever's already local otherwise.
-      const budget_type = sessionData.budgetType ?? prev?.budget_type ?? null;
-      const budget_amount = sessionData.budgetAmount ?? prev?.budget_amount ?? null;
-      const u = prev?.email
-        ? { ...prev, isPremium: !!sessionData.isPremium, trialEnd: sessionData.trialEnd ?? null, hasPassword, bonusPairings: sessionData.bonusPairings ?? prev?.bonusPairings ?? 0, budget_type, budget_amount }
-        : { email: sessionData.email, name: sessionData.name || "", isPremium: !!sessionData.isPremium, trialEnd: sessionData.trialEnd ?? null, hasPassword, bonusPairings: sessionData.bonusPairings ?? 0, budget_type, budget_amount };
+      const budget_type = sessionData.budgetType ?? (sameAccount ? prev?.budget_type : null) ?? null;
+      const budget_amount = sessionData.budgetAmount ?? (sameAccount ? prev?.budget_amount : null) ?? null;
+      const u = sameAccount
+        ? { ...prev, isPremium: !!sessionData.isPremium, trialEnd: sessionData.trialEnd ?? null, hasPassword, bonusPairings: sessionData.bonusPairings ?? prev?.bonusPairings ?? 0, pairingCount: sessionData.pairingCount ?? prev?.pairingCount ?? 0, budget_type, budget_amount }
+        : { email: sessionData.email, name: sessionData.name || "", isPremium: !!sessionData.isPremium, trialEnd: sessionData.trialEnd ?? null, hasPassword, bonusPairings: sessionData.bonusPairings ?? 0, pairingCount: sessionData.pairingCount ?? 0, budget_type, budget_amount };
       storage.set(USER_KEY, u);
       return u;
     });
@@ -3527,6 +3541,9 @@ function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess, onGenerate, retur
   const [loading, setLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState(null);
   const [billing, setBilling] = useState("monthly"); // monthly | annual
+  // Estimated first-charge date if the trial starts now — computed once per
+  // paywall view, not on every render (Date.now() must stay out of render body).
+  const [estFirstCharge] = useState(() => new Date(Date.now() + TRIAL_DAYS_MS));
 
   const handleClick = async () => {
     setLoading(true);
@@ -3618,12 +3635,13 @@ function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess, onGenerate, retur
         </div>
       )}
       <button style={styles.primaryBtn} onClick={handleClick} disabled={loading}>
-        {loading ? t.checkout_redirecting : t.start_trial_cta}
+        {loading ? t.checkout_redirecting : `${t.start_trial_cta} — ${t.then_charged} ${billing === "annual" ? "$62.32/" + t.per_year : "$7.99/" + t.per_month}`}
       </button>
       <div style={{ color: C.muted, fontSize: 11, textAlign: "center", marginTop: 8, maxWidth: 280 }}>
         {billing === "annual"
           ? `${t.trial_disclaimer} $62.32/${t.per_year}.`
           : `${t.trial_disclaimer} $7.99/${t.per_month}.`}
+        {" "}{t.first_charge_on} {estFirstCharge.toLocaleDateString()}.
       </div>
       <button style={{...styles.backBtn, flex: "none"}} onClick={onBack}>{t.back}</button>
     </div>
