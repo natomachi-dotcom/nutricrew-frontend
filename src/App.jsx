@@ -88,6 +88,7 @@ const T = {
     allergies_section: "Allergies & Intolerances",
     nut_free: "Nut-Free", egg_free: "Egg-Free", shellfish_free: "Shellfish-Free",
     soy_free: "Soy-Free", lactose_free: "Lactose-Free", fodmap: "Low-FODMAP",
+    sesame_free: "Sesame-Free",
     offline_banner: "Offline — showing last saved plan",
     offline_generate: "No connection — generating a new plan requires internet.",
     history_btn: "Plan History", history_title: "Plan History",
@@ -322,6 +323,7 @@ const T = {
     allergies_section: "Allergies & Intolérances",
     nut_free: "Sans Noix", egg_free: "Sans Œufs", shellfish_free: "Sans Fruits de Mer",
     soy_free: "Sans Soja", lactose_free: "Sans Lactose", fodmap: "FODMAP Faible",
+    sesame_free: "Sans Sésame",
     offline_banner: "Hors ligne — affichage du dernier plan sauvegardé",
     offline_generate: "Hors ligne — générer un nouveau plan nécessite une connexion internet.",
     history_btn: "Historique", history_title: "Historique des plans",
@@ -556,6 +558,7 @@ const T = {
     allergies_section: "Alergias & Intolerancias",
     nut_free: "Sin Frutos Secos", egg_free: "Sin Huevo", shellfish_free: "Sin Mariscos",
     soy_free: "Sin Soja", lactose_free: "Sin Lactosa", fodmap: "Bajo-FODMAP",
+    sesame_free: "Sin Sésamo",
     offline_banner: "Sin conexión — mostrando el último plan guardado",
     offline_generate: "Sin conexión — generar un nuevo plan requiere internet.",
     history_btn: "Historial", history_title: "Historial de planes",
@@ -2578,6 +2581,7 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
                 {v:"egg_free",l:t.egg_free,icon:"🥚"},
                 {v:"shellfish_free",l:t.shellfish_free,icon:"🦐"},
                 {v:"soy_free",l:t.soy_free,icon:"🫘"},
+                {v:"sesame_free",l:t.sesame_free,icon:"🫙"},
                 {v:"fodmap",l:t.fodmap,icon:"🌿"},
               ]}
               values={pairing.diets || []}
@@ -5207,6 +5211,7 @@ function ProfileModal({ t, user, onSave, onClose, onManageSubscription }) {
             {v:"egg_free",l:t.egg_free,icon:"🥚"},
             {v:"shellfish_free",l:t.shellfish_free,icon:"🦐"},
             {v:"soy_free",l:t.soy_free,icon:"🫘"},
+            {v:"sesame_free",l:t.sesame_free,icon:"🫙"},
             {v:"fodmap",l:t.fodmap,icon:"🌿"},
           ]}
           values={diets}
