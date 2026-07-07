@@ -164,6 +164,10 @@ const T = {
     calorie_disclaimer: "Estimates only — not medical advice.",
     allergy_warning_title: "⚠️ Verify every ingredient yourself",
     allergy_warning_text: "This plan was generated to avoid your selected allergies/intolerances, but AI-generated content can make mistakes. NutriCrew is not a substitute for reading real ingredient labels or asking directly at restaurants. If you have a severe or life-threatening allergy, always verify every ingredient yourself and carry your prescribed medication (e.g. epinephrine auto-injector) as usual.",
+    ingredients_label: "Tap an ingredient you're allergic to",
+    ingredient_allergic_tooltip: "Allergic to this? Tap to remove it from the meal",
+    meal_updating: "Updating meal to remove that ingredient...",
+    meal_update_failed: "Couldn't update this meal — please try again.",
     plan_loading: "Preparing your nutrition plan...",
     plan_error: "The kitchen's unavailable right now. Check your connection and tap Retry.",
     calorie_error: "Couldn't reach the kitchen. Check your connection and try again.",
@@ -401,6 +405,10 @@ const T = {
     calorie_disclaimer: "Estimations seulement — pas un avis médical.",
     allergy_warning_title: "⚠️ Vérifiez chaque ingrédient vous-même",
     allergy_warning_text: "Ce plan a été généré pour éviter vos allergies/intolérances sélectionnées, mais le contenu généré par IA peut contenir des erreurs. NutriCrew ne remplace pas la lecture des véritables étiquettes d'ingrédients ni les questions directes au restaurant. Si vous avez une allergie sévère ou potentiellement mortelle, vérifiez toujours chaque ingrédient vous-même et gardez votre médicament prescrit (ex. auto-injecteur d'épinéphrine) comme d'habitude.",
+    ingredients_label: "Touchez un ingrédient auquel vous êtes allergique",
+    ingredient_allergic_tooltip: "Allergique à ceci ? Touchez pour le retirer du repas",
+    meal_updating: "Mise à jour du repas pour retirer cet ingrédient...",
+    meal_update_failed: "Impossible de mettre à jour ce repas — veuillez réessayer.",
     plan_loading: "Préparation de votre plan nutritionnel...",
     plan_error: "La cuisine est temporairement indisponible. Vérifiez votre connexion et réessayez.",
     calorie_error: "Impossible d'atteindre la cuisine. Vérifiez votre connexion.",
@@ -638,6 +646,10 @@ const T = {
     calorie_disclaimer: "Solo estimaciones — no es un consejo médico.",
     allergy_warning_title: "⚠️ Verifica cada ingrediente tú mismo",
     allergy_warning_text: "Este plan fue generado para evitar tus alergias/intolerancias seleccionadas, pero el contenido generado por IA puede contener errores. NutriCrew no sustituye la lectura de las etiquetas reales de ingredientes ni preguntar directamente en los restaurantes. Si tienes una alergia grave o potencialmente mortal, verifica siempre cada ingrediente tú mismo y lleva tu medicamento recetado (ej. autoinyector de epinefrina) como de costumbre.",
+    ingredients_label: "Toca un ingrediente al que seas alérgico",
+    ingredient_allergic_tooltip: "¿Eres alérgico a esto? Toca para quitarlo de la comida",
+    meal_updating: "Actualizando la comida para quitar ese ingrediente...",
+    meal_update_failed: "No se pudo actualizar esta comida — inténtalo de nuevo.",
     plan_loading: "Preparando tu plan nutricional...",
     plan_error: "La cocina no está disponible ahora. Revisa tu conexión y toca Reintentar.",
     calorie_error: "No se pudo alcanzar la cocina. Revisa tu conexión.",
@@ -1548,6 +1560,19 @@ export default function NutriCrew() {
     });
   };
 
+  // Replaces a single meal in-place after the crew member flags a personal
+  // allergen ingredient and it's regenerated — used by DayPlan/PlanScreen.
+  const updateMeal = (dayIndex, mealIndex, newMeal) => {
+    setPlan(p => {
+      if (!p?.days) return p;
+      const days = p.days.map((d, i) => i !== dayIndex ? d : {
+        ...d,
+        meals: d.meals.map((m, j) => j !== mealIndex ? m : newMeal),
+      });
+      return { ...p, days };
+    });
+  };
+
   const updateProfile = (changes) => {
     const updated = { ...(user || {}), ...changes };
     storage.set(USER_KEY, updated);
@@ -1732,6 +1757,7 @@ export default function NutriCrew() {
           onNewPairing={startNewPairing} onRetry={handleGenerate} lang={lang}
           favorites={favorites} onToggleFavorite={toggleFavorite}
           onOpenAirplaneMeal={() => setShowAirplaneMeal(true)}
+          onUpdateMeal={updateMeal}
           isOnline={isOnline}
           planKey={planCacheKey({ ...user, ...Object.fromEntries(Object.entries(pairing).filter(([, v]) => !(Array.isArray(v) && v.length === 0))) }, lang)}
           onShare={handleShare}
@@ -2981,7 +3007,7 @@ const PLAN_LOAD_STEPS = [
   "Finalizing your plan...",
 ];
 
-function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, activeDay, setActiveDay, onNewPairing, onRetry, favorites, onToggleFavorite, onOpenAirplaneMeal, isOnline, planKey, onShare, shareCopied, onOpenReferral }) {
+function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, activeDay, setActiveDay, onNewPairing, onRetry, favorites, onToggleFavorite, onOpenAirplaneMeal, onUpdateMeal, isOnline, planKey, onShare, shareCopied, onOpenReferral, lang }) {
   const days = pairing.pairing_days || 1;
   const hasJetlag = Math.abs(parseInt(pairing.timezone||0)) >= 4;
   const [loadStep, setLoadStep] = useState(0);
@@ -3196,7 +3222,9 @@ function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, 
                 <button style={styles.primaryBtn} onClick={onRetry}>{t.try_again}</button>
               </div>
             )
-            : <DayPlan day={plan.days[activeDay]} t={t} favorites={favorites} onToggleFavorite={onToggleFavorite} onOpenAirplaneMeal={onOpenAirplaneMeal}/>
+            : <DayPlan day={plan.days[activeDay]} t={t} favorites={favorites} onToggleFavorite={onToggleFavorite} onOpenAirplaneMeal={onOpenAirplaneMeal}
+                pairing={pairing} user={user} lang={lang}
+                onUpdateMeal={(mealIdx, newMeal) => onUpdateMeal(activeDay, mealIdx, newMeal)}/>
         )}
         {activeTab === "grocery" && plan.groceryList && (
           <GroceryList list={plan.groceryList}/>
@@ -3295,9 +3323,32 @@ function PlanFeedback({ t, planKey }) {
   );
 }
 
-function DayPlan({ day, t, favorites, onToggleFavorite, onOpenAirplaneMeal }) {
+function DayPlan({ day, t, favorites, onToggleFavorite, onOpenAirplaneMeal, pairing, user, lang, onUpdateMeal }) {
   const [expandedIdx, setExpandedIdx] = useState(null);
+  const [regeneratingIdx, setRegeneratingIdx] = useState(null);
+  const [regenError, setRegenError] = useState(null);
   const mealColors = { Breakfast: C.gold, Lunch: C.sky, Dinner: C.green, Snack: C.muted };
+  const hasAllergy = (pairing?.diets || user?.diets || []).some(d => ALLERGY_DIET_VALUES.includes(d));
+
+  const flagIngredient = async (i, meal, ingredient) => {
+    setRegenError(null);
+    setRegeneratingIdx(i);
+    try {
+      const r = await fetch(`${API_BASE}/api/regenerate-meal`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ meal, excludeIngredient: ingredient, data: { ...user, ...pairing }, lang }),
+      });
+      const result = await r.json();
+      if (!r.ok || result.error) throw new Error(result.error || "Failed to update meal");
+      onUpdateMeal?.(i, result.meal);
+    } catch {
+      setRegenError(i);
+    } finally {
+      setRegeneratingIdx(null);
+    }
+  };
+
   return (
     <div>
       <div style={styles.dayLabel2}>{day.label}</div>
@@ -3346,6 +3397,27 @@ function DayPlan({ day, t, favorites, onToggleFavorite, onOpenAirplaneMeal }) {
                   <span>F: {meal.fat}g</span>
                   {meal.tags?.map(tag => <span key={tag} style={styles.tag}>{tag}</span>)}
                 </div>
+                {hasAllergy && meal.ingredients?.length > 0 && (
+                  <div style={{ marginTop: 10 }}>
+                    <div style={styles.ingredientsLabel}>🚨 {t.ingredients_label}</div>
+                    {regeneratingIdx === i ? (
+                      <div style={{ fontSize: 12, color: C.muted, padding: "6px 0" }}>{t.meal_updating}</div>
+                    ) : (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {meal.ingredients.map((ing, k) => (
+                          <button key={k} style={styles.ingredientChip}
+                            onClick={e => { e.stopPropagation(); flagIngredient(i, meal, ing); }}
+                            title={t.ingredient_allergic_tooltip}>
+                            {ing} ✕
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {regenError === i && (
+                      <div style={{ fontSize: 12, color: C.red, marginTop: 4 }}>{t.meal_update_failed}</div>
+                    )}
+                  </div>
+                )}
                 {meal.tip && (
                   <div style={styles.postIt}>
                     <span style={styles.postItPin}>📌</span><span>{meal.tip}</span>
@@ -5965,6 +6037,12 @@ const styles = {
   tag: {
     fontSize: 10, padding: "2px 8px", borderRadius: 20,
     background: C.navyCard, color: C.muted, border: `1px solid ${C.navyBorder}`,
+  },
+  ingredientsLabel: { fontSize: 10, color: C.red, letterSpacing: 1, marginBottom: 6, fontWeight: 700 },
+  ingredientChip: {
+    fontSize: 11, padding: "4px 10px", borderRadius: 20,
+    background: "transparent", color: C.white, border: `1px solid ${C.navyBorder}`,
+    cursor: "pointer", fontFamily: "inherit",
   },
   postIt: {
     marginTop: 10, background: "#FFE066", color: "#3a2f00",

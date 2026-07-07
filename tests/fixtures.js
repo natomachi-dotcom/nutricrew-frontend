@@ -60,6 +60,7 @@ export const MOCK_PLAN = {
           carbs: 15,
           fat: 8,
           tags: ["protein-rich"],
+          ingredients: ["Greek yogurt", "almonds", "honey"],
           tip: "Buy single-serving cups for travel.",
           recyclingTip: "Rinse and recycle the yogurt cup.",
         },
