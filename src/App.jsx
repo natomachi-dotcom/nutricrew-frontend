@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, startTransition } from "react";
 import { FAQ } from "./faq.js";
+import { searchAirports } from "./airports.js";
 
 // AI backend base URL. Empty in local dev (Vite proxies /api to localhost:3001);
 // set VITE_API_BASE_URL on Vercel to point at the deployed nutricrew-backend.
@@ -2463,7 +2464,7 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
         );
 
       case "departure":
-        return <TextInput label={t.step_route + " — " + "Departure"} value={localVal}
+        return <AirportInput label={t.step_route + " — " + "Departure"} value={localVal}
           onChange={v => {
             setLocalVal(v);
             clearTimeout(depTimerRef.current);
@@ -2493,7 +2494,7 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
             {Array.from({ length: numDays }).map((_, i) => (
               <div key={i} style={{marginBottom: 12}}>
                 <div style={styles.hint}>{t.day} {i+1}</div>
-                <TextInput value={localDests[i] || ""}
+                <AirportInput value={localDests[i] || ""}
                   onChange={v => updDest(i, v)}
                   placeholder={t.destination_placeholder} icon="🛬"/>
               </div>
@@ -5425,6 +5426,41 @@ function TextInput({ label, value, onChange, placeholder, icon, type = "text" })
   );
 }
 
+// Same as TextInput, plus a dropdown of matching airports as the user types
+// a city name or IATA/ICAO code. Selecting one fills the field with the
+// exact "City (CODE)" format the rest of the app already expects (timezone
+// lookup, border-restriction detection) — free-typing anything else still
+// works exactly as before, this is a helper, not a hard constraint.
+function AirportInput({ label, value, onChange, placeholder, icon }) {
+  const [open, setOpen] = useState(false);
+  const matches = open ? searchAirports(value) : [];
+  return (
+    <div style={{ position: "relative" }}>
+      {label && <div style={styles.inputLabel}>{label}</div>}
+      <div style={styles.inputWrap}>
+        {icon && <span style={styles.inputIcon}>{icon}</span>}
+        <input style={styles.input} type="text" value={value}
+          onChange={e => onChange(e.target.value)}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          placeholder={placeholder} autoComplete="off"/>
+      </div>
+      {matches.length > 0 && (
+        <div style={styles.airportDropdown}>
+          {matches.map(a => (
+            <button key={a.iata} type="button" style={styles.airportOption}
+              onMouseDown={e => e.preventDefault()}
+              onClick={() => { onChange(`${a.city} (${a.iata})`); setOpen(false); }}>
+              <span style={styles.airportOptionCode}>{a.iata}</span>
+              <span style={styles.airportOptionText}>{a.name} — {a.city}, {a.country}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CalorieTargetStep({ t, pairing, user, upd }) {
   const weight = pairing.weight || user?.weight || "70kg";
   const gender = pairing.gender || user?.gender || "female";
@@ -5810,6 +5846,22 @@ const styles = {
     flex: 1, background: "transparent", border: "none", color: C.white,
     fontSize: 15, fontFamily: "inherit", outline: "none",
   },
+  airportDropdown: {
+    position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, zIndex: 20,
+    background: C.navyCard, border: `1px solid ${C.navyBorder}`, borderRadius: 10,
+    overflow: "hidden", boxShadow: `0 8px 24px ${C.bg}`,
+  },
+  airportOption: {
+    display: "flex", alignItems: "center", gap: 10, width: "100%",
+    padding: "10px 14px", background: "transparent", border: "none",
+    borderBottom: `1px solid ${C.navyBorder}`, cursor: "pointer",
+    fontFamily: "inherit", textAlign: "left",
+  },
+  airportOptionCode: {
+    fontSize: 13, fontWeight: 800, color: C.gold, letterSpacing: 1,
+    flexShrink: 0, minWidth: 36,
+  },
+  airportOptionText: { fontSize: 12, color: C.white, lineHeight: 1.3 },
   hint: { fontSize: 11, color: C.muted, marginTop: 6 },
   jetlagCard: {
     display: "flex", gap: 10, alignItems: "center", marginTop: 12,
