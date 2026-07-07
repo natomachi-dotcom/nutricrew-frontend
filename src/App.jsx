@@ -134,6 +134,9 @@ const T = {
     checkout_redirecting: "Taking you to secure checkout…",
     trial_disclaimer: "Card required. Free for 30 days, cancel anytime — after that you'll be charged",
     first_charge_on: "First charge on",
+    trial_legal_title: "Billing Terms",
+    trial_legal_text: "If you do not cancel by the last day of your free trial, your card will automatically be charged and your subscription will continue to renew every month (or year, for the annual plan) until you cancel. You can cancel anytime, free of charge, from Manage Subscription in your account, or by",
+    trial_legal_contact_link: "contacting us",
     per_month: "month",
     per_year: "year",
     trial_active_until: "Free until",
@@ -377,6 +380,9 @@ const T = {
     checkout_redirecting: "Redirection vers le paiement sécurisé…",
     trial_disclaimer: "Carte requise. Gratuit pendant 30 jours, annulez à tout moment — ensuite vous serez facturé",
     first_charge_on: "Premier prélèvement le",
+    trial_legal_title: "Conditions de Facturation",
+    trial_legal_text: "Si vous n'annulez pas avant le dernier jour de votre essai gratuit, votre carte sera automatiquement débitée et votre abonnement continuera à se renouveler chaque mois (ou chaque année, pour le forfait annuel) jusqu'à ce que vous annuliez. Vous pouvez annuler à tout moment, gratuitement, depuis Gérer l'Abonnement dans votre compte, ou en",
+    trial_legal_contact_link: "nous contactant",
     per_month: "mois",
     per_year: "an",
     trial_active_until: "Gratuit jusqu'au",
@@ -620,6 +626,9 @@ const T = {
     checkout_redirecting: "Te llevamos al pago seguro…",
     trial_disclaimer: "Se requiere tarjeta. Gratis por 30 días, cancela cuando quieras — luego se te cobrará",
     first_charge_on: "Primer cobro el",
+    trial_legal_title: "Condiciones de Facturación",
+    trial_legal_text: "Si no cancelas antes del último día de tu prueba gratuita, se cobrará automáticamente a tu tarjeta y tu suscripción seguirá renovándose cada mes (o cada año, en el plan anual) hasta que canceles. Puedes cancelar en cualquier momento, sin costo, desde Administrar Suscripción en tu cuenta, o",
+    trial_legal_contact_link: "contáctanos",
     per_month: "mes",
     per_year: "año",
     trial_active_until: "Gratis hasta",
@@ -1782,7 +1791,7 @@ export default function NutriCrew() {
       )}
 
       {screen === "premium" && (
-        <PremiumScreen t={t} onBack={() => setScreen(premiumReturnScreen)} onUpgrade={handleUpgrade} premiumSuccess={premiumSuccess} onGenerate={handleGenerate} returnScreen={premiumReturnScreen} trialEnd={user?.trialEnd}/>
+        <PremiumScreen t={t} onBack={() => setScreen(premiumReturnScreen)} onUpgrade={handleUpgrade} premiumSuccess={premiumSuccess} onGenerate={handleGenerate} returnScreen={premiumReturnScreen} trialEnd={user?.trialEnd} onOpenContact={() => setShowContact(true)}/>
       )}
 
       {/* Floating calorie button */}
@@ -3537,7 +3546,7 @@ function FoodRestrictions({ data, pairing }) {
 }
 
 // ─── PREMIUM SCREEN ───────────────────────────────────────────────
-function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess, onGenerate, returnScreen, trialEnd }) {
+function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess, onGenerate, returnScreen, trialEnd, onOpenContact }) {
   const [loading, setLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState(null);
   const [billing, setBilling] = useState("monthly"); // monthly | annual
@@ -3642,6 +3651,13 @@ function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess, onGenerate, retur
           ? `${t.trial_disclaimer} $62.32/${t.per_year}.`
           : `${t.trial_disclaimer} $7.99/${t.per_month}.`}
         {" "}{t.first_charge_on} {estFirstCharge.toLocaleDateString()}.
+      </div>
+      <div style={styles.disclaimerBanner}>
+        <div style={styles.disclaimerBannerTitle}>{t.trial_legal_title}</div>
+        <div style={styles.disclaimerBannerText}>
+          {t.trial_legal_text}{" "}
+          <span style={{ textDecoration: "underline", cursor: "pointer" }} onClick={onOpenContact}>{t.trial_legal_contact_link}</span>.
+        </div>
       </div>
       <button style={{...styles.backBtn, flex: "none"}} onClick={onBack}>{t.back}</button>
     </div>
