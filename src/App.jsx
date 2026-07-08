@@ -135,13 +135,23 @@ const T = {
     trial_disclaimer: "Card required. Free for 30 days, cancel anytime — after that you'll be charged",
     first_charge_on: "First charge on",
     trial_legal_title: "Billing Terms",
-    trial_legal_text: "If you do not cancel by the last day of your free trial, your card will automatically be charged and your subscription will continue to renew every month (or year, for the annual plan) until you cancel. You can cancel anytime, free of charge, from Manage Subscription in your account, or by",
+    trial_legal_text: "If you do not cancel by the last day of your free trial, your card will automatically be charged and your subscription will continue to renew every month (or year, for the annual plan) until you cancel. You can cancel anytime, free of charge, from Manage Billing in your account, or by",
     trial_legal_contact_link: "contacting us",
     per_month: "month",
     per_year: "year",
     trial_active_until: "Free until",
     subscription_active: "Premium — Active",
-    manage_subscription: "Manage Subscription",
+    add_subscription_cta: "Start a Subscription",
+    buy_annual_cta: "Switch to Annual — $62.32/yr",
+    switch_annual_confirm_text: "This switches your billing to annual ($62.32/yr) right away, with a prorated charge or credit for the switch. Continue?",
+    switch_annual_success: "You're now on the annual plan.",
+    already_annual_msg: "You're already on the annual plan.",
+    switch_annual_error: "Couldn't switch to annual. Please try again.",
+    manage_billing_cta: "Manage Billing (Update Card / Instant Cancel)",
+    cancel_via_email_cta: "Cancel by Emailing Support",
+    confirm_action: "Confirm",
+    cancel_action: "Never mind",
+    cancel_email_template: "I'd like to cancel my NutriCrew subscription. Please cancel the subscription on my account.",
     calorie_title: "Calorie Estimator",
     calorie_placeholder: "Describe what you ate (e.g. chicken sandwich, coffee with milk)...",
     calorie_btn: "Estimate Calories",
@@ -381,13 +391,23 @@ const T = {
     trial_disclaimer: "Carte requise. Gratuit pendant 30 jours, annulez à tout moment — ensuite vous serez facturé",
     first_charge_on: "Premier prélèvement le",
     trial_legal_title: "Conditions de Facturation",
-    trial_legal_text: "Si vous n'annulez pas avant le dernier jour de votre essai gratuit, votre carte sera automatiquement débitée et votre abonnement continuera à se renouveler chaque mois (ou chaque année, pour le forfait annuel) jusqu'à ce que vous annuliez. Vous pouvez annuler à tout moment, gratuitement, depuis Gérer l'Abonnement dans votre compte, ou en",
+    trial_legal_text: "Si vous n'annulez pas avant le dernier jour de votre essai gratuit, votre carte sera automatiquement débitée et votre abonnement continuera à se renouveler chaque mois (ou chaque année, pour le forfait annuel) jusqu'à ce que vous annuliez. Vous pouvez annuler à tout moment, gratuitement, depuis Gérer la Facturation dans votre compte, ou en",
     trial_legal_contact_link: "nous contactant",
     per_month: "mois",
     per_year: "an",
     trial_active_until: "Gratuit jusqu'au",
     subscription_active: "Premium — Actif",
-    manage_subscription: "Gérer l'Abonnement",
+    add_subscription_cta: "Démarrer un Abonnement",
+    buy_annual_cta: "Passer à l'Annuel — 62,32 $/an",
+    switch_annual_confirm_text: "Cela passe votre facturation à l'annuel (62,32 $/an) immédiatement, avec un ajustement au prorata. Continuer ?",
+    switch_annual_success: "Vous êtes maintenant sur le forfait annuel.",
+    already_annual_msg: "Vous êtes déjà sur le forfait annuel.",
+    switch_annual_error: "Impossible de passer à l'annuel. Veuillez réessayer.",
+    manage_billing_cta: "Gérer la Facturation (Carte / Annulation Instantanée)",
+    cancel_via_email_cta: "Annuler par E-mail",
+    confirm_action: "Confirmer",
+    cancel_action: "Laisser tomber",
+    cancel_email_template: "Je souhaite annuler mon abonnement NutriCrew. Merci d'annuler l'abonnement sur mon compte.",
     calorie_title: "Estimateur de Calories",
     calorie_placeholder: "Décrivez ce que vous avez mangé...",
     calorie_btn: "Estimer les Calories",
@@ -627,13 +647,23 @@ const T = {
     trial_disclaimer: "Se requiere tarjeta. Gratis por 30 días, cancela cuando quieras — luego se te cobrará",
     first_charge_on: "Primer cobro el",
     trial_legal_title: "Condiciones de Facturación",
-    trial_legal_text: "Si no cancelas antes del último día de tu prueba gratuita, se cobrará automáticamente a tu tarjeta y tu suscripción seguirá renovándose cada mes (o cada año, en el plan anual) hasta que canceles. Puedes cancelar en cualquier momento, sin costo, desde Administrar Suscripción en tu cuenta, o",
+    trial_legal_text: "Si no cancelas antes del último día de tu prueba gratuita, se cobrará automáticamente a tu tarjeta y tu suscripción seguirá renovándose cada mes (o cada año, en el plan anual) hasta que canceles. Puedes cancelar en cualquier momento, sin costo, desde Administrar Facturación en tu cuenta, o",
     trial_legal_contact_link: "contáctanos",
     per_month: "mes",
     per_year: "año",
     trial_active_until: "Gratis hasta",
     subscription_active: "Premium — Activo",
-    manage_subscription: "Administrar Suscripción",
+    add_subscription_cta: "Iniciar una Suscripción",
+    buy_annual_cta: "Cambiar a Anual — $62.32/año",
+    switch_annual_confirm_text: "Esto cambia tu facturación a anual ($62.32/año) de inmediato, con un ajuste prorrateado. ¿Continuar?",
+    switch_annual_success: "Ahora estás en el plan anual.",
+    already_annual_msg: "Ya estás en el plan anual.",
+    switch_annual_error: "No se pudo cambiar a anual. Inténtalo de nuevo.",
+    manage_billing_cta: "Administrar Facturación (Tarjeta / Cancelación Instantánea)",
+    cancel_via_email_cta: "Cancelar por Correo",
+    confirm_action: "Confirmar",
+    cancel_action: "Dejarlo",
+    cancel_email_template: "Me gustaría cancelar mi suscripción de NutriCrew. Por favor cancela la suscripción de mi cuenta.",
     calorie_title: "Estimador de Calorías",
     calorie_placeholder: "Describe lo que comiste (ej: sándwich de pollo, café con leche)...",
     calorie_btn: "Estimar Calorías",
@@ -1104,6 +1134,7 @@ export default function NutriCrew() {
   const [referralCode, setReferralCode] = useState(null);
   const [showFAQ, setShowFAQ] = useState(false);
   const [showContact, setShowContact] = useState(false);
+  const [contactPrefill, setContactPrefill] = useState("");
   const [shareCopied, setShareCopied] = useState(false);
   const [premiumReturnScreen, setPremiumReturnScreen] = useState("boarding");
 
@@ -1433,6 +1464,29 @@ export default function NutriCrew() {
     } else {
       throw new Error(data.error || "Could not open billing portal");
     }
+  };
+
+  // Switches an existing subscriber's billing to annual in place (proration),
+  // not a new checkout — stays on this screen instead of redirecting.
+  const handleSwitchToAnnual = async () => {
+    const email = user?.email;
+    if (!email) return;
+    const res = await fetch(`${API_BASE}/api/switch-to-annual`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "Could not switch to annual billing.");
+    return data;
+  };
+
+  // Opens the Contact modal with a pre-filled cancellation message, as an
+  // alternative to the instant self-serve cancel in the billing portal.
+  const handleCancelViaEmail = () => {
+    setContactPrefill(t.cancel_email_template);
+    setShowProfile(false);
+    setShowContact(true);
   };
 
   const handleContinue = () => {
@@ -1790,7 +1844,7 @@ export default function NutriCrew() {
       )}
 
       {showContact && (
-        <ContactModal t={t} user={user} onClose={() => setShowContact(false)} />
+        <ContactModal t={t} user={user} initialMessage={contactPrefill} onClose={() => { setShowContact(false); setContactPrefill(""); }} />
       )}
 
       {showRoster && (
@@ -1924,6 +1978,9 @@ export default function NutriCrew() {
           onSave={updateProfile}
           onClose={() => setShowProfile(false)}
           onManageSubscription={handleManageSubscription}
+          onSwitchToAnnual={handleSwitchToAnnual}
+          onCancelViaEmail={handleCancelViaEmail}
+          onAddSubscription={() => { setShowProfile(false); setPremiumReturnScreen("splash"); setScreen("premium"); }}
         />
       )}
 
@@ -5088,10 +5145,10 @@ function FAQModal({ t, lang, onClose }) {
   );
 }
 
-function ContactModal({ t, user, onClose }) {
+function ContactModal({ t, user, onClose, initialMessage }) {
   const [name, setName] = useState(user?.name || "");
   const [email, setEmail] = useState(user?.email || "");
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(initialMessage || "");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
@@ -5169,7 +5226,7 @@ function ContactModal({ t, user, onClose }) {
   );
 }
 
-function ProfileModal({ t, user, onSave, onClose, onManageSubscription }) {
+function ProfileModal({ t, user, onSave, onClose, onManageSubscription, onSwitchToAnnual, onCancelViaEmail, onAddSubscription }) {
   const initialUnit = (user?.weight || "").toString().includes("lbs") ? "lbs" : "kg";
   const initialWeight = parseFloat(user?.weight) || "";
   const [gender, setGender] = useState(user?.gender || "");
@@ -5190,6 +5247,10 @@ function ProfileModal({ t, user, onSave, onClose, onManageSubscription }) {
   const [pwSaving, setPwSaving] = useState(false);
   const [pwSuccess, setPwSuccess] = useState(false);
   const [portalError, setPortalError] = useState("");
+  const [confirmingAnnual, setConfirmingAnnual] = useState(false);
+  const [switchingAnnual, setSwitchingAnnual] = useState(false);
+  const [annualError, setAnnualError] = useState("");
+  const [annualMsg, setAnnualMsg] = useState("");
 
   const trialEndDate = user?.trialEnd ? new Date(user.trialEnd) : null;
   const isTrialing = trialEndDate && trialEndDate > new Date();
@@ -5200,6 +5261,20 @@ function ProfileModal({ t, user, onSave, onClose, onManageSubscription }) {
       await onManageSubscription();
     } catch (err) {
       setPortalError(err.message || "Could not open billing portal.");
+    }
+  };
+
+  const handleConfirmAnnual = async () => {
+    setSwitchingAnnual(true);
+    setAnnualError("");
+    try {
+      const data = await onSwitchToAnnual();
+      setAnnualMsg(data?.alreadyAnnual ? t.already_annual_msg : t.switch_annual_success);
+      setConfirmingAnnual(false);
+    } catch (err) {
+      setAnnualError(err.message || t.switch_annual_error);
+    } finally {
+      setSwitchingAnnual(false);
     }
   };
 
@@ -5266,7 +5341,7 @@ function ProfileModal({ t, user, onSave, onClose, onManageSubscription }) {
           <div style={{...styles.restrictText, marginTop: 6, fontSize: 11}}>{t.profile_locked_note}</div>
         </div>
 
-        {user?.isPremium && (
+        {user?.isPremium ? (
           <div style={{ background: C.navyCard, border: `1px solid ${C.gold}`, borderRadius: 10, padding: "12px 14px" }}>
             <div style={{ color: C.gold, fontWeight: 700, fontSize: 13, marginBottom: 4 }}>
               {isTrialing
@@ -5274,8 +5349,38 @@ function ProfileModal({ t, user, onSave, onClose, onManageSubscription }) {
                 : t.subscription_active}
             </div>
             {portalError && <div style={{ color: "#e55", fontSize: 12, marginBottom: 6 }}>{portalError}</div>}
-            <button style={{ ...styles.secondaryBtn, marginTop: 4 }} onClick={handleManageClick}>
-              {t.manage_subscription}
+            {annualError && <div style={{ color: "#e55", fontSize: 12, marginBottom: 6 }}>{annualError}</div>}
+            {annualMsg && <div style={{ color: C.gold, fontSize: 12, marginBottom: 6 }}>{annualMsg}</div>}
+
+            {!confirmingAnnual ? (
+              <button style={{ ...styles.secondaryBtn, marginTop: 4 }} onClick={() => { setConfirmingAnnual(true); setAnnualError(""); setAnnualMsg(""); }}>
+                {t.buy_annual_cta}
+              </button>
+            ) : (
+              <div style={{ marginTop: 4 }}>
+                <div style={{ color: C.muted, fontSize: 12, marginBottom: 6 }}>{t.switch_annual_confirm_text}</div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button style={{ ...styles.primaryBtn, flex: 1, justifyContent: "center", padding: "8px 12px" }} onClick={handleConfirmAnnual} disabled={switchingAnnual}>
+                    {switchingAnnual ? t.checkout_redirecting : t.confirm_action}
+                  </button>
+                  <button style={{ ...styles.secondaryBtn, flex: 1 }} onClick={() => setConfirmingAnnual(false)} disabled={switchingAnnual}>
+                    {t.cancel_action}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <button style={{ ...styles.secondaryBtn, marginTop: 8 }} onClick={handleManageClick}>
+              {t.manage_billing_cta}
+            </button>
+            <button style={{ ...styles.secondaryBtn, marginTop: 8 }} onClick={onCancelViaEmail}>
+              {t.cancel_via_email_cta}
+            </button>
+          </div>
+        ) : (
+          <div style={{ background: C.navyCard, border: `1px solid ${C.navyBorder}`, borderRadius: 10, padding: "12px 14px" }}>
+            <button style={{ ...styles.primaryBtn, justifyContent: "center", width: "100%" }} onClick={onAddSubscription}>
+              {t.add_subscription_cta}
             </button>
           </div>
         )}
