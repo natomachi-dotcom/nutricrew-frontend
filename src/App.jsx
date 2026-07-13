@@ -90,6 +90,8 @@ const T = {
     nut_free: "Nut-Free", egg_free: "Egg-Free", shellfish_free: "Shellfish-Free",
     soy_free: "Soy-Free", lactose_free: "Lactose-Free", fodmap: "Low-FODMAP",
     sesame_free: "Sesame-Free",
+    allergy_other: "Other Allergy", allergy_other_placeholder: "Tell us what you're allergic to...",
+    val_allergy_describe: "Please describe your allergy",
     offline_banner: "Offline — showing last saved plan",
     offline_generate: "No connection — generating a new plan requires internet.",
     history_btn: "Plan History", history_title: "Plan History",
@@ -346,6 +348,8 @@ const T = {
     nut_free: "Sans Noix", egg_free: "Sans Œufs", shellfish_free: "Sans Fruits de Mer",
     soy_free: "Sans Soja", lactose_free: "Sans Lactose", fodmap: "FODMAP Faible",
     sesame_free: "Sans Sésame",
+    allergy_other: "Autre Allergie", allergy_other_placeholder: "Dites-nous à quoi vous êtes allergique...",
+    val_allergy_describe: "Veuillez décrire votre allergie",
     offline_banner: "Hors ligne — affichage du dernier plan sauvegardé",
     offline_generate: "Hors ligne — générer un nouveau plan nécessite une connexion internet.",
     history_btn: "Historique", history_title: "Historique des plans",
@@ -602,6 +606,8 @@ const T = {
     nut_free: "Sin Frutos Secos", egg_free: "Sin Huevo", shellfish_free: "Sin Mariscos",
     soy_free: "Sin Soja", lactose_free: "Sin Lactosa", fodmap: "Bajo-FODMAP",
     sesame_free: "Sin Sésamo",
+    allergy_other: "Otra Alergia", allergy_other_placeholder: "Dinos a qué eres alérgico...",
+    val_allergy_describe: "Por favor describe tu alergia",
     offline_banner: "Sin conexión — mostrando el último plan guardado",
     offline_generate: "Sin conexión — generar un nuevo plan requiere internet.",
     history_btn: "Historial", history_title: "Historial de planes",
@@ -1025,7 +1031,7 @@ const IDENTITY_FIELDS = ["name", "email", "gender", "weight", "dob", "position"]
 // responds; on a different device/account it's dropped, never inherited.
 const DURABLE_PROFILE_FIELDS = [
   "gender", "weight", "dob", "position",
-  "lunch_bag", "cooking_pref", "diets", "diet_other", "goals",
+  "lunch_bag", "cooking_pref", "diets", "diet_other", "allergy_other_text", "goals",
   "calorie_target", "calorie_deficit_amount", "calorie_deficit_preset",
   "departure", "budget_type", "budget_amount", "kitchen",
 ];
@@ -1040,7 +1046,7 @@ function mergeDurableProfileFields(sessionData, prev, sameAccount) {
 // Allergy/intolerance diet values — used to show the allergy-specific
 // disclaimer on the plan screen (a stronger warning than the general one,
 // since these are real allergen-avoidance requests, not just preferences).
-const ALLERGY_DIET_VALUES = ["gluten_free", "dairy_free", "lactose_free", "nut_free", "egg_free", "shellfish_free", "soy_free", "sesame_free", "fodmap"];
+const ALLERGY_DIET_VALUES = ["gluten_free", "dairy_free", "lactose_free", "nut_free", "egg_free", "shellfish_free", "soy_free", "sesame_free", "fodmap", "allergy_other"];
 
 // ─── MAIN APP ─────────────────────────────────────────────────────
 export default function NutriCrew() {
@@ -1330,10 +1336,15 @@ export default function NutriCrew() {
   // previous account on the same browser had already used its free pairing).
   const pairingCount = user?.pairingCount || 0;
   const bonusPairings = user?.bonusPairings || 0;
-  const isPremiumNeeded = premiumSuccess ? false : pairingCount >= FREE_PAIRING_LIMIT + bonusPairings;
   // Real subscription status (server-authoritative) — true right after Stripe
   // checkout returns, or once verify-session/login confirms it from the DB.
   const isPremium = premiumSuccess || !!user?.isPremium;
+  // An active subscriber never needs the paywall, no matter how high their
+  // lifetime pairingCount is — without this check, a returning premium user
+  // (isPremium true but premiumSuccess false, i.e. not mid-checkout-return)
+  // would get bounced to the upsell screen on every "Generate" click, since
+  // pairingCount stays >= FREE_PAIRING_LIMIT (0) forever after their first pairing.
+  const isPremiumNeeded = isPremium ? false : pairingCount >= FREE_PAIRING_LIMIT + bonusPairings;
 
   // ── STEP DEFINITIONS (check-in flow) ──────────────────────────
   // If returning user, skip personal steps.
@@ -1384,7 +1395,7 @@ export default function NutriCrew() {
   // One-time fields: asked only during first-time onboarding, never shown
   // again to a returning user — always safe to keep updating the saved
   // default as they're being set (no returning-user overwrite risk).
-  const ONE_TIME_PROFILE_FIELDS = ["gender", "weight", "dob", "position", "lunch_bag", "cooking_pref", "diets", "diet_other", "calorie_target", "calorie_deficit_amount", "calorie_deficit_preset", "goals"];
+  const ONE_TIME_PROFILE_FIELDS = ["gender", "weight", "dob", "position", "lunch_bag", "cooking_pref", "diets", "diet_other", "allergy_other_text", "calorie_target", "calorie_deficit_amount", "calorie_deficit_preset", "goals"];
   // Adjustable fields: remain visible/editable on every pairing, including a
   // returning user's. departure is a home-airport (crews almost always
   // depart from the same one); budget can be tweaked per trip; kitchen
@@ -2447,6 +2458,7 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
     if (currentStep === "diet") {
       if (!pairing.diets || pairing.diets.length === 0) return false;
       if (pairing.diets.includes("other") && !pairing.diet_other?.trim()) return false;
+      if (pairing.diets.includes("allergy_other") && !pairing.allergy_other_text?.trim()) return false;
       return true;
     }
     const v = pairing[currentStep] ?? user?.[currentStep];
@@ -2486,6 +2498,7 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
       case "diet":
         if (!pairing.diets || pairing.diets.length === 0) return t.val_select_diet;
         if (pairing.diets.includes("other") && !pairing.diet_other?.trim()) return t.val_diet_describe;
+        if (pairing.diets.includes("allergy_other") && !pairing.allergy_other_text?.trim()) return t.val_allergy_describe;
         return null;
       case "goals":        return t.val_select_goal;
       case "budget":       return t.val_enter_budget;
@@ -2753,6 +2766,7 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
                 {v:"soy_free",l:t.soy_free,icon:"🫘"},
                 {v:"sesame_free",l:t.sesame_free,icon:"🫙"},
                 {v:"fodmap",l:t.fodmap,icon:"🌿"},
+                {v:"allergy_other",l:t.allergy_other,icon:"❗"},
               ]}
               values={pairing.diets || []}
               onChange={v => {
@@ -2769,6 +2783,13 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
                 <TextInput value={pairing.diet_other || ""}
                   onChange={v => upd("diet_other", v)}
                   placeholder={t.diet_other_placeholder} icon="✏️"/>
+              </div>
+            )}
+            {(pairing.diets || []).includes("allergy_other") && (
+              <div style={{marginTop:12}}>
+                <TextInput value={pairing.allergy_other_text || ""}
+                  onChange={v => upd("allergy_other_text", v)}
+                  placeholder={t.allergy_other_placeholder} icon="❗"/>
               </div>
             )}
           </div>
@@ -3024,7 +3045,11 @@ function describeReviewField(key, pairing, user, t) {
     const diets = pairing.diets?.length ? pairing.diets : (user?.diets || []);
     const filtered = diets.filter(d => d && d !== "none");
     const value = filtered.length === 0 ? "—"
-      : filtered.map(d => d === "other" ? (v("diet_other") || "Other") : d.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())).join(", ");
+      : filtered.map(d => {
+          if (d === "other") return v("diet_other") || "Other";
+          if (d === "allergy_other") return `Allergic to: ${v("allergy_other_text") || "Other"}`;
+          return d.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+        }).join(", ");
     return { label: "DIET", value };
   }
   if (key === "calorie_target") {
@@ -3089,6 +3114,7 @@ function isFieldFilled(key, pairing, user) {
     const diets = pairing.diets?.length ? pairing.diets : (user?.diets || []);
     if (!diets.length) return false;
     if (diets.includes("other") && !(pairing.diet_other || user?.diet_other || "").trim()) return false;
+    if (diets.includes("allergy_other") && !(pairing.allergy_other_text || user?.allergy_other_text || "").trim()) return false;
     return true;
   }
   if (key === "calorie_target") return !!v("calorie_target");
@@ -3222,7 +3248,11 @@ function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, 
         const filteredDiets = allDiets.filter(d => d !== "none");
         const dietDisplay = filteredDiets.length === 0
           ? t.no_restrictions
-          : filteredDiets.map(d => d === "other" ? (mergedUser.diet_other || "OTHER").toUpperCase() : d.replace(/_/g, " ").toUpperCase()).join(" + ");
+          : filteredDiets.map(d => {
+              if (d === "other") return (mergedUser.diet_other || "OTHER").toUpperCase();
+              if (d === "allergy_other") return `ALLERGIC TO ${(mergedUser.allergy_other_text || "OTHER").toUpperCase()}`;
+              return d.replace(/_/g, " ").toUpperCase();
+            }).join(" + ");
         const goalsDisplay = (mergedUser.goals || []).slice(0, 2).join(", ").replace(/_/g, " ").toUpperCase();
         return (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
@@ -5240,6 +5270,7 @@ function ProfileModal({ t, user, onSave, onClose, onManageSubscription, onSwitch
   const [cookingPref, setCookingPref] = useState(user?.cooking_pref || "");
   const [diets, setDiets] = useState(user?.diets || []);
   const [dietOther, setDietOther] = useState(user?.diet_other || "");
+  const [allergyOtherText, setAllergyOtherText] = useState(user?.allergy_other_text || "");
   const [goals, setGoals] = useState(user?.goals || []);
   const [budgetType, setBudgetType] = useState(user?.budget_type || "day");
   const [budgetAmount, setBudgetAmount] = useState(user?.budget_amount || "");
@@ -5323,6 +5354,7 @@ function ProfileModal({ t, user, onSave, onClose, onManageSubscription, onSwitch
       cooking_pref: cookingPref,
       diets,
       diet_other: dietOther,
+      allergy_other_text: allergyOtherText,
       goals,
       budget_type: budgetType,
       budget_amount: budgetAmount,
@@ -5499,6 +5531,7 @@ function ProfileModal({ t, user, onSave, onClose, onManageSubscription, onSwitch
             {v:"soy_free",l:t.soy_free,icon:"🫘"},
             {v:"sesame_free",l:t.sesame_free,icon:"🫙"},
             {v:"fodmap",l:t.fodmap,icon:"🌿"},
+            {v:"allergy_other",l:t.allergy_other,icon:"❗"},
           ]}
           values={diets}
           onChange={onDietsChange}/>
@@ -5506,6 +5539,12 @@ function ProfileModal({ t, user, onSave, onClose, onManageSubscription, onSwitch
           <div style={{marginTop:12}}>
             <TextInput value={dietOther} onChange={setDietOther}
               placeholder={t.diet_other_placeholder} icon="✏️"/>
+          </div>
+        )}
+        {diets.includes("allergy_other") && (
+          <div style={{marginTop:12}}>
+            <TextInput value={allergyOtherText} onChange={setAllergyOtherText}
+              placeholder={t.allergy_other_placeholder} icon="❗"/>
           </div>
         )}
 
