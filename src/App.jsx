@@ -28,6 +28,7 @@ const T = {
   en: {
     tagline: "Fuel Your Flight",
     tagline_sub: "Nutrition, jet lag, and meal planning built for flight crews",
+    login_link: "Already have an account? Log In",
     contact_us: "Questions? Contact us",
     contact_heading: "Contact Us",
     contact_intro: "Send us a message and we'll get back to you by email.",
@@ -287,6 +288,7 @@ const T = {
   fr: {
     tagline: "Alimentez Votre Vol",
     tagline_sub: "Nutrition, décalage horaire et planification des repas pour le personnel de cabine",
+    login_link: "Vous avez déjà un compte ? Connectez-vous",
     contact_us: "Des questions ? Contactez-nous",
     contact_heading: "Contactez-nous",
     contact_intro: "Envoyez-nous un message et nous vous répondrons par e-mail.",
@@ -545,6 +547,7 @@ const T = {
   es: {
     tagline: "Combustible Para Tu Vuelo",
     tagline_sub: "Nutrición, jet lag y planificación de comidas para tripulaciones de vuelo",
+    login_link: "¿Ya tienes una cuenta? Inicia sesión",
     contact_us: "¿Preguntas? Contáctanos",
     contact_heading: "Contáctanos",
     contact_intro: "Envíanos un mensaje y te responderemos por correo electrónico.",
@@ -922,6 +925,18 @@ const ProfileIcon = () => (
     <circle cx="11" cy="11" r="9" stroke={C.gold} strokeWidth="1.5" fill="none"/>
     <circle cx="11" cy="9" r="2.6" stroke={C.gold} strokeWidth="1.5" fill="none"/>
     <path d="M5.5 17c0.8-2.6 3-4 5.5-4s4.7 1.4 5.5 4" stroke={C.gold} strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+  </svg>
+);
+
+// Sign-in door-and-arrow glyph — shown in place of ProfileIcon for a visitor
+// with no cached account on this device/browser (e.g. incognito, cleared
+// storage, or a different device) so they can reach the existing-account
+// login flow instead of being funneled straight into first-time check-in.
+const LoginIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 22 22" fill="none">
+    <path d="M9 4H5.5a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1H9" stroke={C.gold} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M13 15l4-4-4-4" stroke={C.gold} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M17 11H9" stroke={C.gold} strokeWidth="1.5" fill="none" strokeLinecap="round"/>
   </svg>
 );
 
@@ -1799,6 +1814,7 @@ export default function NutriCrew() {
         <LoginScreen
           onSent={(email) => { setPendingOtpEmail(email); setScreen("otp"); }}
           onSuccess={handleLoginSuccess}
+          onBack={() => setScreen("splash")}
         />
       )}
 
@@ -1838,6 +1854,7 @@ export default function NutriCrew() {
           onOpenReferral={openReferralModal}
           onOpenFAQ={() => setShowFAQ(true)}
           onOpenContact={() => setShowContact(true)}
+          onLogin={() => setScreen("login")}
         />
       )}
 
@@ -2016,7 +2033,7 @@ function LoadingScreen() {
 }
 
 // ─── LOGIN SCREEN ─────────────────────────────────────────────────
-function LoginScreen({ onSent, onSuccess }) {
+function LoginScreen({ onSent, onSuccess, onBack }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -2076,6 +2093,11 @@ function LoginScreen({ onSent, onSuccess }) {
   return (
     <div style={styles.splash}>
       <div style={{ ...styles.splashInner, maxWidth: 400 }}>
+        {onBack && (
+          <button style={{ ...styles.backBtn, flex: "none", marginBottom: 16 }} onClick={onBack}>
+            ← Back
+          </button>
+        )}
         <div style={{ textAlign: "center", marginBottom: 32 }}>
           <div style={{ fontSize: 28, color: C.gold, letterSpacing: 4, fontWeight: "bold", marginBottom: 6 }}>✈ NUTRICREW</div>
           <div style={{ fontSize: 13, color: C.muted, letterSpacing: 2 }}>CREW NUTRITION</div>
@@ -2310,12 +2332,19 @@ function OTPScreen({ email, onSuccess, onBack }) {
 }
 
 // ─── SPLASH SCREEN ────────────────────────────────────────────────
-function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onStart, onNewPairing, onOpenHistory, onOpenSavedMeals, onOpenProfile, onOpenRoster, onOpenReferral, onOpenFAQ, onOpenContact, isPremium }) {
+function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onStart, onNewPairing, onOpenHistory, onOpenSavedMeals, onOpenProfile, onOpenRoster, onOpenReferral, onOpenFAQ, onOpenContact, onLogin, isPremium }) {
   return (
     <div style={styles.splash}>
-      {user && (
+      {user ? (
         <button style={styles.profileBtn} onClick={onOpenProfile} aria-label="profile">
           <ProfileIcon/>
+        </button>
+      ) : (
+        // No cached account on this device/browser (incognito, cleared storage,
+        // or a different device) — offer a way to the existing-account login
+        // flow instead of only ever funneling into first-time check-in.
+        <button style={styles.profileBtn} onClick={onLogin} aria-label="log in" title={t.login_link}>
+          <LoginIcon/>
         </button>
       )}
       <div style={styles.splashInner}>
