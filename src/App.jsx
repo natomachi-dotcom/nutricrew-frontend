@@ -244,9 +244,13 @@ const T = {
     step_duty: "Your Duty Schedule",
     duty_report: "Report Time",
     duty_length: "Duty Length",
+    duty_layover_location: "Layover Location",
+    layover_location_away: "Away From Base",
+    layover_location_base: "At Home Base",
     duty_layover: "Layover Type",
-    layover_short: "Short  ≤8h",
-    layover_standard: "Standard 8–24h",
+    layover_short_away: "Short  10–16h",
+    layover_short_base: "Short  12–16h",
+    layover_standard: "Standard 16–24h",
     layover_long: "Long  24h+",
     duty_direction: "Flight Direction",
     dir_east: "Eastward",
@@ -503,9 +507,13 @@ const T = {
     step_duty: "Votre Planning Service",
     duty_report: "Heure de Présentation",
     duty_length: "Durée de Service",
+    duty_layover_location: "Lieu de l'Escale",
+    layover_location_away: "Hors Base",
+    layover_location_base: "À la Base",
     duty_layover: "Type d'Escale",
-    layover_short: "Court  ≤8h",
-    layover_standard: "Standard 8–24h",
+    layover_short_away: "Court  10–16h",
+    layover_short_base: "Court  12–16h",
+    layover_standard: "Standard 16–24h",
     layover_long: "Long  24h+",
     duty_direction: "Direction du Vol",
     dir_east: "Vers l'Est",
@@ -762,9 +770,13 @@ const T = {
     step_duty: "Tu Horario de Servicio",
     duty_report: "Hora de Presentación",
     duty_length: "Duración de Servicio",
+    duty_layover_location: "Ubicación de la Escala",
+    layover_location_away: "Fuera de Base",
+    layover_location_base: "En Base",
     duty_layover: "Tipo de Escala",
-    layover_short: "Corta  ≤8h",
-    layover_standard: "Estándar 8–24h",
+    layover_short_away: "Corta  10–16h",
+    layover_short_base: "Corta  12–16h",
+    layover_standard: "Estándar 16–24h",
     layover_long: "Larga  24h+",
     duty_direction: "Dirección del Vuelo",
     dir_east: "Hacia el Este",
@@ -5648,9 +5660,22 @@ function DutyScheduleStep({ t, pairing, upd }) {
       </div>
 
       <div style={{ marginBottom: 16 }}>
+        <div style={{ ...styles.hint, marginBottom: 6 }}>{t.duty_layover_location}</div>
+        <div style={{ display: "flex", gap: 8 }}>
+          {[["no", t.layover_location_away], ["yes", t.layover_location_base]].map(([v, l]) => (
+            <button key={v} style={(pairing.layover_in_base || "no") === v ? DUTY_BTN_ACTIVE : DUTY_BTN_BASE}
+              onClick={() => upd("layover_in_base", v)}>{l}</button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
         <div style={{ ...styles.hint, marginBottom: 6 }}>{t.duty_layover}</div>
         <div style={{ display: "flex", gap: 8 }}>
-          {[["short", t.layover_short], ["standard", t.layover_standard], ["long", t.layover_long]].map(([v, l]) => (
+          {/* Minimum required rest before a layover counts as "short": 10h away
+              from home base, 12h at home base — never shorter, so the label
+              reflects whichever floor applies instead of a flat, unrealistic ≤8h. */}
+          {[["short", pairing.layover_in_base === "yes" ? t.layover_short_base : t.layover_short_away], ["standard", t.layover_standard], ["long", t.layover_long]].map(([v, l]) => (
             <button key={v} style={pairing.layover_type === v ? DUTY_BTN_ACTIVE : DUTY_BTN_BASE}
               onClick={() => upd("layover_type", v)}>{l}</button>
           ))}
