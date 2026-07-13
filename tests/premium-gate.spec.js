@@ -1,16 +1,15 @@
 import { test, expect } from "@playwright/test";
 import { gotoFresh, completeCheckIn } from "./fixtures.js";
 
-test("hitting the free pairing limit shows the premium upgrade screen", async ({ page }) => {
+test("a new (non-premium) user is paywalled immediately — no free pairing", async ({ page }) => {
+  // With FREE_PAIRING_LIMIT = 0 there is no free plan: a brand-new user must
+  // start the card-required free month before any plan is generated, so the
+  // premium screen appears on Generate WITHOUT the client ever calling
+  // /api/generate-plan. Fail loudly if that request is made.
+  let generateCalled = false;
   await page.route("**/api/generate-plan", async (route) => {
-    await route.fulfill({
-      status: 403,
-      json: {
-        error: "premium_required",
-        message: "You've used all 3 free pairing plans. Upgrade to Premium for unlimited plans.",
-        pairingCount: 3,
-      },
-    });
+    generateCalled = true;
+    await route.abort();
   });
 
   await gotoFresh(page);
@@ -19,9 +18,7 @@ test("hitting the free pairing limit shows the premium upgrade screen", async ({
 
   await expect(page.getByText("Premium Feature")).toBeVisible();
   await expect(page.getByText("Start Your Free Month")).toBeVisible();
-
-  // The free-pairing usage reported by the server is persisted locally.
-  await expect.poll(() => page.evaluate(() => localStorage.getItem("nutricrew_pairing_count"))).toBe("3");
+  expect(generateCalled).toBe(false);
 
   // Back returns to the boarding pass screen.
   await page.getByRole("button", { name: "← Back" }).click();

@@ -126,9 +126,9 @@ const T = {
     jetlag_tip_5: "Eat meals aligned with your destination's local time as soon as possible.",
     jetlag_fab: "Jet Lag",
     premium_title: "Premium Feature",
-    premium_msg: "You've used your free pairing. Upgrade to continue.",
+    premium_msg: "Start your free month to generate meal plans. Card required, cancel anytime.",
     upgrade: "Upgrade to Premium",
-    free_trial: "First Pairing Free",
+    free_trial: "First Month Free",
     start_trial_cta: "Start Your Free Month",
     then_charged: "then",
     checkout_redirecting: "Taking you to secure checkout…",
@@ -142,8 +142,8 @@ const T = {
     trial_active_until: "Free until",
     subscription_active: "Premium — Active",
     add_subscription_cta: "Start a Subscription",
-    buy_annual_cta: "Switch to Annual — $62.32/yr",
-    switch_annual_confirm_text: "This switches your billing to annual ($62.32/yr) right away, with a prorated charge or credit for the switch. Continue?",
+    buy_annual_cta: "Switch to Annual — $67.12/yr",
+    switch_annual_confirm_text: "This switches your billing to annual ($67.12/yr) right away, with a prorated charge or credit for the switch. Continue?",
     switch_annual_success: "You're now on the annual plan.",
     already_annual_msg: "You're already on the annual plan.",
     switch_annual_error: "Couldn't switch to annual. Please try again.",
@@ -382,9 +382,9 @@ const T = {
     jetlag_tip_5: "Mangez selon l'heure locale de votre destination dès que possible.",
     jetlag_fab: "Décalage",
     premium_title: "Fonctionnalité Premium",
-    premium_msg: "Vous avez utilisé votre pairing gratuit. Passez au Premium.",
+    premium_msg: "Commencez votre mois gratuit pour générer des plans. Carte requise, annulez à tout moment.",
     upgrade: "Passer au Premium",
-    free_trial: "Premier Pairing Gratuit",
+    free_trial: "Premier Mois Gratuit",
     start_trial_cta: "Commencer Votre Mois Gratuit",
     then_charged: "puis",
     checkout_redirecting: "Redirection vers le paiement sécurisé…",
@@ -398,8 +398,8 @@ const T = {
     trial_active_until: "Gratuit jusqu'au",
     subscription_active: "Premium — Actif",
     add_subscription_cta: "Démarrer un Abonnement",
-    buy_annual_cta: "Passer à l'Annuel — 62,32 $/an",
-    switch_annual_confirm_text: "Cela passe votre facturation à l'annuel (62,32 $/an) immédiatement, avec un ajustement au prorata. Continuer ?",
+    buy_annual_cta: "Passer à l'Annuel — 67,12 $/an",
+    switch_annual_confirm_text: "Cela passe votre facturation à l'annuel (67,12 $/an) immédiatement, avec un ajustement au prorata. Continuer ?",
     switch_annual_success: "Vous êtes maintenant sur le forfait annuel.",
     already_annual_msg: "Vous êtes déjà sur le forfait annuel.",
     switch_annual_error: "Impossible de passer à l'annuel. Veuillez réessayer.",
@@ -638,9 +638,9 @@ const T = {
     jetlag_tip_5: "Come según la hora local de tu destino lo antes posible.",
     jetlag_fab: "Jet Lag",
     premium_title: "Función Premium",
-    premium_msg: "Usaste tu pairing gratuito. Actualiza para continuar.",
+    premium_msg: "Comienza tu mes gratis para generar planes. Tarjeta requerida, cancela cuando quieras.",
     upgrade: "Actualizar a Premium",
-    free_trial: "Primer Pairing Gratis",
+    free_trial: "Primer Mes Gratis",
     start_trial_cta: "Comienza Tu Mes Gratis",
     then_charged: "luego",
     checkout_redirecting: "Te llevamos al pago seguro…",
@@ -654,8 +654,8 @@ const T = {
     trial_active_until: "Gratis hasta",
     subscription_active: "Premium — Activo",
     add_subscription_cta: "Iniciar una Suscripción",
-    buy_annual_cta: "Cambiar a Anual — $62.32/año",
-    switch_annual_confirm_text: "Esto cambia tu facturación a anual ($62.32/año) de inmediato, con un ajuste prorrateado. ¿Continuar?",
+    buy_annual_cta: "Cambiar a Anual — $67.12/año",
+    switch_annual_confirm_text: "Esto cambia tu facturación a anual ($67.12/año) de inmediato, con un ajuste prorrateado. ¿Continuar?",
     switch_annual_success: "Ahora estás en el plan anual.",
     already_annual_msg: "Ya estás en el plan anual.",
     switch_annual_error: "No se pudo cambiar a anual. Inténtalo de nuevo.",
@@ -1259,7 +1259,10 @@ export default function NutriCrew() {
 
   const t = T[lang];
 
-  const FREE_PAIRING_LIMIT = 1;
+  // No free pairing — new users are paywalled immediately and must start the
+  // card-required free month. Kept as a named constant (mirrors the CRUD
+  // service) so referral bonusPairings can still grant free plans on top.
+  const FREE_PAIRING_LIMIT = 0;
 
   // Detect successful Stripe return (?premium=true in URL)
   const [premiumSuccess] = useState(() => {
@@ -3739,8 +3742,8 @@ function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess, onGenerate, retur
             fontWeight: 700, fontSize: 14,
           }}
         >
-          <span style={{ position: "absolute", top: -10, right: -6, background: C.green, color: "#fff", fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 8 }}>SAVE 35%</span>
-          Annual<br/><span style={{fontWeight: 400, fontSize: 12}}>$62.32/yr</span>
+          <span style={{ position: "absolute", top: -10, right: -6, background: C.green, color: "#fff", fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 8 }}>SAVE 30%</span>
+          Annual<br/><span style={{fontWeight: 400, fontSize: 12}}>$67.12/yr</span>
         </button>
       </div>
 
@@ -3750,11 +3753,11 @@ function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess, onGenerate, retur
         </div>
       )}
       <button style={styles.primaryBtn} onClick={handleClick} disabled={loading}>
-        {loading ? t.checkout_redirecting : `${t.start_trial_cta} — ${t.then_charged} ${billing === "annual" ? "$62.32/" + t.per_year : "$7.99/" + t.per_month}`}
+        {loading ? t.checkout_redirecting : `${t.start_trial_cta} — ${t.then_charged} ${billing === "annual" ? "$67.12/" + t.per_year : "$7.99/" + t.per_month}`}
       </button>
       <div style={{ color: C.muted, fontSize: 11, textAlign: "center", marginTop: 8, maxWidth: 280 }}>
         {billing === "annual"
-          ? `${t.trial_disclaimer} $62.32/${t.per_year}.`
+          ? `${t.trial_disclaimer} $67.12/${t.per_year}.`
           : `${t.trial_disclaimer} $7.99/${t.per_month}.`}
         {" "}{t.first_charge_on} {estFirstCharge.toLocaleDateString()}.
       </div>

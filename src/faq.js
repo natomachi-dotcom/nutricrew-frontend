@@ -7,7 +7,7 @@ export const FAQ = {
     },
     {
       q: "Is NutriCrew free to use?",
-      a: "Your first pairing plan is free. After that, generating new plans requires a Premium subscription — viewing plans you've already saved is always free.",
+      a: "Your first month is free — add a card to start your trial, then it's $7.99/month or $67.12/year (save 30%). Cancel anytime before the trial ends and you won't be charged. Viewing plans you've already saved is always free.",
     },
     {
       q: "How is my meal plan generated?",
@@ -45,7 +45,7 @@ export const FAQ = {
     },
     {
       q: "NutriCrew est-il gratuit ?",
-      a: "Votre premier plan de rotation est gratuit. Ensuite, la génération de nouveaux plans nécessite un abonnement Premium — consulter les plans déjà enregistrés reste toujours gratuit.",
+      a: "Votre premier mois est gratuit — ajoutez une carte pour démarrer l'essai, puis c'est 7,99 $/mois ou 67,12 $/an (économisez 30 %). Annulez avant la fin de l'essai et vous ne serez pas facturé. Consulter les plans déjà enregistrés reste toujours gratuit.",
     },
     {
       q: "Comment le plan de repas est-il généré ?",
@@ -83,7 +83,7 @@ export const FAQ = {
     },
     {
       q: "¿Es gratis usar NutriCrew?",
-      a: "Tu primer plan de rotación es gratis. Después, generar nuevos planes requiere una suscripción Premium — ver los planes que ya guardaste siempre es gratis.",
+      a: "Tu primer mes es gratis — agrega una tarjeta para iniciar la prueba, luego son $7.99/mes o $67.12/año (ahorra 30%). Cancela antes de que termine la prueba y no se te cobrará. Ver los planes que ya guardaste siempre es gratis.",
     },
     {
       q: "¿Cómo se genera mi plan de comidas?",
