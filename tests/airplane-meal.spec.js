@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { MOCK_PLAN, gotoFresh, completeCheckIn } from "./fixtures.js";
+import { MOCK_PLAN, gotoAsPremiumUser, completeNewPairing } from "./fixtures.js";
 
 test("airplane meal checker evaluates a served meal against the crew member's diet", async ({ page }) => {
   await page.route("**/api/generate-plan", async (route) => {
@@ -16,8 +16,8 @@ test("airplane meal checker evaluates a served meal against the crew member's di
     });
   });
 
-  await gotoFresh(page);
-  await completeCheckIn(page);
+  await gotoAsPremiumUser(page);
+  await completeNewPairing(page);
   await page.getByRole("button", { name: "Generate My Plan" }).click();
   await expect(page.getByText("Oatmeal with Berries")).toBeVisible();
 

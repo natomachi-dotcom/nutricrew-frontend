@@ -17,7 +17,7 @@ test("a new (non-premium) user is paywalled immediately — no free pairing", as
   await page.getByRole("button", { name: "Generate My Plan" }).click();
 
   await expect(page.getByText("Premium Feature")).toBeVisible();
-  await expect(page.getByText("Start Your Free Month")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Start Your Free Month" })).toBeVisible();
   expect(generateCalled).toBe(false);
 
   // Back returns to the boarding pass screen.

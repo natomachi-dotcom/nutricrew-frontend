@@ -1,53 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { MOCK_PLAN, gotoFresh } from "./fixtures.js";
-
-// Walks through check-in selecting Nut-Free (instead of the default "No
-// Restrictions" completeCheckIn uses) so the ingredient-exclusion UI is
-// active on the resulting plan.
-async function completeCheckInNutFree(page) {
-  const continueBtn = page.getByRole("button", { name: "Continue →" });
-
-  await page.getByRole("button", { name: "Begin Check-In" }).click();
-  await page.getByPlaceholder("John Smith").fill("Alex Pilot");
-  await continueBtn.click();
-  await page.getByPlaceholder("john@airline.com").fill("alex.pilot@example.com");
-  await continueBtn.click();
-  await page.getByRole("button", { name: "Male", exact: true }).click();
-  await continueBtn.click();
-  await page.getByPlaceholder("70").fill("75");
-  await continueBtn.click();
-  await page.locator('input[type="date"]').fill("1990-01-01");
-  await continueBtn.click();
-  await page.getByRole("button", { name: "Pilot" }).click();
-  await continueBtn.click();
-  await page.getByRole("button", { name: /Small/ }).click();
-  await continueBtn.click();
-  await page.getByRole("button", { name: "I Need Simple Recipes" }).click();
-  await continueBtn.click();
-
-  // diet: Nut-Free (an allergy, not "No Restrictions")
-  await page.getByRole("button", { name: "Nut-Free" }).click();
-  await continueBtn.click();
-
-  await page.getByRole("button", { name: "Stay Focused & Alert" }).click();
-  await continueBtn.click();
-  await page.getByRole("button", { name: "Per Day" }).click();
-  await page.getByPlaceholder("50").fill("50");
-  await continueBtn.click();
-  await page.getByRole("button", { name: "1 Days" }).click();
-  await continueBtn.click();
-  await page.getByPlaceholder("Montreal (YUL)").fill("Montreal (YUL)");
-  await continueBtn.click();
-  await page.getByPlaceholder("Where are you flying? (city or airport)").fill("Paris (CDG)");
-  await continueBtn.click();
-  await page.getByRole("button", { name: "Hotel (No Kitchen)" }).click();
-  await continueBtn.click();
-  await page.getByRole("button", { name: "🌍 No", exact: true }).click();
-  await continueBtn.click();
-  await continueBtn.click(); // duty schedule, optional — skip
-
-  await expect(page.getByRole("button", { name: "Generate My Plan" })).toBeVisible();
-}
+import { MOCK_PLAN, gotoAsPremiumUser, completeNewPairing } from "./fixtures.js";
 
 test("flagging an allergen ingredient regenerates just that meal", async ({ page }) => {
   await page.route("**/api/generate-plan", async (route) => {
@@ -74,8 +26,12 @@ test("flagging an allergen ingredient regenerates just that meal", async ({ page
     await route.fulfill({ json: { meal: replacementMeal } });
   });
 
-  await gotoFresh(page);
-  await completeCheckInNutFree(page);
+  // Nut-Free is a one-time profile field, seeded directly rather than clicked
+  // through onboarding — a returning user's diet/allergies are pre-set, not
+  // re-asked (see bf4095f "Fix returning users being forced through full
+  // onboarding on every pairing").
+  await gotoAsPremiumUser(page, { diets: ["nut_free"] });
+  await completeNewPairing(page);
   await page.getByRole("button", { name: "Generate My Plan" }).click();
   await expect(page.getByText("Day 1 — Paris")).toBeVisible();
 

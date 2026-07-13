@@ -173,3 +173,52 @@ export async function completeCheckIn(page, { name = "Alex Pilot", email = "alex
   // boarding pass screen
   await expect(page.getByRole("button", { name: "Generate My Plan" })).toBeVisible();
 }
+
+// Seeds a fully-onboarded, already-subscribed (isPremium: true) returning user
+// directly into localStorage/session and lands on the splash screen with a
+// "New Pairing" button — bypasses the paywall (a brand-new user has no free
+// pairing; see premium-gate.spec.js) so tests whose subject is what happens
+// AFTER a plan is generated (ingredient exclusion, airplane-meal checker, etc.)
+// don't need to re-run full first-time onboarding just to reach that point.
+export async function gotoAsPremiumUser(page, overrides = {}) {
+  const user = {
+    name: "Alex Pilot", email: "alex.pilot@example.com", isPremium: true, hasPassword: true,
+    gender: "male", weight: "75kg", dob: "1990-01-01", position: "pilot",
+    lunch_bag: "small", cooking_pref: "simple_recipes", diets: ["none"], goals: ["stay_focused"],
+    budget_type: "day", budget_amount: "50", departure: "Montreal (YUL)", kitchen: ["hotel"],
+    ...overrides,
+  };
+  await page.route("**/api/auth/verify-session", (route) =>
+    route.fulfill({ json: { email: user.email, isPremium: true } })
+  );
+  await page.addInitScript((u) => {
+    localStorage.clear();
+    localStorage.setItem("nutricrew_session", JSON.stringify({ token: "test-token", email: u.email }));
+    localStorage.setItem("nutricrew_user", JSON.stringify(u));
+  }, user);
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "New Pairing" })).toBeVisible();
+}
+
+// Walks the shortened returning-user "New Pairing" flow (budget → pairing_days
+// → departure → destination → kitchen_day_1 → going_usa → duty_schedule) for a
+// 1-day pairing and lands on the boarding pass. Budget/departure/kitchen are
+// pre-filled from the seeded profile (gotoAsPremiumUser) — only destination is
+// ever left blank by design, so it's the only field this fills in.
+export async function completeNewPairing(page, { destination = "Paris (CDG)" } = {}) {
+  const continueBtn = page.getByRole("button", { name: "Continue →" });
+
+  await page.getByRole("button", { name: "New Pairing" }).click();
+  await continueBtn.click(); // budget: pre-filled from profile
+  await page.getByRole("button", { name: "1 Days" }).click();
+  await continueBtn.click();
+  await continueBtn.click(); // departure: pre-filled from profile
+  await page.getByPlaceholder("Where are you flying? (city or airport)").fill(destination);
+  await continueBtn.click();
+  await continueBtn.click(); // kitchen access (day 1): pre-filled from profile
+  await page.getByRole("button", { name: "🌍 No", exact: true }).click();
+  await continueBtn.click();
+  await continueBtn.click(); // duty schedule, optional — skip
+
+  await expect(page.getByRole("button", { name: "Generate My Plan" })).toBeVisible();
+}

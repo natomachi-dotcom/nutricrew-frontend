@@ -41,13 +41,17 @@ async function gotoReturningUser(page) {
   });
 }
 
-// Clicks through the returning-user steps (pairing_days → departure →
+// Clicks through the returning-user steps (budget → pairing_days → departure →
 // destination → kitchen_day_1 → going_usa → duty_schedule) and leaves the
 // caller on the duty_schedule step, ready to fill in the time or skip it.
 async function walkToDutySchedule(page) {
   const continueBtn = page.getByRole("button", { name: "Continue →" });
 
   await page.getByRole("button", { name: "New Pairing" }).click();
+
+  // budget: deliberately not skipped for returning users — pre-filled from the
+  // saved profile (day/$50), editable per-trip. Accept the pre-filled value.
+  await continueBtn.click();
 
   // pairing_days: 1 day
   await page.getByRole("button", { name: "1 Days" }).click();
@@ -60,8 +64,9 @@ async function walkToDutySchedule(page) {
   await page.getByPlaceholder("Where are you flying? (city or airport)").fill("Paris (CDG)");
   await continueBtn.click();
 
-  // kitchen access (day 1): required — at least one option
-  await page.getByRole("button", { name: "Fridge, No Stove" }).click();
+  // kitchen access (day 1): pre-filled from the saved profile ("fridge", seeded
+  // above) since it's not yet set for this pairing — do not click it again,
+  // that would deselect it and leave the day with zero kitchen options.
   await continueBtn.click();
 
   // going_usa: No
