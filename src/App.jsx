@@ -53,6 +53,7 @@ const T = {
     step_weight: "Weight",
     step_age: "Date of Birth",
     step_position: "Your Role",
+    profile_home_base: "Home Base",
     step_pairing: "Pairing Length",
     step_route: "Your Route",
     destination_label: "Destination",
@@ -317,6 +318,7 @@ const T = {
     step_weight: "Poids",
     step_age: "Date de Naissance",
     step_position: "Votre Rôle",
+    profile_home_base: "Base d'Attache",
     step_pairing: "Durée du Pairing",
     step_route: "Votre Route",
     destination_label: "Destination",
@@ -580,6 +582,7 @@ const T = {
     step_weight: "Peso",
     step_age: "Fecha de Nacimiento",
     step_position: "Tu Rol",
+    profile_home_base: "Base de Operaciones",
     step_pairing: "Duración del Pairing",
     step_route: "Tu Ruta",
     destination_label: "Destino",
@@ -5357,6 +5360,7 @@ function ProfileModal({ t, user, onSave, onClose, onManageSubscription, onSwitch
   const [weightVal, setWeightVal] = useState(initialWeight ? String(initialWeight) : "");
   const [weightUnit, setWeightUnit] = useState(initialUnit);
   const [position, setPosition] = useState(user?.position || "");
+  const [departure, setDeparture] = useState(user?.departure || "");
   const [lunchBag, setLunchBag] = useState(user?.lunch_bag || "");
   const [cookingPref, setCookingPref] = useState(user?.cooking_pref || "");
   const [diets, setDiets] = useState(user?.diets || []);
@@ -5441,6 +5445,7 @@ function ProfileModal({ t, user, onSave, onClose, onManageSubscription, onSwitch
       gender,
       weight: weightVal ? `${weightVal}${weightUnit}` : user?.weight,
       position,
+      departure,
       lunch_bag: lunchBag,
       cooking_pref: cookingPref,
       diets,
@@ -5573,6 +5578,10 @@ function ProfileModal({ t, user, onSave, onClose, onManageSubscription, onSwitch
           ]}
           value={position}
           onChange={setPosition}/>
+
+        <AirportInput label={t.profile_home_base} value={departure}
+          onChange={setDeparture}
+          placeholder="Montreal (YUL)" icon="🛫"/>
 
         <RadioGroup label={t.step_lunch_bag}
           options={[
