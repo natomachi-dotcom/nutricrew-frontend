@@ -3942,6 +3942,61 @@ function parseRosterText(text, homeBase) {
   return { pairings, errors };
 }
 
+// Normalizes a roster photo before it's sent for AI parsing: upscales
+// genuinely small/low-res images (dense grid text becomes illegible below
+// ~1800px wide — confirmed via live testing that this materially improves
+// pairing-extraction accuracy) and downscales oversized ones (a real
+// phone-camera photo can be several MB; 4 of those as base64 in one JSON
+// body risks the request-size limit). Falls back to the raw file if canvas
+// processing fails for any reason (e.g. an undecodable format) so a single
+// bad file never blocks the whole upload.
+const ROSTER_IMAGE_MIN_WIDTH = 1800;
+const ROSTER_IMAGE_MAX_WIDTH = 2000;
+const ROSTER_IMAGE_JPEG_QUALITY = 0.85;
+
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve({ data: reader.result.split(",")[1], mediaType: file.type || "image/jpeg" });
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function normalizeRosterImage(file) {
+  try {
+    const objectUrl = URL.createObjectURL(file);
+    const img = await new Promise((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = reject;
+      el.src = objectUrl;
+    });
+    URL.revokeObjectURL(objectUrl);
+
+    let targetWidth = img.naturalWidth;
+    if (img.naturalWidth < ROSTER_IMAGE_MIN_WIDTH) targetWidth = ROSTER_IMAGE_MIN_WIDTH;
+    else if (img.naturalWidth > ROSTER_IMAGE_MAX_WIDTH) targetWidth = ROSTER_IMAGE_MAX_WIDTH;
+    if (targetWidth === img.naturalWidth) return readFileAsBase64(file); // no resize needed
+
+    const scale = targetWidth / img.naturalWidth;
+    const targetHeight = Math.round(img.naturalHeight * scale);
+    const canvas = document.createElement("canvas");
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+    const ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", ROSTER_IMAGE_JPEG_QUALITY));
+    if (!blob) return readFileAsBase64(file);
+    return readFileAsBase64(blob);
+  } catch {
+    return readFileAsBase64(file); // canvas processing failed — send the original
+  }
+}
+
 // ─── ROSTER MODAL ─────────────────────────────────────────────────
 function RosterModal({ t, user, onClose, onRequirePremium }) {
   const [phase, setPhase] = useState("upload"); // upload | parsing | confirm | saving | done | error
@@ -3965,12 +4020,7 @@ function RosterModal({ t, user, onClose, onRequirePremium }) {
     if (images.length === 0) return;
     setPhase("parsing");
     try {
-      const encoded = await Promise.all(images.map(f => new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve({ data: reader.result.split(",")[1], mediaType: f.type || "image/jpeg" });
-        reader.onerror = reject;
-        reader.readAsDataURL(f);
-      })));
+      const encoded = await Promise.all(images.map(normalizeRosterImage));
       const res = await fetch(`${API_BASE}/api/roster/parse`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
