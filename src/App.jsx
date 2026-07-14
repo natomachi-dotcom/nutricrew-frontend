@@ -2347,16 +2347,9 @@ function OTPScreen({ email, onSuccess, onBack }) {
 function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onStart, onNewPairing, onOpenHistory, onOpenSavedMeals, onOpenProfile, onOpenRoster, onOpenReferral, onOpenFAQ, onOpenContact, onLogin, isPremium }) {
   return (
     <div style={styles.splash}>
-      {user ? (
+      {user && (
         <button style={styles.profileBtn} onClick={onOpenProfile} aria-label="profile">
           <ProfileIcon/>
-        </button>
-      ) : (
-        // No cached account on this device/browser (incognito, cleared storage,
-        // or a different device) — offer a way to the existing-account login
-        // flow instead of only ever funneling into first-time check-in.
-        <button style={styles.profileBtn} onClick={onLogin} aria-label="log in" title={t.login_link}>
-          <LoginIcon/>
         </button>
       )}
       <div style={styles.splashInner}>
@@ -2410,6 +2403,13 @@ function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onS
             <div style={styles.freeTrialBadge}>⭐ {t.free_trial}</div>
             <button style={styles.primaryBtn} onClick={onStart}>
               {t.start}
+            </button>
+            {/* No cached account on this device/browser (incognito, cleared
+                storage, or a different device) — offer a way to the
+                existing-account login flow right next to the start button,
+                instead of only ever funneling into first-time check-in. */}
+            <button style={styles.loginLinkBtn} onClick={onLogin}>
+              <LoginIcon/> {t.login_link}
             </button>
           </div>
         )}
@@ -6076,6 +6076,13 @@ const styles = {
     background: "transparent", border: `1px solid ${C.navyBorder}`,
     color: C.skyLight, fontSize: 13, fontWeight: 700,
     cursor: "pointer", fontFamily: "inherit", letterSpacing: "1px",
+  },
+  loginLinkBtn: {
+    display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+    margin: "14px auto 0", padding: "6px 10px",
+    background: "transparent", border: "none",
+    color: C.muted, fontSize: 13, fontWeight: 600,
+    cursor: "pointer", fontFamily: "inherit",
   },
   welcomeBack: { display: "flex", flexDirection: "column", alignItems: "center", gap: 12 },
   wbTitle: { fontSize: 16, color: C.skyLight, letterSpacing: "1px" },

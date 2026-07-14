@@ -9,8 +9,8 @@ test("a visitor with no cached account can reach login from the splash screen", 
 
   // "Begin Check-In" is still the primary CTA...
   await expect(page.getByRole("button", { name: "Begin Check-In" })).toBeVisible();
-  // ...but a separate login control is also available.
-  const loginBtn = page.getByRole("button", { name: "log in" });
+  // ...but a separate login control sits right beneath it.
+  const loginBtn = page.getByRole("button", { name: "Already have an account? Log In" });
   await expect(loginBtn).toBeVisible();
 
   await loginBtn.click();
