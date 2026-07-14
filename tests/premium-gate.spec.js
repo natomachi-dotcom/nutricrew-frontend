@@ -1,24 +1,42 @@
 import { test, expect } from "@playwright/test";
-import { gotoFresh, completeCheckIn } from "./fixtures.js";
+import { MOCK_PLAN, gotoFresh, completeCheckIn } from "./fixtures.js";
 
-test("a new (non-premium) user is paywalled immediately — no free pairing", async ({ page }) => {
-  // With FREE_PAIRING_LIMIT = 0 there is no free plan: a brand-new user must
-  // start the card-required free month before any plan is generated, so the
-  // premium screen appears on Generate WITHOUT the client ever calling
-  // /api/generate-plan. Fail loudly if that request is made.
-  let generateCalled = false;
+test("first pairing is free with no card and no paywall; second pairing hits the paywall", async ({ page }) => {
+  let generateCallCount = 0;
   await page.route("**/api/generate-plan", async (route) => {
-    generateCalled = true;
-    await route.abort();
+    generateCallCount++;
+    await route.fulfill({ json: { ...MOCK_PLAN, pairingCount: 1, isPremium: false } });
   });
 
   await gotoFresh(page);
   await completeCheckIn(page);
-  await page.getByRole("button", { name: "Generate My Plan" }).click();
 
+  // STAGE 1 — first pairing: free, no card, no paywall.
+  await page.getByRole("button", { name: "Generate My Plan" }).click();
+  await expect(page.getByText("Day 1 — Paris")).toBeVisible();
+  expect(generateCallCount).toBe(1);
+
+  // STAGE 2 — same account's second pairing attempt: the client already knows
+  // (server-authoritative pairingCount=1 from the first response) that this
+  // account has used its free pairing, so it routes straight to the paywall
+  // without a wasted round trip. Fail loudly if generate-plan is called again.
+  await page.getByRole("button", { name: "New Pairing" }).click();
+  const continueBtn = page.getByRole("button", { name: "Continue →" });
+  await continueBtn.click(); // budget: pre-filled from profile
+  await page.getByRole("button", { name: "1 Days" }).click();
+  await continueBtn.click();
+  await continueBtn.click(); // departure: pre-filled from profile
+  await page.getByPlaceholder("Where are you flying? (city or airport)").fill("Tokyo (NRT)");
+  await continueBtn.click();
+  await continueBtn.click(); // kitchen access (day 1): pre-filled from profile
+  await page.getByRole("button", { name: "🌍 No", exact: true }).click();
+  await continueBtn.click();
+  await continueBtn.click(); // duty schedule, optional — skip
+
+  await page.getByRole("button", { name: "Generate My Plan" }).click();
   await expect(page.getByText("Premium Feature")).toBeVisible();
   await expect(page.getByRole("button", { name: "Start Your Free Month" })).toBeVisible();
-  expect(generateCalled).toBe(false);
+  expect(generateCallCount).toBe(1);
 
   // Back returns to the boarding pass screen.
   await page.getByRole("button", { name: "← Back" }).click();

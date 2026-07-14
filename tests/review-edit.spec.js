@@ -39,11 +39,13 @@ test("editing a field from the review screen updates it and returns without losi
   await expect(page.getByText("Alex Pilot")).toBeVisible();
   await expect(page.getByText("bloating", { exact: false })).toBeVisible(); // goals edit reflected
 
-  // This account has no free pairing (paywall behavior itself is covered by
-  // premium-gate.spec.js) — Generate routes to the paywall rather than calling
-  // /api/generate-plan, so the request-body assertion stops here: what this
-  // test verifies is that both edits survived multiple review-screen round trips.
+  // This account's free first pairing is still available — Generate and
+  // confirm the request reflects both edits.
   await page.getByRole("button", { name: "Generate My Plan" }).click();
-  await expect(page.getByText("Premium Feature")).toBeVisible();
-  expect(generatePlanRequestBody).toBeNull();
+  await expect(page.getByText("Day 1 — Paris")).toBeVisible();
+
+  expect(generatePlanRequestBody.data.budget_amount).toBe("75");
+  expect(generatePlanRequestBody.data.goals).toEqual(expect.arrayContaining(["stay_focused", "no_bloating"]));
+  expect(generatePlanRequestBody.data.name).toBe("Alex Pilot");
+  expect(generatePlanRequestBody.data.pairing_days).toBe(1);
 });

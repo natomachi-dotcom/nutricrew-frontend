@@ -1295,10 +1295,14 @@ export default function NutriCrew() {
 
   const t = T[lang];
 
-  // No free pairing — new users are paywalled immediately and must start the
-  // card-required free month. Kept as a named constant (mirrors the CRUD
-  // service) so referral bonusPairings can still grant free plans on top.
-  const FREE_PAIRING_LIMIT = 0;
+  // Two-stage funnel: 1 free pairing, no card required, then the paywall on
+  // the second attempt starts the card-required free month. This constant is
+  // UI-only (lets the client show/skip the paywall screen without a round
+  // trip) — the CRUD service's own copy of this same value is the actual
+  // authority; every request still goes through its atomic reserve check
+  // regardless of what this client-side guess says, so a mismatch here could
+  // only ever cause a wrong screen, never a wrong charge or a bypassed limit.
+  const FREE_PAIRING_LIMIT = 1;
 
   // Detect successful Stripe return (?premium=true in URL)
   const [premiumSuccess] = useState(() => {
@@ -1373,7 +1377,7 @@ export default function NutriCrew() {
   // lifetime pairingCount is — without this check, a returning premium user
   // (isPremium true but premiumSuccess false, i.e. not mid-checkout-return)
   // would get bounced to the upsell screen on every "Generate" click, since
-  // pairingCount stays >= FREE_PAIRING_LIMIT (0) forever after their first pairing.
+  // pairingCount stays >= FREE_PAIRING_LIMIT (1) forever after their second pairing.
   const isPremiumNeeded = isPremium ? false : pairingCount >= FREE_PAIRING_LIMIT + bonusPairings;
 
   // ── STEP DEFINITIONS (check-in flow) ──────────────────────────

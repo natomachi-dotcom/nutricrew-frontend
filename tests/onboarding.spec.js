@@ -1,20 +1,11 @@
 import { test, expect } from "@playwright/test";
-import { gotoFresh, completeCheckIn } from "./fixtures.js";
+import { MOCK_PLAN, gotoFresh, completeCheckIn } from "./fixtures.js";
 
-// A brand-new, never-logged-in user has no free pairing under the current
-// paywall model (FREE_PAIRING_LIMIT = 0 — see premium-gate.spec.js) and there's
-// no front-end-only way to fake "already premium" for a user who was never
-// issued a session (premiumSuccess force-navigates straight to the premium
-// screen rather than letting checkin continue). So this test covers what a
-// truly fresh user can reach on their own: check-in completion and the
-// boarding pass. Generate-and-explore for an already-subscribed user is
-// covered by ingredient-exclusion.spec.js and airplane-meal.spec.js, which
-// seed an already-premium returning user via gotoAsPremiumUser.
-test("new crew member completes check-in and reaches the paywall on first Generate", async ({ page }) => {
-  let generateCalled = false;
+test("new crew member completes check-in, generates their free first plan, and explores it", async ({ page }) => {
+  let generatePlanRequestBody = null;
   await page.route("**/api/generate-plan", async (route) => {
-    generateCalled = true;
-    await route.abort();
+    generatePlanRequestBody = route.request().postDataJSON();
+    await route.fulfill({ json: MOCK_PLAN });
   });
 
   await gotoFresh(page);
@@ -39,8 +30,36 @@ test("new crew member completes check-in and reaches the paywall on first Genera
   await expect(page.getByRole("button", { name: "Generate My Plan" })).toBeVisible();
   await expect(page.getByText("$50/DAY")).toBeVisible();
 
-  // First Generate hits the paywall, not the AI backend.
+  // STAGE 1 of the funnel: a brand-new user's first pairing is free — no
+  // card, no paywall. Generate goes straight to the AI backend.
   await page.getByRole("button", { name: "Generate My Plan" }).click();
-  await expect(page.getByText("Premium Feature")).toBeVisible();
-  expect(generateCalled).toBe(false);
+
+  // Plan screen: meal plan tab (default) with the mocked day's meals.
+  await expect(page.getByText("Day 1 — Paris")).toBeVisible();
+  await expect(page.getByText("Jet Lag Advisory")).toBeVisible();
+  await expect(page.getByText("Oatmeal with Berries")).toBeVisible();
+  await expect(page.getByText(/Total:\s*1950\s*kcal/)).toBeVisible();
+
+  expect(generatePlanRequestBody.lang).toBe("en");
+  expect(generatePlanRequestBody.data.name).toBe("Alex Pilot");
+  expect(generatePlanRequestBody.data.email).toBe("alex.pilot@example.com");
+  expect(generatePlanRequestBody.data.pairing_days).toBe(1);
+
+  // Meal cards are collapsed by default — expand the first one to reveal its
+  // favorite button.
+  await page.getByText("Oatmeal with Berries").click();
+  const favoriteBtn = page.getByRole("button", { name: "favorite" }).first();
+  await expect(favoriteBtn).toHaveText("🤍");
+  await favoriteBtn.click();
+  await expect(favoriteBtn).toHaveText("❤️");
+
+  // Grocery list tab.
+  await page.getByRole("button", { name: "Grocery List" }).click();
+  await expect(page.getByText("Bananas")).toBeVisible();
+  await expect(page.getByText("Chicken breast")).toBeVisible();
+
+  // Food rules tab (going_usa = "no", so only destination/general rules show).
+  await page.getByRole("button", { name: "Food Rules" }).click();
+  await expect(page.getByText("Some dairy and meat products")).toBeVisible();
+  await expect(page.getByText("Stay hydrated and avoid excess sodium")).toBeVisible();
 });
