@@ -64,6 +64,7 @@ const T = {
     bag_small: "Small  — fits 1–2 containers (~4L)",
     bag_medium: "Medium — fits 2–3 containers (~6L)",
     bag_large: "Large  — fits 3–4 containers + extras (~10L)",
+    meal_type_breakfast: "Breakfast", meal_type_lunch: "Lunch", meal_type_dinner: "Dinner", meal_type_snack: "Snack",
     step_diet: "Your Diet",
     step_goals: "Your Goals",
     step_budget: "Your Budget",
@@ -329,6 +330,7 @@ const T = {
     bag_small: "Petit  — 1–2 boîtes (~4L)",
     bag_medium: "Moyen — 2–3 boîtes (~6L)",
     bag_large: "Grand  — 3–4 boîtes + extras (~10L)",
+    meal_type_breakfast: "Petit-déjeuner", meal_type_lunch: "Déjeuner", meal_type_dinner: "Dîner", meal_type_snack: "Collation",
     step_diet: "Votre Alimentation",
     step_goals: "Vos Objectifs",
     step_budget: "Votre Budget",
@@ -593,6 +595,7 @@ const T = {
     bag_small: "Pequeño — 1–2 recipientes (~4L)",
     bag_medium: "Mediano — 2–3 recipientes (~6L)",
     bag_large: "Grande  — 3–4 recipientes + extras (~10L)",
+    meal_type_breakfast: "Desayuno", meal_type_lunch: "Almuerzo", meal_type_dinner: "Cena", meal_type_snack: "Merienda",
     step_diet: "Tu Dieta",
     step_goals: "Tus Objetivos",
     step_budget: "Tu Presupuesto",
@@ -1014,6 +1017,13 @@ function planCacheKey(data, lang) {
   const sorted = {};
   Object.keys(data).sort().forEach(k => { sorted[k] = data[k]; });
   return `${lang}|${JSON.stringify(sorted)}`;
+}
+
+// meal.type is always an English enum by backend design (used for color/icon
+// lookups) — translate it for display here rather than in the API response.
+const MEAL_TYPE_KEYS = { Breakfast: "meal_type_breakfast", Lunch: "meal_type_lunch", Dinner: "meal_type_dinner", Snack: "meal_type_snack" };
+function mealTypeLabel(t, type) {
+  return t[MEAL_TYPE_KEYS[type]] || type;
 }
 
 function getSavedPlans() {
@@ -3581,7 +3591,7 @@ function DayPlan({ day, t, favorites, onToggleFavorite, onOpenAirplaneMeal, pair
               {meal.emoji && <span style={styles.mealEmoji}>{meal.emoji}</span>}
               <div style={{flex: 1, minWidth: 0}}>
                 <div style={{...styles.mealType, color, marginBottom: 3}}>
-                  <PlaneIcon size={10} color={color}/> {meal.type}
+                  <PlaneIcon size={10} color={color}/> {mealTypeLabel(t, meal.type)}
                 </div>
                 <div style={styles.mealName}>{meal.name}</div>
               </div>
@@ -5108,7 +5118,7 @@ function SavedMealsModal({ t, favorites, onToggleFavorite, onClose }) {
               <div key={meal.id || i} style={{...styles.mealCard, borderLeftColor: mealColors[meal.type] || C.muted}}>
                 <div style={styles.mealTop}>
                   <span style={{...styles.mealType, color: mealColors[meal.type] || C.muted}}>
-                    <PlaneIcon size={11} color={mealColors[meal.type] || C.muted}/> {meal.type}
+                    <PlaneIcon size={11} color={mealColors[meal.type] || C.muted}/> {mealTypeLabel(t, meal.type)}
                   </span>
                   <div style={styles.mealTopRight}>
                     <span style={styles.mealCals}>🔥 {meal.calories} kcal</span>
