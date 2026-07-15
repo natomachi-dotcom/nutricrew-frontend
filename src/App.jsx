@@ -1274,8 +1274,8 @@ export default function NutriCrew() {
             const sameAccount = prev?.email === data.email;
             const profileFields = mergeDurableProfileFields(data, prev, sameAccount);
             const u = sameAccount
-              ? { ...prev, ...profileFields, isPremium: !!data.isPremium, trialEnd: data.trialEnd ?? null, bonusPairings: data.bonusPairings ?? prev?.bonusPairings ?? 0, pairingCount: data.pairingCount ?? prev?.pairingCount ?? 0 }
-              : { email: data.email, name: data.name || "", ...profileFields, isPremium: !!data.isPremium, trialEnd: data.trialEnd ?? null, bonusPairings: data.bonusPairings ?? 0, pairingCount: data.pairingCount ?? 0 };
+              ? { ...prev, ...profileFields, isPremium: !!data.isPremium, trialEnd: data.trialEnd ?? null, bonusPairings: data.bonusPairings ?? prev?.bonusPairings ?? 0, pairingCount: data.pairingCount ?? prev?.pairingCount ?? 0, needsPremium: data.needsPremium ?? prev?.needsPremium }
+              : { email: data.email, name: data.name || "", ...profileFields, isPremium: !!data.isPremium, trialEnd: data.trialEnd ?? null, bonusPairings: data.bonusPairings ?? 0, pairingCount: data.pairingCount ?? 0, needsPremium: data.needsPremium ?? false };
             storage.set(USER_KEY, u);
             return u;
           });
@@ -1294,15 +1294,6 @@ export default function NutriCrew() {
   }, []); // eslint-disable-line
 
   const t = T[lang];
-
-  // Two-stage funnel: 1 free pairing, no card required, then the paywall on
-  // the second attempt starts the card-required free month. This constant is
-  // UI-only (lets the client show/skip the paywall screen without a round
-  // trip) — the CRUD service's own copy of this same value is the actual
-  // authority; every request still goes through its atomic reserve check
-  // regardless of what this client-side guess says, so a mismatch here could
-  // only ever cause a wrong screen, never a wrong charge or a bypassed limit.
-  const FREE_PAIRING_LIMIT = 1;
 
   // Detect successful Stripe return (?premium=true in URL)
   const [premiumSuccess] = useState(() => {
@@ -1348,8 +1339,8 @@ export default function NutriCrew() {
           if (data.isPremium) {
             setUser(prev => {
               const u = prev?.email
-                ? { ...prev, isPremium: true, trialEnd: data.trialEnd ?? null }
-                : { email: data.email, name: data.name || "", isPremium: true, trialEnd: data.trialEnd ?? null };
+                ? { ...prev, isPremium: true, trialEnd: data.trialEnd ?? null, needsPremium: false }
+                : { email: data.email, name: data.name || "", isPremium: true, trialEnd: data.trialEnd ?? null, needsPremium: false };
               storage.set(USER_KEY, u);
               return u;
             });
@@ -1369,16 +1360,19 @@ export default function NutriCrew() {
   // across accounts (e.g. a brand-new user paywalled immediately because a
   // previous account on the same browser had already used its free pairing).
   const pairingCount = user?.pairingCount || 0;
-  const bonusPairings = user?.bonusPairings || 0;
   // Real subscription status (server-authoritative) — true right after Stripe
   // checkout returns, or once verify-session/login confirms it from the DB.
   const isPremium = premiumSuccess || !!user?.isPremium;
-  // An active subscriber never needs the paywall, no matter how high their
-  // lifetime pairingCount is — without this check, a returning premium user
-  // (isPremium true but premiumSuccess false, i.e. not mid-checkout-return)
-  // would get bounced to the upsell screen on every "Generate" click, since
-  // pairingCount stays >= FREE_PAIRING_LIMIT (1) forever after their second pairing.
-  const isPremiumNeeded = isPremium ? false : pairingCount >= FREE_PAIRING_LIMIT + bonusPairings;
+  // Whether this account needs premium for its NEXT pairing — copied
+  // directly from the server's last response (see needsPremium in
+  // NutriCrew/server.js's canGeneratePairing()), never computed here from a
+  // local copy of the free-pairing limit. There is exactly one place that
+  // compares pairingCount against the limit, and it isn't this file.
+  // undefined (no server response yet — e.g. a session-less first-time
+  // visitor) defaults to "not needed", matching the server's own behavior
+  // for a brand-new account; the real /api/generate-plan call is always the
+  // final word regardless of what this cached value says.
+  const isPremiumNeeded = isPremium ? false : !!user?.needsPremium;
 
   // ── STEP DEFINITIONS (check-in flow) ──────────────────────────
   // If returning user, skip personal steps.
@@ -1556,11 +1550,15 @@ export default function NutriCrew() {
   const mergedDiets = pairing.diets?.length ? pairing.diets : (user?.diets || []);
   const needsPremiumForDiet = mergedDiets.includes("calorie_deficit") && !isPremium;
 
-  // Persists the server's authoritative pairingCount onto the per-account
-  // user record (not a device-global key), so it can never leak across accounts.
-  const setPairingCount = (count) => {
+  // Persists the server's authoritative pairingCount (and needsPremium, the
+  // server-computed "will this account's next pairing require premium?"
+  // flag — see canGeneratePairing() in NutriCrew/server.js) onto the
+  // per-account user record (not a device-global key), so it can never leak
+  // across accounts. needsPremium is opaque here: the client never derives
+  // it from a local limit constant, only ever copies it from a server response.
+  const setPairingCount = (count, needsPremium) => {
     setUser(prev => {
-      const u = { ...(prev || {}), pairingCount: count };
+      const u = { ...(prev || {}), pairingCount: count, ...(needsPremium !== undefined ? { needsPremium } : {}) };
       storage.set(USER_KEY, u);
       return u;
     });
@@ -1620,14 +1618,14 @@ export default function NutriCrew() {
         return;
       }
       setPlan(result);
-      setPairingCount(result.pairingCount ?? pairingCount + 1);
+      setPairingCount(result.pairingCount ?? pairingCount + 1, result.needsPremium);
       if (!result.failedDays?.length) {
         saveSavedPlan(cacheKey, data, result);
         storage.set(CHECKIN_DRAFT_KEY, null);
       }
     } catch (e) {
       if (e.code === "premium_required") {
-        setPairingCount(e.pairingCount ?? FREE_PAIRING_LIMIT);
+        setPairingCount(e.pairingCount ?? pairingCount, e.needsPremium ?? true);
         setScreen("premium");
       } else {
         setPlan({ error: true });
@@ -1642,7 +1640,7 @@ export default function NutriCrew() {
     const { result, cacheKey, data } = pending || pendingFirstPlan || {};
     if (!result) { setScreen("splash"); return; }
     setPlan(result);
-    setPairingCount(result.pairingCount ?? 0);
+    setPairingCount(result.pairingCount ?? 0, result.needsPremium);
     if (!result.failedDays?.length) {
       saveSavedPlan(cacheKey, data, result);
       storage.set(CHECKIN_DRAFT_KEY, null);
@@ -1791,8 +1789,8 @@ export default function NutriCrew() {
       // already local otherwise, but only for the SAME account.
       const profileFields = mergeDurableProfileFields(sessionData, prev, sameAccount);
       const u = sameAccount
-        ? { ...prev, ...profileFields, isPremium: !!sessionData.isPremium, trialEnd: sessionData.trialEnd ?? null, hasPassword, bonusPairings: sessionData.bonusPairings ?? prev?.bonusPairings ?? 0, pairingCount: sessionData.pairingCount ?? prev?.pairingCount ?? 0 }
-        : { email: sessionData.email, name: sessionData.name || "", ...profileFields, isPremium: !!sessionData.isPremium, trialEnd: sessionData.trialEnd ?? null, hasPassword, bonusPairings: sessionData.bonusPairings ?? 0, pairingCount: sessionData.pairingCount ?? 0 };
+        ? { ...prev, ...profileFields, isPremium: !!sessionData.isPremium, trialEnd: sessionData.trialEnd ?? null, hasPassword, bonusPairings: sessionData.bonusPairings ?? prev?.bonusPairings ?? 0, pairingCount: sessionData.pairingCount ?? prev?.pairingCount ?? 0, needsPremium: sessionData.needsPremium ?? prev?.needsPremium }
+        : { email: sessionData.email, name: sessionData.name || "", ...profileFields, isPremium: !!sessionData.isPremium, trialEnd: sessionData.trialEnd ?? null, hasPassword, bonusPairings: sessionData.bonusPairings ?? 0, pairingCount: sessionData.pairingCount ?? 0, needsPremium: sessionData.needsPremium ?? false };
       storage.set(USER_KEY, u);
       return u;
     });
@@ -5998,7 +5996,7 @@ async function generatePlan(data, lang) {
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     if (res.status === 403 && body?.error === "premium_required") {
-      throw Object.assign(new Error("premium_required"), { code: "premium_required", pairingCount: body.pairingCount });
+      throw Object.assign(new Error("premium_required"), { code: "premium_required", pairingCount: body.pairingCount, needsPremium: body.needsPremium ?? true });
     }
     throw new Error("Failed to generate plan");
   }

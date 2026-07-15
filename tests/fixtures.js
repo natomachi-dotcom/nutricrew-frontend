@@ -81,6 +81,11 @@ export const MOCK_PLAN = {
   },
   pairingCount: 1,
   isPremium: false,
+  // Server-computed (see needsPremium in NutriCrew/server.js's
+  // canGeneratePairing()): after consuming the 1 free pairing, the account's
+  // NEXT attempt needs premium. The client caches this directly from the
+  // response — it never derives it from a local limit constant.
+  needsPremium: true,
   // Bypasses the mandatory password-setup gate for brand-new accounts (added
   // alongside server-side "Add mandatory password setup for new accounts") —
   // that flow is out of scope for these onboarding tests.

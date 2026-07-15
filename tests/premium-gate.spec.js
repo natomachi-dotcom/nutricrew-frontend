@@ -17,9 +17,10 @@ test("first pairing is free with no card and no paywall; second pairing hits the
   expect(generateCallCount).toBe(1);
 
   // STAGE 2 — same account's second pairing attempt: the client already knows
-  // (server-authoritative pairingCount=1 from the first response) that this
-  // account has used its free pairing, so it routes straight to the paywall
-  // without a wasted round trip. Fail loudly if generate-plan is called again.
+  // (needsPremium=true, cached verbatim from the first response — see
+  // MOCK_PLAN) that this account has used its free pairing, so it routes
+  // straight to the paywall without a wasted round trip. Fail loudly if
+  // generate-plan is called again.
   await page.getByRole("button", { name: "New Pairing" }).click();
   const continueBtn = page.getByRole("button", { name: "Continue →" });
   await continueBtn.click(); // budget: pre-filled from profile
