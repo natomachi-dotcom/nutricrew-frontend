@@ -3625,13 +3625,19 @@ function DayPlan({ day, t, favorites, onToggleFavorite, onOpenAirplaneMeal, pair
                       <div style={{ fontSize: 12, color: C.muted, padding: "6px 0" }}>{t.meal_updating}</div>
                     ) : (
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                        {meal.ingredients.map((ing, k) => (
-                          <button key={k} style={styles.ingredientChip}
-                            onClick={e => { e.stopPropagation(); flagIngredient(i, meal, ing); }}
-                            title={t.ingredient_allergic_tooltip}>
-                            {ing} ✕
-                          </button>
-                        ))}
+                        {meal.ingredients.map((ing, k) => {
+                          // ingredients moved from plain strings to {name,quantity,unit}
+                          // objects (backend validator needs quantity/unit) — fall back to
+                          // the bare string for any older cached/bank plan still in that shape.
+                          const ingName = typeof ing === "string" ? ing : ing.name;
+                          return (
+                            <button key={k} style={styles.ingredientChip}
+                              onClick={e => { e.stopPropagation(); flagIngredient(i, meal, ingName); }}
+                              title={t.ingredient_allergic_tooltip}>
+                              {ingName} ✕
+                            </button>
+                          );
+                        })}
                       </div>
                     )}
                     {regenError === i && (
