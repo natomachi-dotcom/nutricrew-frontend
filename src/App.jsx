@@ -83,7 +83,7 @@ const T = {
     full_kitchen: "Full Kitchen at Home", hotel_no_kitchen: "Hotel (No Kitchen)",
     microwave: "Microwave Only", fridge: "Fridge, No Stove", airplane_food: "Airplane Meals Provided",
     step_cooking_pref: "Cooking Preference", cooking_enjoy: "I Enjoy Cooking", cooking_simple: "I Need Simple Recipes",
-    no_restrictions: "No Restrictions", vegetarian: "Vegetarian",
+    no_restrictions: "No Restrictions", allergic_to: "ALLERGIC TO", vegetarian: "Vegetarian",
     vegan: "Vegan", gluten_free: "Gluten-Free", halal: "Halal",
     kosher: "Kosher", low_carb: "Low-Carb / Keto",
     dairy_free: "Dairy-Free", mediterranean: "Mediterranean", carnivore: "Carnivore",
@@ -348,7 +348,7 @@ const T = {
     full_kitchen: "Cuisine Complète", hotel_no_kitchen: "Hôtel (Sans Cuisine)",
     microwave: "Micro-ondes Seulement", fridge: "Frigo, Sans Cuisinière", airplane_food: "Repas Avion Fournis",
     step_cooking_pref: "Préférence de Cuisine", cooking_enjoy: "J'aime Cuisiner", cooking_simple: "Je Veux des Recettes Simples",
-    no_restrictions: "Sans Restrictions", vegetarian: "Végétarien",
+    no_restrictions: "Sans Restrictions", allergic_to: "ALLERGIQUE À", vegetarian: "Végétarien",
     vegan: "Végétalien", gluten_free: "Sans Gluten", halal: "Halal",
     kosher: "Casher", low_carb: "Faible en Glucides",
     dairy_free: "Sans Produits Laitiers", mediterranean: "Méditerranéen", carnivore: "Carnivore",
@@ -613,7 +613,7 @@ const T = {
     full_kitchen: "Cocina Completa en Casa", hotel_no_kitchen: "Hotel (Sin Cocina)",
     microwave: "Solo Microondas", fridge: "Refrigerador, Sin Estufa", airplane_food: "Comida de Avión Incluida",
     step_cooking_pref: "Preferencia de Cocina", cooking_enjoy: "Me Gusta Cocinar", cooking_simple: "Necesito Recetas Simples",
-    no_restrictions: "Sin Restricciones", vegetarian: "Vegetariano",
+    no_restrictions: "Sin Restricciones", allergic_to: "ALÉRGICO A", vegetarian: "Vegetariano",
     vegan: "Vegano", gluten_free: "Sin Gluten", halal: "Halal",
     kosher: "Kosher", low_carb: "Bajo en Carbohidratos",
     dairy_free: "Sin Lácteos", mediterranean: "Mediterráneo", carnivore: "Carnívoro",
@@ -3306,16 +3306,18 @@ function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, 
           ? t.no_restrictions
           : filteredDiets.map(d => {
               if (d === "other") return (mergedUser.diet_other || "OTHER").toUpperCase();
-              if (d === "allergy_other") return `ALLERGIC TO ${(mergedUser.allergy_other_text || "OTHER").toUpperCase()}`;
-              return d.replace(/_/g, " ").toUpperCase();
+              if (d === "allergy_other") return `${t.allergic_to || "ALLERGIC TO"} ${(mergedUser.allergy_other_text || "OTHER").toUpperCase()}`;
+              return (t[d] || d.replace(/_/g, " ")).toUpperCase();
             }).join(" + ");
-        const goalsDisplay = (mergedUser.goals || []).slice(0, 2).join(", ").replace(/_/g, " ").toUpperCase();
+        const goalsDisplay = (mergedUser.goals || []).slice(0, 2)
+          .map(g => (t[g] || g.replace(/_/g, " ")).toUpperCase())
+          .join(", ");
         return (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
             <span style={styles.selectionChip}>🍽️ {dietDisplay}</span>
             {goalsDisplay && <span style={styles.selectionChip}>🎯 {goalsDisplay}</span>}
             {mergedUser.budget_amount && (
-              <span style={styles.selectionChip}>💰 ${mergedUser.budget_amount}/{mergedUser.budget_type === "day" ? "DAY" : "TRIP"}</span>
+              <span style={styles.selectionChip}>💰 ${mergedUser.budget_amount}/{(mergedUser.budget_type === "day" ? t.day : t.budget_total).toUpperCase()}</span>
             )}
           </div>
         );
