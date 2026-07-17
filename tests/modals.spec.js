@@ -51,9 +51,11 @@ test("jet lag modal shows body-clock guidance for the detected time difference",
   await page.getByRole("button", { name: "jet lag info" }).click();
   await expect(page.getByText("Jet Lag Control")).toBeVisible();
 
-  // Montreal (UTC-5) -> Paris (UTC+1) is a 6h eastward jump.
-  await expect(page.getByText(/Time difference: 6 hours \(ahead\)/)).toBeVisible();
-  await expect(page.getByText("Advance Your Body Clock")).toBeVisible();
+  // Montreal (UTC-5) -> Paris (UTC+1) is a 6h jump where the destination's
+  // clock is ahead — those hours get skipped over, i.e. lost. Copy is
+  // phrased in gained/lost hours, never "eastbound"/"westbound".
+  await expect(page.getByText(/Time difference: 6 hours \(lost\)/)).toBeVisible();
+  await expect(page.getByText("You'll lose 6 hours on this leg.")).toBeVisible();
   await expect(page.getByText("General Tips")).toBeVisible();
 
   await page.getByRole("button", { name: "✕" }).click();

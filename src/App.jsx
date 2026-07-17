@@ -115,14 +115,17 @@ const T = {
     jetlag_advisory: "Jet Lag Advisory",
     jetlag_diff_label: "Time difference",
     jetlag_hours: "hours",
-    jetlag_ahead: "ahead",
-    jetlag_behind: "behind",
+    jetlag_ahead: "lost",
+    jetlag_behind: "gained",
+    // Crew think in hours gained/lost, not compass directions — never show
+    // "eastbound"/"westbound" in the UI. {n} is replaced with the leg's
+    // computed hour count at render time.
+    jetlag_lose_sentence: "You'll lose {n} hours on this leg.",
+    jetlag_gain_sentence: "You'll gain {n} hours on this leg.",
     jetlag_none_title: "No Significant Jet Lag",
     jetlag_none_text: "Your route has a time difference of less than 4 hours — your body clock shouldn't need major adjustments. Stay hydrated and keep a regular meal schedule.",
-    jetlag_eastward_title: "Advance Your Body Clock",
-    jetlag_eastward_text: "Your destination is ahead of home. Shift your sleep and meals earlier each day before departure if possible, and get bright light in the morning at your destination.",
-    jetlag_westward_title: "Delay Your Body Clock",
-    jetlag_westward_text: "Your destination is behind home. Stay up later and delay meals and sleep gradually, and get bright light in the evening at your destination.",
+    jetlag_eastward_text: "Losing hours is the harder adjustment — your body clock has to move earlier. Shift your sleep and meals earlier each day before departure if possible, and get bright light in the morning at your destination. Expect to feel hungry and sleepy on your old schedule for the first couple of days.",
+    jetlag_westward_text: "Gaining hours is the easier adjustment — your body clock just needs to move later. Stay up later and delay meals and sleep gradually, and get bright light in the evening at your destination. You may feel wide awake well past your normal bedtime for the first night or two.",
     jetlag_tips_title: "General Tips",
     jetlag_tip_1: "Stay hydrated — drink plenty of water and limit alcohol and caffeine during the flight.",
     jetlag_tip_2: "Get natural daylight at your destination as soon as possible to reset your body clock.",
@@ -254,10 +257,6 @@ const T = {
     layover_short_base: "Short  12–16h",
     layover_standard: "Standard 16–24h",
     layover_long: "Long  24h+",
-    duty_direction: "Flight Direction",
-    dir_east: "Eastward",
-    dir_west: "Westward",
-    dir_ns: "North/South",
     duty_skip: "Skip — standard pairing",
     tab_performance: "Performance",
     perf_advisory_title: "Duty Performance Advisory",
@@ -380,14 +379,14 @@ const T = {
     jetlag_advisory: "Alerte Décalage Horaire",
     jetlag_diff_label: "Décalage horaire",
     jetlag_hours: "heures",
-    jetlag_ahead: "en avance",
-    jetlag_behind: "en retard",
+    jetlag_ahead: "perdues",
+    jetlag_behind: "gagnées",
+    jetlag_lose_sentence: "Vous perdrez {n} heures sur ce vol.",
+    jetlag_gain_sentence: "Vous gagnerez {n} heures sur ce vol.",
     jetlag_none_title: "Pas de Décalage Important",
     jetlag_none_text: "Votre trajet présente un décalage de moins de 4 heures — votre horloge interne ne devrait pas avoir besoin d'ajustements majeurs. Restez hydraté et gardez un horaire de repas régulier.",
-    jetlag_eastward_title: "Avancez Votre Horloge Interne",
-    jetlag_eastward_text: "Votre destination est en avance par rapport à votre domicile. Avancez progressivement votre sommeil et vos repas avant le départ si possible, et exposez-vous à la lumière du matin à destination.",
-    jetlag_westward_title: "Retardez Votre Horloge Interne",
-    jetlag_westward_text: "Votre destination est en retard par rapport à votre domicile. Couchez-vous plus tard et retardez progressivement vos repas et votre sommeil, et exposez-vous à la lumière du soir à destination.",
+    jetlag_eastward_text: "Perdre des heures est l'ajustement le plus difficile — votre horloge interne doit avancer. Avancez progressivement votre sommeil et vos repas avant le départ si possible, et exposez-vous à la lumière du matin à destination. Attendez-vous à avoir faim et sommeil selon votre ancien horaire les premiers jours.",
+    jetlag_westward_text: "Gagner des heures est l'ajustement le plus facile — votre horloge interne doit simplement retarder. Couchez-vous plus tard et retardez progressivement vos repas et votre sommeil, et exposez-vous à la lumière du soir à destination. Vous pourriez rester bien éveillé après votre heure de coucher habituelle les premières nuits.",
     jetlag_tips_title: "Conseils Généraux",
     jetlag_tip_1: "Restez hydraté — buvez beaucoup d'eau et limitez l'alcool et la caféine pendant le vol.",
     jetlag_tip_2: "Exposez-vous à la lumière naturelle à destination dès que possible pour réinitialiser votre horloge interne.",
@@ -519,10 +518,6 @@ const T = {
     layover_short_base: "Court  12–16h",
     layover_standard: "Standard 16–24h",
     layover_long: "Long  24h+",
-    duty_direction: "Direction du Vol",
-    dir_east: "Vers l'Est",
-    dir_west: "Vers l'Ouest",
-    dir_ns: "Nord/Sud",
     duty_skip: "Ignorer — pairing standard",
     tab_performance: "Performance",
     perf_advisory_title: "Avis Performance de Service",
@@ -645,21 +640,21 @@ const T = {
     jetlag_advisory: "Aviso de Jet Lag",
     jetlag_diff_label: "Diferencia horaria",
     jetlag_hours: "horas",
-    jetlag_ahead: "adelante",
-    jetlag_behind: "atrás",
+    jetlag_ahead: "perdidas",
+    jetlag_behind: "ganadas",
+    jetlag_lose_sentence: "Perderás {n} horas en este vuelo.",
+    jetlag_gain_sentence: "Ganarás {n} horas en este vuelo.",
     jetlag_none_title: "Sin Jet Lag Significativo",
     jetlag_none_text: "Tu ruta tiene una diferencia horaria menor a 4 horas — tu reloj interno no debería necesitar ajustes importantes. Mantente hidratado y conserva un horario de comidas regular.",
-    jetlag_eastward_title: "Adelanta tu Reloj Interno",
-    jetlag_eastward_text: "Tu destino está adelantado respecto a tu hogar. Adelanta gradualmente tu sueño y comidas antes de la salida si es posible, y busca luz natural por la mañana en tu destino.",
-    jetlag_westward_title: "Retrasa tu Reloj Interno",
-    jetlag_westward_text: "Tu destino está atrasado respecto a tu hogar. Acuéstate más tarde y retrasa gradualmente tus comidas y sueño, y busca luz natural por la noche en tu destino.",
+    jetlag_eastward_text: "Perder horas es el ajuste más difícil — tu reloj interno debe adelantarse. Adelanta gradualmente tu sueño y comidas antes de la salida si es posible, y busca luz natural por la mañana en tu destino. Es normal sentir hambre y sueño según tu horario anterior los primeros días.",
+    jetlag_westward_text: "Ganar horas es el ajuste más fácil — tu reloj interno solo necesita retrasarse. Acuéstate más tarde y retrasa gradualmente tus comidas y sueño, y busca luz natural por la noche en tu destino. Es posible que te sientas bien despierto mucho después de tu hora de dormir habitual las primeras noches.",
     jetlag_tips_title: "Consejos Generales",
     jetlag_tip_1: "Mantente hidratado — bebe mucha agua y limita el alcohol y la cafeína durante el vuelo.",
     jetlag_tip_2: "Recibe luz natural en tu destino lo antes posible para reiniciar tu reloj interno.",
     jetlag_tip_3: "Usa la cafeína estratégicamente para mantenerte alerta durante el día en tu destino — evítala antes de dormir.",
     jetlag_tip_4: "Las siestas cortas (20-30 minutos) pueden ayudar, pero evita siestas largas que alteren el sueño nocturno.",
     jetlag_tip_5: "Come según la hora local de tu destino lo antes posible.",
-    jetlag_fab: "Jet Lag",
+    jetlag_fab: "Desfase",
     premium_title: "Función Premium",
     premium_msg: "Comienza tu mes gratis para generar planes. Tarjeta requerida, cancela cuando quieras.",
     upgrade: "Actualizar a Premium",
@@ -784,10 +779,6 @@ const T = {
     layover_short_base: "Corta  12–16h",
     layover_standard: "Estándar 16–24h",
     layover_long: "Larga  24h+",
-    duty_direction: "Dirección del Vuelo",
-    dir_east: "Hacia el Este",
-    dir_west: "Hacia el Oeste",
-    dir_ns: "Norte/Sur",
     duty_skip: "Omitir — pairing estándar",
     tab_performance: "Rendimiento",
     perf_advisory_title: "Aviso de Rendimiento de Servicio",
@@ -5050,7 +5041,12 @@ function JetlagModal({ t, pairing, user, lang, isPremium, onClose, onRequirePrem
               <span>{t.jetlag_diff_label}: {Math.abs(tz)} {t.jetlag_hours} ({tz > 0 ? t.jetlag_ahead : t.jetlag_behind})</span>
             </div>
             <div style={styles.restrictCard}>
-              <div style={styles.restrictTitle}>{tz > 0 ? t.jetlag_eastward_title : t.jetlag_westward_title}</div>
+              {/* Crew think in hours gained/lost, not compass directions — never
+                  show "eastbound"/"westbound" here. tz > 0 means the destination's
+                  clock is ahead, i.e. that time gets skipped over = lost. */}
+              <div style={styles.restrictTitle}>
+                {(tz > 0 ? t.jetlag_lose_sentence : t.jetlag_gain_sentence).replace("{n}", Math.abs(tz))}
+              </div>
               <div style={styles.restrictText}>{tz > 0 ? t.jetlag_eastward_text : t.jetlag_westward_text}</div>
             </div>
 
@@ -5761,15 +5757,6 @@ function DutyScheduleStep({ t, pairing, upd }) {
         </div>
       </div>
 
-      <div style={{ marginBottom: 8 }}>
-        <div style={{ ...styles.hint, marginBottom: 6 }}>{t.duty_direction}</div>
-        <div style={{ display: "flex", gap: 8 }}>
-          {[["east", t.dir_east, "→"], ["west", t.dir_west, "←"], ["ns", t.dir_ns, "↕"]].map(([v, l, ic]) => (
-            <button key={v} style={pairing.flight_direction === v ? DUTY_BTN_ACTIVE : DUTY_BTN_BASE}
-              onClick={() => upd("flight_direction", v)}>{ic} {l}</button>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }
