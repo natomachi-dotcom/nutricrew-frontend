@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, startTransition } from "react";
-import { FAQ } from "./faq.js";
+import { getFAQ } from "./faq.js";
 import { searchAirports } from "./airports.js";
 
 // AI backend base URL. Empty in local dev (Vite proxies /api to localhost:3001);
@@ -134,24 +134,33 @@ const T = {
     jetlag_tip_5: "Eat meals aligned with your destination's local time as soon as possible.",
     jetlag_fab: "Jet Lag",
     premium_title: "Premium Feature",
+    // premium_msg/free_trial/start_trial_cta/trial_* below are the TRIAL_ENABLED=true
+    // copy, preserved verbatim for when the trial campaign is re-enabled — see
+    // premium_msg_notrial/first_pairing_free/subscribe_* for the current
+    // (TRIAL_ENABLED=false) launch copy actually shown by default.
     premium_msg: "Start your free month to generate meal plans. Card required, cancel anytime.",
+    premium_msg_notrial: "Subscribe to generate unlimited meal plans. Cancel anytime.",
     upgrade: "Upgrade to Premium",
     free_trial: "First Month Free",
+    first_pairing_free: "First Pairing Free",
     start_trial_cta: "Start Your Free Month",
+    subscribe_cta: "Subscribe",
     then_charged: "then",
     checkout_redirecting: "Taking you to secure checkout…",
     trial_disclaimer: "Card required. Free for 30 days, cancel anytime — after that you'll be charged",
+    subscribe_disclaimer: "Your card will be charged",
     first_charge_on: "First charge on",
     trial_legal_title: "Billing Terms",
     trial_legal_text: "If you do not cancel by the last day of your free trial, your card will automatically be charged and your subscription will continue to renew every month (or year, for the annual plan) until you cancel. You can cancel anytime, free of charge, from Manage Billing in your account, or by",
+    subscribe_legal_text: "Your card will be charged immediately and your subscription will renew automatically every month (or year, for the annual plan) until you cancel. You can cancel anytime, free of charge, from Manage Billing in your account, or by",
     trial_legal_contact_link: "contacting us",
     per_month: "month",
     per_year: "year",
     trial_active_until: "Free until",
     subscription_active: "Premium — Active",
     add_subscription_cta: "Start a Subscription",
-    buy_annual_cta: "Switch to Annual — $67.12/yr",
-    switch_annual_confirm_text: "This switches your billing to annual ($67.12/yr) right away, with a prorated charge or credit for the switch. Continue?",
+    buy_annual_cta: "Switch to Annual — $62.32/yr",
+    switch_annual_confirm_text: "This switches your billing to annual ($62.32/yr) right away, with a prorated charge or credit for the switch. Continue?",
     switch_annual_success: "You're now on the annual plan.",
     already_annual_msg: "You're already on the annual plan.",
     switch_annual_error: "Couldn't switch to annual. Please try again.",
@@ -396,23 +405,28 @@ const T = {
     jetlag_fab: "Décalage",
     premium_title: "Fonctionnalité Premium",
     premium_msg: "Commencez votre mois gratuit pour générer des plans. Carte requise, annulez à tout moment.",
+    premium_msg_notrial: "Abonnez-vous pour générer des plans de repas illimités. Annulez à tout moment.",
     upgrade: "Passer au Premium",
     free_trial: "Premier Mois Gratuit",
+    first_pairing_free: "Premier Pairing Gratuit",
     start_trial_cta: "Commencer Votre Mois Gratuit",
+    subscribe_cta: "S'abonner",
     then_charged: "puis",
     checkout_redirecting: "Redirection vers le paiement sécurisé…",
     trial_disclaimer: "Carte requise. Gratuit pendant 30 jours, annulez à tout moment — ensuite vous serez facturé",
+    subscribe_disclaimer: "Votre carte sera débitée",
     first_charge_on: "Premier prélèvement le",
     trial_legal_title: "Conditions de Facturation",
     trial_legal_text: "Si vous n'annulez pas avant le dernier jour de votre essai gratuit, votre carte sera automatiquement débitée et votre abonnement continuera à se renouveler chaque mois (ou chaque année, pour le forfait annuel) jusqu'à ce que vous annuliez. Vous pouvez annuler à tout moment, gratuitement, depuis Gérer la Facturation dans votre compte, ou en",
+    subscribe_legal_text: "Votre carte sera débitée immédiatement et votre abonnement continuera à se renouveler chaque mois (ou chaque année, pour le forfait annuel) jusqu'à ce que vous annuliez. Vous pouvez annuler à tout moment, gratuitement, depuis Gérer la Facturation dans votre compte, ou en",
     trial_legal_contact_link: "nous contactant",
     per_month: "mois",
     per_year: "an",
     trial_active_until: "Gratuit jusqu'au",
     subscription_active: "Premium — Actif",
     add_subscription_cta: "Démarrer un Abonnement",
-    buy_annual_cta: "Passer à l'Annuel — 67,12 $/an",
-    switch_annual_confirm_text: "Cela passe votre facturation à l'annuel (67,12 $/an) immédiatement, avec un ajustement au prorata. Continuer ?",
+    buy_annual_cta: "Passer à l'Annuel — 62,32 $/an",
+    switch_annual_confirm_text: "Cela passe votre facturation à l'annuel (62,32 $/an) immédiatement, avec un ajustement au prorata. Continuer ?",
     switch_annual_success: "Vous êtes maintenant sur le forfait annuel.",
     already_annual_msg: "Vous êtes déjà sur le forfait annuel.",
     switch_annual_error: "Impossible de passer à l'annuel. Veuillez réessayer.",
@@ -657,23 +671,28 @@ const T = {
     jetlag_fab: "Desfase",
     premium_title: "Función Premium",
     premium_msg: "Comienza tu mes gratis para generar planes. Tarjeta requerida, cancela cuando quieras.",
+    premium_msg_notrial: "Suscríbete para generar planes de comidas ilimitados. Cancela cuando quieras.",
     upgrade: "Actualizar a Premium",
     free_trial: "Primer Mes Gratis",
+    first_pairing_free: "Primer Pairing Gratis",
     start_trial_cta: "Comienza Tu Mes Gratis",
+    subscribe_cta: "Suscribirse",
     then_charged: "luego",
     checkout_redirecting: "Te llevamos al pago seguro…",
     trial_disclaimer: "Se requiere tarjeta. Gratis por 30 días, cancela cuando quieras — luego se te cobrará",
+    subscribe_disclaimer: "Se cobrará a tu tarjeta",
     first_charge_on: "Primer cobro el",
     trial_legal_title: "Condiciones de Facturación",
     trial_legal_text: "Si no cancelas antes del último día de tu prueba gratuita, se cobrará automáticamente a tu tarjeta y tu suscripción seguirá renovándose cada mes (o cada año, en el plan anual) hasta que canceles. Puedes cancelar en cualquier momento, sin costo, desde Administrar Facturación en tu cuenta, o",
+    subscribe_legal_text: "Se cobrará a tu tarjeta de inmediato y tu suscripción seguirá renovándose cada mes (o cada año, en el plan anual) hasta que canceles. Puedes cancelar en cualquier momento, sin costo, desde Administrar Facturación en tu cuenta, o",
     trial_legal_contact_link: "contáctanos",
     per_month: "mes",
     per_year: "año",
     trial_active_until: "Gratis hasta",
     subscription_active: "Premium — Activo",
     add_subscription_cta: "Iniciar una Suscripción",
-    buy_annual_cta: "Cambiar a Anual — $67.12/año",
-    switch_annual_confirm_text: "Esto cambia tu facturación a anual ($67.12/año) de inmediato, con un ajuste prorrateado. ¿Continuar?",
+    buy_annual_cta: "Cambiar a Anual — $62.32/año",
+    switch_annual_confirm_text: "Esto cambia tu facturación a anual ($62.32/año) de inmediato, con un ajuste prorrateado. ¿Continuar?",
     switch_annual_success: "Ahora estás en el plan anual.",
     already_annual_msg: "Ya estás en el plan anual.",
     switch_annual_error: "No se pudo cambiar a anual. Inténtalo de nuevo.",
@@ -1174,6 +1193,12 @@ export default function NutriCrew() {
   const [contactPrefill, setContactPrefill] = useState("");
   const [shareCopied, setShareCopied] = useState(false);
   const [premiumReturnScreen, setPremiumReturnScreen] = useState("boarding");
+  // Mirrors the backend's TRIAL_ENABLED flag (nutricrew-backend/server.js) —
+  // defaults to false (the launch model: 1 free pairing, then subscribe
+  // immediately, no trial) until /api/config confirms otherwise, so a failed
+  // or slow fetch never accidentally shows trial copy that checkout won't
+  // actually honor.
+  const [trialEnabled, setTrialEnabled] = useState(false);
 
   const openRoster = (fromScreen) => {
     setPremiumReturnScreen(fromScreen);
@@ -1195,6 +1220,16 @@ export default function NutriCrew() {
   useEffect(() => {
     if (forcePlanOpen) window.history.replaceState({}, "", window.location.pathname);
   }, [forcePlanOpen]);
+
+  // One-time fetch of the trial feature flag — keeps the paywall copy in
+  // sync with whatever checkout actually does server-side, instead of
+  // hardcoding the launch state on the frontend too (see TRIAL_ENABLED).
+  useEffect(() => {
+    fetch(`${API_BASE}/api/config`)
+      .then(r => r.json())
+      .then(d => setTrialEnabled(!!d.trialEnabled))
+      .catch(() => {});
+  }, []);
 
   // A roster-automation plan was generated with no app session involved, so
   // there's no in-app state pointing at it yet. As soon as routing settles on
@@ -1861,7 +1896,7 @@ export default function NutriCrew() {
 
       {screen === "splash" && (
         <SplashScreen t={t} lang={lang} setLang={setLang}
-          returningUser={returningUser} user={user} isPremium={isPremium}
+          returningUser={returningUser} user={user} isPremium={isPremium} trialEnabled={trialEnabled}
           hasSavedPlan={getSavedPlans().length > 0}
           onStart={() => { setCheckinReturning(returningUser); setScreen("checkin"); }}
           onNewPairing={startNewPairing}
@@ -1889,7 +1924,7 @@ export default function NutriCrew() {
       )}
 
       {showFAQ && (
-        <FAQModal t={t} lang={lang} onClose={() => setShowFAQ(false)} />
+        <FAQModal t={t} lang={lang} onClose={() => setShowFAQ(false)} trialEnabled={trialEnabled} />
       )}
 
       {showContact && (
@@ -1936,7 +1971,7 @@ export default function NutriCrew() {
       )}
 
       {screen === "premium" && (
-        <PremiumScreen t={t} onBack={() => setScreen(premiumReturnScreen)} onUpgrade={handleUpgrade} premiumSuccess={premiumSuccess} onGenerate={handleGenerate} returnScreen={premiumReturnScreen} trialEnd={user?.trialEnd} onOpenContact={() => setShowContact(true)}/>
+        <PremiumScreen t={t} onBack={() => setScreen(premiumReturnScreen)} onUpgrade={handleUpgrade} premiumSuccess={premiumSuccess} onGenerate={handleGenerate} returnScreen={premiumReturnScreen} trialEnd={user?.trialEnd} trialEnabled={trialEnabled} onOpenContact={() => setShowContact(true)}/>
       )}
 
       {/* Floating calorie button */}
@@ -2350,7 +2385,7 @@ function OTPScreen({ email, onSuccess, onBack }) {
 }
 
 // ─── SPLASH SCREEN ────────────────────────────────────────────────
-function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onStart, onNewPairing, onOpenHistory, onOpenSavedMeals, onOpenProfile, onOpenRoster, onOpenReferral, onOpenFAQ, onOpenContact, onLogin, isPremium }) {
+function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onStart, onNewPairing, onOpenHistory, onOpenSavedMeals, onOpenProfile, onOpenRoster, onOpenReferral, onOpenFAQ, onOpenContact, onLogin, isPremium, trialEnabled }) {
   return (
     <div style={styles.splash}>
       {user && (
@@ -2406,7 +2441,7 @@ function SplashScreen({ t, lang, setLang, returningUser, user, hasSavedPlan, onS
           </div>
         ) : (
           <div>
-            <div style={styles.freeTrialBadge}>⭐ {t.free_trial}</div>
+            <div style={styles.freeTrialBadge}>⭐ {trialEnabled ? t.free_trial : t.first_pairing_free}</div>
             <button style={styles.primaryBtn} onClick={onStart}>
               {t.start}
             </button>
@@ -3740,7 +3775,7 @@ function FoodRestrictions({ data, pairing }) {
 }
 
 // ─── PREMIUM SCREEN ───────────────────────────────────────────────
-function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess, onGenerate, returnScreen, trialEnd, onOpenContact }) {
+function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess, onGenerate, returnScreen, trialEnd, trialEnabled, onOpenContact }) {
   const [loading, setLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState(null);
   const [billing, setBilling] = useState("monthly"); // monthly | annual
@@ -3788,7 +3823,7 @@ function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess, onGenerate, retur
     <div style={styles.premiumScreen}>
       <div style={styles.premiumIcon}>⭐</div>
       <div style={styles.premiumTitle}>{t.premium_title}</div>
-      <div style={styles.premiumMsg}>{t.premium_msg}</div>
+      <div style={styles.premiumMsg}>{trialEnabled ? t.premium_msg : t.premium_msg_notrial}</div>
       <div style={styles.premiumFeatures}>
         {[
           "Unlimited meal plans",
@@ -3827,8 +3862,8 @@ function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess, onGenerate, retur
             fontWeight: 700, fontSize: 14,
           }}
         >
-          <span style={{ position: "absolute", top: -10, right: -6, background: C.green, color: "#fff", fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 8 }}>SAVE 30%</span>
-          Annual<br/><span style={{fontWeight: 400, fontSize: 12}}>$67.12/yr</span>
+          <span style={{ position: "absolute", top: -10, right: -6, background: C.green, color: "#fff", fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 8 }}>SAVE 35%</span>
+          Annual<br/><span style={{fontWeight: 400, fontSize: 12}}>$62.32/yr</span>
         </button>
       </div>
 
@@ -3838,18 +3873,28 @@ function PremiumScreen({ t, onBack, onUpgrade, premiumSuccess, onGenerate, retur
         </div>
       )}
       <button style={styles.primaryBtn} onClick={handleClick} disabled={loading}>
-        {loading ? t.checkout_redirecting : `${t.start_trial_cta} — ${t.then_charged} ${billing === "annual" ? "$67.12/" + t.per_year : "$7.99/" + t.per_month}`}
+        {loading ? t.checkout_redirecting : trialEnabled
+          ? `${t.start_trial_cta} — ${t.then_charged} ${billing === "annual" ? "$62.32/" + t.per_year : "$7.99/" + t.per_month}`
+          : `${t.subscribe_cta} — ${billing === "annual" ? "$62.32/" + t.per_year : "$7.99/" + t.per_month}`}
       </button>
       <div style={{ color: C.muted, fontSize: 11, textAlign: "center", marginTop: 8, maxWidth: 280 }}>
-        {billing === "annual"
-          ? `${t.trial_disclaimer} $67.12/${t.per_year}.`
-          : `${t.trial_disclaimer} $7.99/${t.per_month}.`}
-        {" "}{t.first_charge_on} {estFirstCharge.toLocaleDateString()}.
+        {trialEnabled ? (
+          <>
+            {billing === "annual"
+              ? `${t.trial_disclaimer} $62.32/${t.per_year}.`
+              : `${t.trial_disclaimer} $7.99/${t.per_month}.`}
+            {" "}{t.first_charge_on} {estFirstCharge.toLocaleDateString()}.
+          </>
+        ) : (
+          billing === "annual"
+            ? `${t.subscribe_disclaimer} $62.32/${t.per_year}.`
+            : `${t.subscribe_disclaimer} $7.99/${t.per_month}.`
+        )}
       </div>
       <div style={styles.disclaimerBanner}>
         <div style={styles.disclaimerBannerTitle}>{t.trial_legal_title}</div>
         <div style={styles.disclaimerBannerText}>
-          {t.trial_legal_text}{" "}
+          {trialEnabled ? t.trial_legal_text : t.subscribe_legal_text}{" "}
           <span style={{ textDecoration: "underline", cursor: "pointer" }} onClick={onOpenContact}>{t.trial_legal_contact_link}</span>.
         </div>
       </div>
@@ -5257,9 +5302,9 @@ function ReferralModal({ t, referralCode, onClose }) {
   );
 }
 
-function FAQModal({ t, lang, onClose }) {
+function FAQModal({ t, lang, onClose, trialEnabled }) {
   const [openIndex, setOpenIndex] = useState(null);
-  const items = FAQ[lang] || FAQ.en;
+  const items = getFAQ(lang, trialEnabled);
 
   return (
     <div style={styles.modalOverlay}>

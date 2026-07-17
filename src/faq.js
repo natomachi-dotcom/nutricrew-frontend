@@ -1,4 +1,14 @@
-// FAQ content shown in the in-app FAQ modal (SplashScreen → FAQModal).
+// FAQ content shown in the in-app FAQ modal (SplashScreen → FAQModal). The
+// pricing answer (index 1 in every language) below is the TRIAL_ENABLED=true
+// copy, preserved for when the trial campaign is re-enabled — see
+// PRICING_ANSWER_NO_TRIAL and getFAQ() below for the current
+// (TRIAL_ENABLED=false) launch copy actually shown by default. Note: the
+// $7.99/$62.32/35% figures here are kept current even in this trial-era
+// answer, since price is a business decision independent of TRIAL_ENABLED —
+// checkout charges the same $62.32/yr annual price either way (see
+// nutricrew-backend/server.js's create-checkout-session). Only the trial
+// MECHANIC wording ("add a card to start your trial") is what's specific to
+// TRIAL_ENABLED=true and preserved here.
 export const FAQ = {
   en: [
     {
@@ -7,7 +17,7 @@ export const FAQ = {
     },
     {
       q: "Is NutriCrew free to use?",
-      a: "Your first month is free — add a card to start your trial, then it's $7.99/month or $67.12/year (save 30%). Cancel anytime before the trial ends and you won't be charged. Viewing plans you've already saved is always free.",
+      a: "Your first month is free — add a card to start your trial, then it's $7.99/month or $62.32/year (save 35%). Cancel anytime before the trial ends and you won't be charged. Viewing plans you've already saved is always free.",
     },
     {
       q: "How is my meal plan generated?",
@@ -45,7 +55,7 @@ export const FAQ = {
     },
     {
       q: "NutriCrew est-il gratuit ?",
-      a: "Votre premier mois est gratuit — ajoutez une carte pour démarrer l'essai, puis c'est 7,99 $/mois ou 67,12 $/an (économisez 30 %). Annulez avant la fin de l'essai et vous ne serez pas facturé. Consulter les plans déjà enregistrés reste toujours gratuit.",
+      a: "Votre premier mois est gratuit — ajoutez une carte pour démarrer l'essai, puis c'est 7,99 $/mois ou 62,32 $/an (économisez 35 %). Annulez avant la fin de l'essai et vous ne serez pas facturé. Consulter les plans déjà enregistrés reste toujours gratuit.",
     },
     {
       q: "Comment le plan de repas est-il généré ?",
@@ -83,7 +93,7 @@ export const FAQ = {
     },
     {
       q: "¿Es gratis usar NutriCrew?",
-      a: "Tu primer mes es gratis — agrega una tarjeta para iniciar la prueba, luego son $7.99/mes o $67.12/año (ahorra 30%). Cancela antes de que termine la prueba y no se te cobrará. Ver los planes que ya guardaste siempre es gratis.",
+      a: "Tu primer mes es gratis — agrega una tarjeta para iniciar la prueba, luego son $7.99/mes o $62.32/año (ahorra 35%). Cancela antes de que termine la prueba y no se te cobrará. Ver los planes que ya guardaste siempre es gratis.",
     },
     {
       q: "¿Cómo se genera mi plan de comidas?",
@@ -115,3 +125,22 @@ export const FAQ = {
     },
   ],
 };
+
+// Launch model (TRIAL_ENABLED=false): first pairing free, no card, no trial —
+// then a paid subscription. Kept separate from FAQ's trial-era answers above
+// so flipping TRIAL_ENABLED back on later restores that original copy
+// untouched instead of needing to be rewritten.
+const PRICING_ANSWER_NO_TRIAL = {
+  en: "Your first pairing is free — no card required. After that, it's $7.99/month or $62.32/year (save 35%). Cancel anytime from your account. Viewing plans you've already saved is always free.",
+  fr: "Votre premier pairing est gratuit — aucune carte requise. Ensuite, c'est 7,99 $/mois ou 62,32 $/an (économisez 35 %). Annulez à tout moment depuis votre compte. Consulter les plans déjà enregistrés reste toujours gratuit.",
+  es: "Tu primer pairing es gratis — no se requiere tarjeta. Después, son $7.99/mes o $62.32/año (ahorra 35%). Cancela cuando quieras desde tu cuenta. Ver los planes que ya guardaste siempre es gratis.",
+};
+
+// Returns this language's FAQ items, swapping in the correct pricing answer
+// (index 1, "Is NutriCrew free to use?") for the current TRIAL_ENABLED state.
+export function getFAQ(lang, trialEnabled) {
+  const base = FAQ[lang] || FAQ.en;
+  if (trialEnabled) return base;
+  const notrial = PRICING_ANSWER_NO_TRIAL[lang] || PRICING_ANSWER_NO_TRIAL.en;
+  return base.map((item, i) => (i === 1 ? { ...item, a: notrial } : item));
+}
