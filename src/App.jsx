@@ -1950,6 +1950,7 @@ export default function NutriCrew() {
           onGenerate={handleGenerate} onBack={() => setScreen("checkin")}
           isPremiumNeeded={isPremiumNeeded || needsPremiumForDiet} isOnline={isOnline}
           reviewFields={reviewFields} onEditField={jumpToReviewField}
+          isPremium={isPremium}
         />
       )}
 
@@ -3011,7 +3012,7 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
 }
 
 // ─── BOARDING PASS ────────────────────────────────────────────────
-function BoardingPassScreen({ t, user, pairing, onGenerate, onBack, isPremiumNeeded, isOnline, reviewFields, onEditField }) {
+function BoardingPassScreen({ t, user, pairing, onGenerate, onBack, isPremiumNeeded, isOnline, reviewFields, onEditField, isPremium }) {
   const mergedUser = { ...(user || {}), ...pairing };
   const dests = pairing.destinations || [];
   const dep = pairing.departure || "—";
@@ -3070,7 +3071,7 @@ function BoardingPassScreen({ t, user, pairing, onGenerate, onBack, isPremiumNee
         {/* Review rows — every pairing choice the plan uses, each editable */}
         <div style={styles.reviewRowGrid}>
           {reviewFields.map(key => {
-            const { label, value, highlight } = describeReviewField(key, pairing, user, t);
+            const { label, value, highlight } = describeReviewField(key, pairing, user, t, isPremium);
             return (
               <ReviewRow key={key} label={label} value={value} highlight={highlight}
                 incomplete={!isFieldFilled(key, pairing, user)}
@@ -3095,7 +3096,7 @@ function BoardingPassScreen({ t, user, pairing, onGenerate, onBack, isPremiumNee
 
       {!canGenerate && (
         <div style={{ background: "#3A0A0A", border: `1px solid ${C.red}`, borderRadius: 10, padding: "8px 14px", margin: "12px 0 0", color: C.red, fontSize: 13 }}>
-          ⚠️ Please complete: {incompleteFields.map(f => describeReviewField(f, pairing, user, t).label).join(", ")}
+          ⚠️ Please complete: {incompleteFields.map(f => describeReviewField(f, pairing, user, t, isPremium).label).join(", ")}
         </div>
       )}
 
@@ -3121,7 +3122,7 @@ function BoardingPassScreen({ t, user, pairing, onGenerate, onBack, isPremiumNee
 
 // Label + display value for one review-screen field. Shared between the row
 // list and the incomplete-fields banner so both always agree on wording.
-function describeReviewField(key, pairing, user, t) {
+function describeReviewField(key, pairing, user, t, isPremium) {
   const v = (k) => pairing[k] ?? user?.[k];
   if (key === "diet") {
     const diets = pairing.diets?.length ? pairing.diets : (user?.diets || []);
@@ -3176,9 +3177,14 @@ function describeReviewField(key, pairing, user, t) {
       : { label: "USA / CUSTOMS", value: pairing.going_usa === "no" ? t.no : "—" };
   }
   if (key === "duty_schedule") {
-    return pairing.report_time
+    if (!pairing.report_time) return { label: "DUTY SCHEDULE", value: "—" };
+    // Cognitive Mode duty-optimized meal timing is a premium feature — the
+    // server withholds performanceAdvisory (and the optimized meal choices
+    // it drives) from non-premium accounts, so this badge must never claim
+    // it's active for a free-pairing user who hasn't subscribed.
+    return isPremium
       ? { label: "DUTY MODE", value: "🧠 COGNITIVE MODE | DUTY OPTIMIZED", highlight: true }
-      : { label: "DUTY SCHEDULE", value: "—" };
+      : { label: "DUTY MODE", value: `👑 ${t.upgrade?.toUpperCase()}`, highlight: false };
   }
   if (key === "airplane_meal_plan") {
     const desc = pairing.airplane_meal_description;

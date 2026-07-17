@@ -4,16 +4,16 @@ import { test, expect } from "@playwright/test";
 // directly to the splash screen with a "New Pairing" button.  The verify-session
 // API call will fail (no backend in tests) but the catch handler only redirects
 // from "loading", so we stay on "splash".
-async function gotoReturningUser(page) {
+async function gotoReturningUser(page, { isPremium = false } = {}) {
   // No real backend runs in tests. Left unmocked, Vite's dev-server proxy turns
   // "nothing listening on :3001" into an HTTP error response (not a network
   // exception), which the app's verify-session handler treats as "session
   // invalid" and force-redirects to the login screen regardless of where the
   // user already navigated. Mock a success response so verify-session is a no-op.
   await page.route("**/api/auth/verify-session", (route) =>
-    route.fulfill({ json: { email: "renatogadeabi@gmail.com", isPremium: false } })
+    route.fulfill({ json: { email: "renatogadeabi@gmail.com", isPremium } })
   );
-  await page.addInitScript(() => {
+  await page.addInitScript((premium) => {
     localStorage.setItem(
       "nutricrew_session",
       JSON.stringify({ token: "test-token", email: "renatogadeabi@gmail.com" })
@@ -32,9 +32,10 @@ async function gotoReturningUser(page) {
         goals: ["stay_focused"],
         budget_type: "day",
         budget_amount: "50",
+        isPremium: premium,
       })
     );
-  });
+  }, isPremium);
   await page.goto("/");
   await expect(page.getByRole("button", { name: "New Pairing" })).toBeVisible({
     timeout: 5000,
@@ -77,8 +78,8 @@ async function walkToDutySchedule(page) {
 }
 
 test.describe("Duty Schedule → Boarding Pass", () => {
-  test("COGNITIVE MODE row appears when report_time is set", async ({ page }) => {
-    await gotoReturningUser(page);
+  test("COGNITIVE MODE row appears when report_time is set, for a premium account", async ({ page }) => {
+    await gotoReturningUser(page, { isPremium: true });
     await walkToDutySchedule(page);
 
     await page.locator('input[type="time"]').fill("06:00");
@@ -90,6 +91,28 @@ test.describe("Duty Schedule → Boarding Pass", () => {
     ).toBeVisible();
     await expect(
       page.getByText("🧠 COGNITIVE MODE | DUTY OPTIMIZED")
+    ).toBeVisible();
+  });
+
+  // Cognitive Mode duty-optimized meal timing is a premium feature — the
+  // server withholds the actual optimized content from non-premium accounts
+  // (see performanceAdvisory gating in server.js), so a free-tier account
+  // must never see this badge claim it's active, even with report_time set.
+  test("COGNITIVE MODE row shows an upgrade prompt instead, for a non-premium account", async ({ page }) => {
+    await gotoReturningUser(page, { isPremium: false });
+    await walkToDutySchedule(page);
+
+    await page.locator('input[type="time"]').fill("06:00");
+    await page.getByRole("button", { name: "Continue →" }).click();
+
+    await expect(
+      page.getByRole("button", { name: "Generate My Plan" })
+    ).toBeVisible();
+    await expect(
+      page.getByText("🧠 COGNITIVE MODE | DUTY OPTIMIZED")
+    ).not.toBeVisible();
+    await expect(
+      page.getByText("👑 UPGRADE TO PREMIUM")
     ).toBeVisible();
   });
 
@@ -105,6 +128,9 @@ test.describe("Duty Schedule → Boarding Pass", () => {
     ).toBeVisible();
     await expect(
       page.getByText("🧠 COGNITIVE MODE | DUTY OPTIMIZED")
+    ).not.toBeVisible();
+    await expect(
+      page.getByText("👑 UPGRADE TO PREMIUM")
     ).not.toBeVisible();
   });
 });
