@@ -6356,8 +6356,16 @@ const styles = {
     padding: "10px 16px", textAlign: "center", fontSize: 13, color: C.gold,
   },
   // PLAN
+  // Bottom padding must clear the FULL floating-action-button stack (Calorie,
+  // Jetlag, Saved, Roster, Gym Plan — 5 buttons on this screen), not just a
+  // fixed 80px. The stack's highest element (Gym Plan's crown badge) sits at
+  // ~bottom:358; 80px left every meal card's last rows — including the "tap
+  // an ingredient you're allergic to" row — permanently obscured under the
+  // buttons on any device short enough to reach the bottom of the page.
+  // 420px clears the full stack with margin; env(safe-area-inset-bottom)
+  // adds the extra clearance notched devices need on top of that.
   planScreen: {
-    minHeight: "100vh", padding: "0 0 80px", position: "relative", zIndex: 1,
+    minHeight: "100vh", padding: "0 0 calc(420px + env(safe-area-inset-bottom, 0px))", position: "relative", zIndex: 1,
   },
   planHeader: {
     background: C.navyMid, padding: "16px 20px",
