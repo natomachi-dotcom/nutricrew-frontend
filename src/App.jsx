@@ -2479,6 +2479,19 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
   const [docNumber] = useState(() => Date.now().toString());
   // Local state for destination inputs — prevents parent re-render on every keystroke.
   const [localDests, setLocalDests] = useState(() => pairing.destinations || []);
+  // Budget can't reuse localVal above: currentStep is "budget" but the field
+  // is "budget_amount", so localVal's `pairing[currentStep]` auto-init would
+  // never find it. Needs its own local state for the same reason weight/
+  // departure/name/email do — a bug found live: with the input rendered as
+  // `value={pairing.budget_amount || user?.budget_amount || ""}`, clearing a
+  // pre-filled amount (e.g. Ctrl+A, Backspace, the normal way anyone retypes
+  // a number) makes pairing.budget_amount "" (falsy), so the `||` chain fell
+  // through to the OLD user?.budget_amount and the field snapped right back
+  // to it — new digits then appended onto the stale number instead of
+  // replacing it (typing "42" over a pre-filled "50" produced "5042"). Local
+  // state has no such fallback: once initialized, it's the only source of
+  // truth for what's displayed, so clearing it actually clears it.
+  const [localBudgetAmount, setLocalBudgetAmount] = useState(() => pairing.budget_amount ?? user?.budget_amount ?? "");
   const depTimerRef = useRef(null);
   const tzTimerRef = useRef(null);
   const textSaveTimerRef = useRef(null);
@@ -2909,8 +2922,8 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
                 </button>
               ))}
             </div>
-            <TextInput value={pairing.budget_amount || user?.budget_amount || ""} type="number"
-              onChange={v => upd("budget_amount", v)}
+            <TextInput value={localBudgetAmount} type="number"
+              onChange={v => { setLocalBudgetAmount(v); upd("budget_amount", v); }}
               placeholder="50" icon="💰"/>
           </div>
         );
