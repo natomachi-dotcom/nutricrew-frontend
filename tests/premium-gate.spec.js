@@ -33,8 +33,6 @@ test("first pairing is free with no card and no paywall; second pairing hits the
   await page.getByPlaceholder("Where are you flying? (city or airport)").fill("Tokyo (NRT)");
   await continueBtn.click();
   await continueBtn.click(); // kitchen access (day 1): pre-filled from profile
-  await page.getByRole("button", { name: "🌍 No", exact: true }).click();
-  await continueBtn.click();
   await continueBtn.click(); // duty schedule, optional — skip
 
   await page.getByRole("button", { name: "Generate My Plan" }).click();

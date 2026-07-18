@@ -58,7 +58,6 @@ const T = {
     step_route: "Your Route",
     destination_label: "Destination",
     destination_placeholder: "Where are you flying? (city or airport)",
-    step_usa: "Flying to the USA?",
     step_kitchen: "Kitchen Access",
     step_lunch_bag: "Lunch Bag Size",
     bag_small: "Small  — fits 1–2 containers (~4L)",
@@ -284,7 +283,6 @@ const T = {
     val_enter_budget: "Enter your budget to continue.",
     val_select_days: "Choose your pairing length to continue.",
     val_fill_dest: "Fill in all destinations to continue.",
-    val_select_usa: "Select yes or no to continue.",
     hydration_target: "Daily Water Target",
     hydration_longhauul: "Long-haul pairing — cabin altitude accelerates dehydration",
     hydration_medium: "Medium-haul pairing — drink more than you would on the ground",
@@ -332,7 +330,6 @@ const T = {
     step_route: "Votre Route",
     destination_label: "Destination",
     destination_placeholder: "Où allez-vous ? (ville ou aéroport)",
-    step_usa: "Vol vers les États-Unis?",
     step_kitchen: "Accès Cuisine",
     step_lunch_bag: "Taille du Sac Repas",
     bag_small: "Petit  — 1–2 boîtes (~4L)",
@@ -550,7 +547,6 @@ const T = {
     val_enter_budget: "Entrez votre budget pour continuer.",
     val_select_days: "Choisissez la durée de votre pairing pour continuer.",
     val_fill_dest: "Remplissez toutes les destinations pour continuer.",
-    val_select_usa: "Sélectionnez oui ou non pour continuer.",
     hydration_target: "Objectif Hydratation Journalier",
     hydration_longhauul: "Vol long-courrier — l'altitude déshydrate plus vite",
     hydration_medium: "Vol moyen-courrier — buvez plus qu'au sol",
@@ -598,7 +594,6 @@ const T = {
     step_route: "Tu Ruta",
     destination_label: "Destino",
     destination_placeholder: "¿A dónde vuelas? (ciudad o aeropuerto)",
-    step_usa: "¿Vuelo a EE.UU.?",
     step_kitchen: "Acceso a Cocina",
     step_lunch_bag: "Tamaño del Bolso",
     bag_small: "Pequeño — 1–2 recipientes (~4L)",
@@ -816,7 +811,6 @@ const T = {
     val_enter_budget: "Ingresa tu presupuesto para continuar.",
     val_select_days: "Elige la duración de tu pairing para continuar.",
     val_fill_dest: "Completa todos los destinos para continuar.",
-    val_select_usa: "Selecciona sí o no para continuar.",
     hydration_target: "Objetivo Diario de Hidratación",
     hydration_longhauul: "Vuelo de largo recorrido — la altitud de cabina deshidrata más rápido",
     hydration_medium: "Vuelo de medio recorrido — bebe más que en tierra",
@@ -1427,7 +1421,7 @@ export default function NutriCrew() {
     "goals", "budget",
     "pairing_days", "departure", "destination",
     ...kitchenDaySteps,
-    "going_usa", "duty_schedule",
+    "duty_schedule",
     ...(anyDayHasAirplaneFood ? ["airplane_meal_plan"] : []),
   ];
   // "budget" is deliberately NOT in this list — a returning user still gets
@@ -2600,7 +2594,6 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
       case "budget":       return t.val_enter_budget;
       case "pairing_days": return t.val_select_days;
       case "destination":  return t.val_fill_dest;
-      case "going_usa":    return t.val_select_usa;
       default:             return null;
     }
   };
@@ -2752,12 +2745,6 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
           </div>
         );
       }
-
-      case "going_usa":
-        return <RadioGroup label={t.step_usa}
-          options={[{v:"yes",l:t.yes,icon:"🇺🇸"},{v:"no",l:t.no,icon:"🌍"}]}
-          value={pairing.going_usa}
-          onChange={v => upd("going_usa", v)}/>;
 
       case "duty_schedule":
         return <DutyScheduleStep t={t} pairing={pairing} upd={upd} />;
@@ -3184,11 +3171,6 @@ function describeReviewField(key, pairing, user, t, isPremium) {
     const map = { full_kitchen: t.full_kitchen, hotel: t.hotel_no_kitchen, fridge: t.fridge, microwave: t.microwave, airplane_food: t.airplane_food };
     return { label: `KITCHEN ACCESS — DAY ${dayNum}`, value: vals.length ? vals.map(x => map[x] || x).join(", ") : "—" };
   }
-  if (key === "going_usa") {
-    return pairing.going_usa === "yes"
-      ? { label: "USA RULES", value: "⚠️ FOOD RESTRICTIONS", highlight: true }
-      : { label: "USA / CUSTOMS", value: pairing.going_usa === "no" ? t.no : "—" };
-  }
   if (key === "duty_schedule") {
     if (!pairing.report_time) return { label: "DUTY SCHEDULE", value: "—" };
     // Cognitive Mode duty-optimized meal timing is a premium feature — the
@@ -3231,7 +3213,6 @@ function isFieldFilled(key, pairing, user) {
     return dests.length >= n && dests.slice(0, n).every(d => d && d.trim());
   }
   if (key.startsWith("kitchen_day_")) return (pairing[key] || []).length > 0;
-  if (key === "going_usa") return pairing.going_usa === "yes" || pairing.going_usa === "no";
   if (key === "duty_schedule") return true; // optional
   if (key === "airplane_meal_plan") return true; // optional
   return true;
@@ -3771,7 +3752,7 @@ function FoodRestrictions({ data, pairing }) {
           <div style={styles.restrictText}>{data.carried}</div>
         </div>
       )}
-      {pairing.going_usa === "yes" && (
+      {data.usaApplies && (
         <div style={styles.restrictCard}>
           <div style={styles.restrictTitle}>🇺🇸 USA Customs Rules</div>
           <div style={styles.restrictText}>{data.usa}</div>

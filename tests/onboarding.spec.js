@@ -58,7 +58,7 @@ test("new crew member completes check-in, generates their free first plan, and e
   await expect(page.getByText("Bananas")).toBeVisible();
   await expect(page.getByText("Chicken breast")).toBeVisible();
 
-  // Food rules tab (going_usa = "no", so only destination/general rules show).
+  // Food rules tab (MOCK_PLAN's foodRestrictions has no usaApplies flag, so only destination/general rules show).
   await page.getByRole("button", { name: "Food Rules" }).click();
   await expect(page.getByText("Some dairy and meat products")).toBeVisible();
   await expect(page.getByText("Stay hydrated and avoid excess sodium")).toBeVisible();

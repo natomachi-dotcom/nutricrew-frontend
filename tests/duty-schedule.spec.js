@@ -43,7 +43,7 @@ async function gotoReturningUser(page, { isPremium = false } = {}) {
 }
 
 // Clicks through the returning-user steps (budget → pairing_days → departure →
-// destination → kitchen_day_1 → going_usa → duty_schedule) and leaves the
+// destination → kitchen_day_1 → duty_schedule) and leaves the
 // caller on the duty_schedule step, ready to fill in the time or skip it.
 async function walkToDutySchedule(page) {
   const continueBtn = page.getByRole("button", { name: "Continue →" });
@@ -68,10 +68,6 @@ async function walkToDutySchedule(page) {
   // kitchen access (day 1): pre-filled from the saved profile ("fridge", seeded
   // above) since it's not yet set for this pairing — do not click it again,
   // that would deselect it and leave the day with zero kitchen options.
-  await continueBtn.click();
-
-  // going_usa: No
-  await page.getByRole("button", { name: "🌍 No", exact: true }).click();
   await continueBtn.click();
 
   // Now on duty_schedule step

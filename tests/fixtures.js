@@ -168,10 +168,6 @@ export async function completeCheckIn(page, { name = "Alex Pilot", email = "alex
   await page.getByRole("button", { name: "Hotel (No Kitchen)" }).click();
   await continueBtn.click();
 
-  // flying to the USA?
-  await page.getByRole("button", { name: "🌍 No", exact: true }).click();
-  await continueBtn.click();
-
   // duty schedule (optional) — skip
   await continueBtn.click();
 
@@ -206,7 +202,7 @@ export async function gotoAsPremiumUser(page, overrides = {}) {
 }
 
 // Walks the shortened returning-user "New Pairing" flow (budget → pairing_days
-// → departure → destination → kitchen_day_1 → going_usa → duty_schedule) for a
+// → departure → destination → kitchen_day_1 → duty_schedule) for a
 // 1-day pairing and lands on the boarding pass. Budget/departure/kitchen are
 // pre-filled from the seeded profile (gotoAsPremiumUser) — only destination is
 // ever left blank by design, so it's the only field this fills in.
@@ -221,8 +217,6 @@ export async function completeNewPairing(page, { destination = "Paris (CDG)" } =
   await page.getByPlaceholder("Where are you flying? (city or airport)").fill(destination);
   await continueBtn.click();
   await continueBtn.click(); // kitchen access (day 1): pre-filled from profile
-  await page.getByRole("button", { name: "🌍 No", exact: true }).click();
-  await continueBtn.click();
   await continueBtn.click(); // duty schedule, optional — skip
 
   await expect(page.getByRole("button", { name: "Generate My Plan" })).toBeVisible();
