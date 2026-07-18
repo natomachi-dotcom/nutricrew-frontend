@@ -78,6 +78,20 @@ export const MOCK_PLAN = {
     usa: "Not applicable — not traveling to the USA",
     destination: "Some dairy and meat products face import restrictions when entering France.",
     general: "Stay hydrated and avoid excess sodium while traveling.",
+    usaApplies: false,
+    // Deterministic, server-computed per-country breakdown (see
+    // buildCustomsByCountry in server.js) — this is what the Food Rules tab
+    // actually renders now, not the free-form `destination` text above.
+    byCountry: [
+      {
+        id: "eu", name: "EU/Schengen border", dayLabel: "Day 1", days: [1], onReturn: false,
+        bans: [
+          "Meat and meat products from outside the EU",
+          "Dairy products from outside the EU",
+          "Fresh fruits and vegetables from non-EU countries (without phytosanitary certificate)",
+        ],
+      },
+    ],
   },
   pairingCount: 1,
   isPremium: false,

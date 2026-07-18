@@ -58,8 +58,12 @@ test("new crew member completes check-in, generates their free first plan, and e
   await expect(page.getByText("Bananas")).toBeVisible();
   await expect(page.getByText("Chicken breast")).toBeVisible();
 
-  // Food rules tab (MOCK_PLAN's foodRestrictions has no usaApplies flag, so only destination/general rules show).
+  // Food rules tab: the per-country customs breakdown (byCountry) is what's
+  // actually rendered now, not the old free-form destination/usa text.
   await page.getByRole("button", { name: "Food Rules" }).click();
-  await expect(page.getByText("Some dairy and meat products")).toBeVisible();
+  await expect(page.getByText("EU/Schengen border")).toBeVisible();
+  await expect(page.getByText("Dairy products from outside the EU")).toBeVisible();
   await expect(page.getByText("Stay hydrated and avoid excess sodium")).toBeVisible();
+  // USA card must not appear for a destination that never touches the USA.
+  await expect(page.getByText("USA (CBP/USDA)")).not.toBeVisible();
 });

@@ -283,6 +283,11 @@ const T = {
     val_enter_budget: "Enter your budget to continue.",
     val_select_days: "Choose your pairing length to continue.",
     val_fill_dest: "Fill in all destinations to continue.",
+    customs_section_title: "Customs & Import Rules",
+    customs_carried_title: "Packed & Carried Food Rules",
+    customs_general_title: "General Tips",
+    customs_word: "Customs",
+    customs_day_note: "Packed items today must clear",
     hydration_target: "Daily Water Target",
     hydration_longhauul: "Long-haul pairing — cabin altitude accelerates dehydration",
     hydration_medium: "Medium-haul pairing — drink more than you would on the ground",
@@ -547,6 +552,11 @@ const T = {
     val_enter_budget: "Entrez votre budget pour continuer.",
     val_select_days: "Choisissez la durée de votre pairing pour continuer.",
     val_fill_dest: "Remplissez toutes les destinations pour continuer.",
+    customs_section_title: "Douanes et Règles d'Importation",
+    customs_carried_title: "Règles pour les Aliments Emballés",
+    customs_general_title: "Conseils Généraux",
+    customs_word: "Douanes",
+    customs_day_note: "Les aliments emballés aujourd'hui doivent passer",
     hydration_target: "Objectif Hydratation Journalier",
     hydration_longhauul: "Vol long-courrier — l'altitude déshydrate plus vite",
     hydration_medium: "Vol moyen-courrier — buvez plus qu'au sol",
@@ -811,6 +821,11 @@ const T = {
     val_enter_budget: "Ingresa tu presupuesto para continuar.",
     val_select_days: "Elige la duración de tu pairing para continuar.",
     val_fill_dest: "Completa todos los destinos para continuar.",
+    customs_section_title: "Aduana y Reglas de Importación",
+    customs_carried_title: "Reglas para Alimentos Empacados",
+    customs_general_title: "Consejos Generales",
+    customs_word: "Aduana",
+    customs_day_note: "Los alimentos empacados hoy deben pasar",
     hydration_target: "Objetivo Diario de Hidratación",
     hydration_longhauul: "Vuelo de largo recorrido — la altitud de cabina deshidrata más rápido",
     hydration_medium: "Vuelo de medio recorrido — bebe más que en tierra",
@@ -3470,14 +3485,14 @@ function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, 
               </div>
             )
             : <DayPlan day={plan.days[activeDay]} t={t} favorites={favorites} onToggleFavorite={onToggleFavorite} onOpenAirplaneMeal={onOpenAirplaneMeal}
-                pairing={pairing} user={user} lang={lang}
+                pairing={pairing} user={user} lang={lang} byCountry={plan.foodRestrictions?.byCountry}
                 onUpdateMeal={(mealIdx, newMeal) => onUpdateMeal(activeDay, mealIdx, newMeal)}/>
         )}
         {activeTab === "grocery" && plan.groceryList && (
           <GroceryList list={plan.groceryList}/>
         )}
         {activeTab === "restrictions" && plan.foodRestrictions && (
-          <FoodRestrictions data={plan.foodRestrictions} pairing={pairing}/>
+          <FoodRestrictions data={plan.foodRestrictions} t={t}/>
         )}
         {activeTab === "performance" && plan.performanceAdvisory && (
           <div style={{ padding: "4px 0" }}>
@@ -3570,12 +3585,17 @@ function PlanFeedback({ t, planKey }) {
   );
 }
 
-function DayPlan({ day, t, favorites, onToggleFavorite, onOpenAirplaneMeal, pairing, user, lang, onUpdateMeal }) {
+function DayPlan({ day, t, favorites, onToggleFavorite, onOpenAirplaneMeal, pairing, user, lang, onUpdateMeal, byCountry }) {
   const [expandedIdx, setExpandedIdx] = useState(null);
   const [regeneratingIdx, setRegeneratingIdx] = useState(null);
   const [regenError, setRegenError] = useState(null);
   const mealColors = { Breakfast: C.gold, Lunch: C.sky, Dinner: C.green, Snack: C.muted };
   const hasAllergy = (pairing?.diets || user?.diets || []).some(d => ALLERGY_DIET_VALUES.includes(d));
+  // Ties this specific day back to WHY its packed items are constrained —
+  // straight from byCountry's own `.days` (server-derived, same source the
+  // Food Rules tab reads), so a day never "just happens" to skip a fresh
+  // ingredient with no visible reason.
+  const dayCountries = (byCountry || []).filter(c => (c.days || []).includes(day.day));
 
   const flagIngredient = async (i, meal, ingredient) => {
     setRegenError(null);
@@ -3605,6 +3625,15 @@ function DayPlan({ day, t, favorites, onToggleFavorite, onOpenAirplaneMeal, pair
       {day.hydrationNote && (
         <div style={{ background: "#081A2E", border: "1px solid #2A6090", borderRadius: 8, padding: "6px 12px", marginBottom: 10, fontSize: 12, color: "#7BBFE0", display: "flex", alignItems: "center", gap: 7 }}>
           <span>💧</span><span>{day.hydrationNote}</span>
+        </div>
+      )}
+      {dayCountries.length > 0 && (
+        <div style={{ background: "#241A08", border: "1px solid #8a6020", borderRadius: 8, padding: "6px 12px", marginBottom: 10, fontSize: 12, color: "#e8a020", display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
+          <span>🛃</span>
+          <span>{t.customs_day_note}</span>
+          {dayCountries.map(c => (
+            <span key={c.id} style={{ fontWeight: 700 }}>{COUNTRY_FLAG[c.id] || "🌍"} {c.name}</span>
+          ))}
         </div>
       )}
       {day.meals?.map((meal, i) => {
@@ -3743,30 +3772,41 @@ function GroceryList({ list }) {
   );
 }
 
-function FoodRestrictions({ data, pairing }) {
+const COUNTRY_FLAG = { usa: "🇺🇸", japan: "🇯🇵", canada: "🇨🇦", mexico: "🇲🇽", uk: "🇬🇧", eu: "🇪🇺", uae: "🇦🇪", australia: "🇦🇺" };
+
+// byCountry is server-computed straight from the SAME restrictedBorders the
+// backend's customs_matches_destination Wall rule checks the plan against —
+// never re-derived or guessed client-side — so what's shown here is
+// guaranteed to match what was actually applied, not a description of it.
+function FoodRestrictions({ data, t }) {
+  const byCountry = data.byCountry || [];
   return (
     <div>
+      {byCountry.length > 0 && (
+        <div style={{ fontSize: 12, fontWeight: 700, color: C.gold, letterSpacing: 1, textTransform: "uppercase", marginBottom: 10 }}>
+          🛃 {t.customs_section_title}
+        </div>
+      )}
       {data.carried && (
         <div style={{...styles.restrictCard, borderLeft: "3px solid #e8a020"}}>
-          <div style={styles.restrictTitle}>⚠️ Packed & Carried Food Rules</div>
+          <div style={styles.restrictTitle}>⚠️ {t.customs_carried_title}</div>
           <div style={styles.restrictText}>{data.carried}</div>
         </div>
       )}
-      {data.usaApplies && (
-        <div style={styles.restrictCard}>
-          <div style={styles.restrictTitle}>🇺🇸 USA Customs Rules</div>
-          <div style={styles.restrictText}>{data.usa}</div>
+      {byCountry.map(c => (
+        <div key={c.id} style={styles.restrictCard}>
+          <div style={styles.restrictTitle}>
+            {COUNTRY_FLAG[c.id] || "🌍"} {c.name} {t.customs_word}
+            {c.dayLabel && <span style={{ color: C.muted, fontWeight: 400 }}> — {c.dayLabel}</span>}
+          </div>
+          <ul style={{ margin: 0, paddingLeft: 18, ...styles.restrictText }}>
+            {c.bans.map((ban, i) => <li key={i} style={{ marginBottom: 4 }}>{ban}</li>)}
+          </ul>
         </div>
-      )}
-      {data.destination && (
-        <div style={styles.restrictCard}>
-          <div style={styles.restrictTitle}>🌍 {[...new Set(pairing.destinations || [])].join(", ")} Rules</div>
-          <div style={styles.restrictText}>{data.destination}</div>
-        </div>
-      )}
+      ))}
       {data.general && (
         <div style={styles.restrictCard}>
-          <div style={styles.restrictTitle}>ℹ️ General Tips</div>
+          <div style={styles.restrictTitle}>ℹ️ {t.customs_general_title}</div>
           <div style={styles.restrictText}>{data.general}</div>
         </div>
       )}
