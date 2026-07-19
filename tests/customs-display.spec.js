@@ -87,6 +87,7 @@ test("a multi-country pairing (YUL -> FLL -> NRT) shows both USA and Japan restr
   await gotoAsPremiumUser(page);
   await page.getByRole("button", { name: "New Pairing" }).click();
   const continueBtn = page.getByRole("button", { name: "Continue →" });
+  await continueBtn.click(); // diet: pre-filled from profile, still editable
   await continueBtn.click(); // budget: pre-filled from profile
   await page.getByRole("button", { name: "2 Days" }).click();
   await continueBtn.click();
@@ -95,8 +96,10 @@ test("a multi-country pairing (YUL -> FLL -> NRT) shows both USA and Japan restr
   await destInputs.nth(0).fill("Fort Lauderdale (FLL)");
   await destInputs.nth(1).fill("Tokyo (NRT)");
   await continueBtn.click();
-  await continueBtn.click(); // kitchen access day 1: pre-filled from profile
-  await continueBtn.click(); // kitchen access day 2: pre-filled from profile
+  await page.getByRole("button", { name: "Hotel (No Kitchen)" }).click(); // kitchen access day 1: no default, explicit choice required
+  await continueBtn.click();
+  await page.getByRole("button", { name: "Hotel (No Kitchen)" }).click(); // kitchen access day 2: no default, explicit choice required
+  await continueBtn.click();
   await continueBtn.click(); // duty schedule, optional — skip
 
   // No customs/country question anywhere in that flow.

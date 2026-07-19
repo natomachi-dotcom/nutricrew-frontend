@@ -26,13 +26,15 @@ test("first pairing is free with no card and no paywall; second pairing hits the
   // generate-plan is called again.
   await page.getByRole("button", { name: "New Pairing" }).click();
   const continueBtn = page.getByRole("button", { name: "Continue →" });
+  await continueBtn.click(); // diet: pre-filled from profile, still editable
   await continueBtn.click(); // budget: pre-filled from profile
   await page.getByRole("button", { name: "1 Days" }).click();
   await continueBtn.click();
   await continueBtn.click(); // departure: pre-filled from profile
   await page.getByPlaceholder("Where are you flying? (city or airport)").fill("Tokyo (NRT)");
   await continueBtn.click();
-  await continueBtn.click(); // kitchen access (day 1): pre-filled from profile
+  await page.getByRole("button", { name: "Hotel (No Kitchen)" }).click(); // kitchen access (day 1): no default, explicit choice required
+  await continueBtn.click();
   await continueBtn.click(); // duty schedule, optional — skip
 
   await page.getByRole("button", { name: "Generate My Plan" }).click();

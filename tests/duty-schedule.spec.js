@@ -50,6 +50,10 @@ async function walkToDutySchedule(page) {
 
   await page.getByRole("button", { name: "New Pairing" }).click();
 
+  // diet: deliberately not skipped for returning users — pre-filled from the
+  // saved profile, editable per-trip. Accept the pre-filled value.
+  await continueBtn.click();
+
   // budget: deliberately not skipped for returning users — pre-filled from the
   // saved profile (day/$50), editable per-trip. Accept the pre-filled value.
   await continueBtn.click();
@@ -65,9 +69,9 @@ async function walkToDutySchedule(page) {
   await page.getByPlaceholder("Where are you flying? (city or airport)").fill("Paris (CDG)");
   await continueBtn.click();
 
-  // kitchen access (day 1): pre-filled from the saved profile ("fridge", seeded
-  // above) since it's not yet set for this pairing — do not click it again,
-  // that would deselect it and leave the day with zero kitchen options.
+  // kitchen access (day 1): never pre-filled (a new trip's accommodation has
+  // no relationship to a prior trip's) — explicit choice required every time.
+  await page.getByRole("button", { name: "Fridge, No Stove" }).click();
   await continueBtn.click();
 
   // Now on duty_schedule step

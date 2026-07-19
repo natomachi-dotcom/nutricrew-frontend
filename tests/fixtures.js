@@ -215,22 +215,27 @@ export async function gotoAsPremiumUser(page, overrides = {}) {
   await expect(page.getByRole("button", { name: "New Pairing" })).toBeVisible();
 }
 
-// Walks the shortened returning-user "New Pairing" flow (budget → pairing_days
-// → departure → destination → kitchen_day_1 → duty_schedule) for a
-// 1-day pairing and lands on the boarding pass. Budget/departure/kitchen are
-// pre-filled from the seeded profile (gotoAsPremiumUser) — only destination is
-// ever left blank by design, so it's the only field this fills in.
+// Walks the shortened returning-user "New Pairing" flow (diet → budget →
+// pairing_days → departure → destination → kitchen_day_1 → duty_schedule)
+// for a 1-day pairing and lands on the boarding pass. Diet/budget/departure
+// are pre-filled from the seeded profile (gotoAsPremiumUser) but still shown
+// (visible, editable, not silently reused) — destination and kitchen access
+// are never pre-filled (a new trip's accommodation has no relationship to a
+// prior trip's), so both require an explicit choice here, matching kitchen
+// access seeded as ["hotel"] in gotoAsPremiumUser's default user.
 export async function completeNewPairing(page, { destination = "Paris (CDG)" } = {}) {
   const continueBtn = page.getByRole("button", { name: "Continue →" });
 
   await page.getByRole("button", { name: "New Pairing" }).click();
+  await continueBtn.click(); // diet: pre-filled from profile, still editable
   await continueBtn.click(); // budget: pre-filled from profile
   await page.getByRole("button", { name: "1 Days" }).click();
   await continueBtn.click();
   await continueBtn.click(); // departure: pre-filled from profile
   await page.getByPlaceholder("Where are you flying? (city or airport)").fill(destination);
   await continueBtn.click();
-  await continueBtn.click(); // kitchen access (day 1): pre-filled from profile
+  await page.getByRole("button", { name: "Hotel (No Kitchen)" }).click(); // kitchen access (day 1): no default, explicit choice required
+  await continueBtn.click();
   await continueBtn.click(); // duty schedule, optional — skip
 
   await expect(page.getByRole("button", { name: "Generate My Plan" })).toBeVisible();

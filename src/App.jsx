@@ -1439,10 +1439,14 @@ export default function NutriCrew() {
     "duty_schedule",
     ...(anyDayHasAirplaneFood ? ["airplane_meal_plan"] : []),
   ];
-  // "budget" is deliberately NOT in this list — a returning user still gets
-  // an optional, pre-filled chance to adjust it for this specific trip
-  // (acceptance criterion: editable per-trip without altering the saved default).
-  const personalSteps = ["name","email","gender","weight","dob","position","lunch_bag","cooking_pref","diet","calorie_target","goals"];
+  // "budget" and "diet" are deliberately NOT in this list — a returning user
+  // still gets a visible, pre-filled chance to adjust either for this
+  // specific trip. diet used to be skipped entirely (silently reused from
+  // the profile with zero visibility), which meant a crew member had no way
+  // to notice or correct a stale/wrong diet without leaving the check-in
+  // flow to find the profile editor — same "hidden default" failure class
+  // as the kitchen-access bug.
+  const personalSteps = ["name","email","gender","weight","dob","position","lunch_bag","cooking_pref","calorie_target","goals"];
   const steps = checkinReturning
     ? allSteps.filter(s => !personalSteps.includes(s))
     : allSteps;
@@ -2522,9 +2526,25 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
       upd("departure", user.departure);
       setLocalVal(user.departure);
     }
-    if (currentStep?.startsWith("kitchen_day_") && !pairing[currentStep] && user?.kitchen?.length) {
-      upd(currentStep, user.kitchen);
+    // diet, like budget, IS pre-filled from the profile — it's a stable
+    // personal characteristic, not something that varies per trip the way
+    // kitchen access does — but unlike the old kitchen-access bug, the step
+    // itself is still SHOWN (see personalSteps above), so the crew member
+    // sees exactly what's pre-selected and can change it for this trip
+    // instead of it being silently applied with no visibility at all.
+    if (currentStep === "diet" && !pairing.diets && user?.diets?.length) {
+      upd("diets", user.diets);
+      if (user.diet_other) upd("diet_other", user.diet_other);
+      if (user.allergy_other_text) upd("allergy_other_text", user.allergy_other_text);
     }
+    // Kitchen access, like destination, is intentionally never auto-filled
+    // from the saved profile — unlike departure (a stable home base), what's
+    // available at THIS trip's accommodation varies every time and has zero
+    // relationship to what a prior trip happened to have. Auto-filling it
+    // silently carried forward stale kitchen access (e.g. a hotel-only prior
+    // trip pre-selecting "Hotel (No Kitchen)" for a trip that actually has a
+    // full kitchen) unless the crew member noticed and corrected it — every
+    // pairing must start with an explicit, deliberate choice instead.
     // Destination is intentionally never auto-filled — unlike departure (a
     // stable home base), a pairing's destination is different every time by
     // definition, so it must always start blank with just a placeholder.
@@ -5481,6 +5501,7 @@ function ProfileModal({ t, user, onSave, onClose, onManageSubscription, onSwitch
   const [switchingAnnual, setSwitchingAnnual] = useState(false);
   const [annualError, setAnnualError] = useState("");
   const [annualMsg, setAnnualMsg] = useState("");
+  const [saveError, setSaveError] = useState("");
 
   const trialEndDate = user?.trialEnd ? new Date(user.trialEnd) : null;
   const isTrialing = trialEndDate && trialEndDate > new Date();
@@ -5542,6 +5563,18 @@ function ProfileModal({ t, user, onSave, onClose, onManageSubscription, onSwitch
   };
 
   const handleSave = () => {
+    // A diet chip that's already selected toggles OFF on tap (same as every
+    // other CheckGroup) — easy to trigger by accident while just reviewing
+    // an existing selection. The check-in step already refuses to let a
+    // brand-new user continue with zero diet chips selected (see
+    // val_select_diet); this modal was the one place that same guard was
+    // missing, so an accidental toggle-off here silently saved "no diet"
+    // and every later pairing was generated with no diet restriction at all.
+    if (diets.length === 0) {
+      setSaveError(t.val_select_diet);
+      return;
+    }
+    setSaveError("");
     onSave({
       gender,
       weight: weightVal ? `${weightVal}${weightUnit}` : user?.weight,
@@ -5779,6 +5812,7 @@ function ProfileModal({ t, user, onSave, onClose, onManageSubscription, onSwitch
             placeholder="50" icon="💰"/>
         </div>
 
+        {saveError && <div style={{ color: "#F87171", fontSize: 13, marginTop: 4 }}>{saveError}</div>}
         <button style={styles.primaryBtn} onClick={handleSave}>{t.save_profile}</button>
       </div>
     </div>
