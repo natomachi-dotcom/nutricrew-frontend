@@ -2128,27 +2128,53 @@ function LoginScreen({ onSent, onSuccess, onBack }) {
       setError("Please enter a valid email address.");
       return;
     }
+    // Password is required to sign in — leaving it blank is no longer a
+    // silent alternate path to the same "Continue" button. Recovering
+    // access without it is now a separate, explicitly-labeled action (see
+    // handleForgotPassword below), so an account with a password on file
+    // can never be logged into by simply not typing one.
+    if (!password) {
+      setError("Password is required. Forgot it? Use the link below instead.");
+      return;
+    }
     setLoading(true);
     setError("");
     setInfo("");
     try {
-      if (password) {
-        const res = await fetch(`${API_BASE}/api/auth/login-password`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: e, password }),
-        });
-        const data = await res.json();
-        if (res.ok) { onSuccess(data); return; }
-        if (data.error === "no_password") {
-          // No password set yet for this account — fall back to the email code silently.
-          setInfo("No password set yet — sending you a one-time code instead.");
-          await sendCode(e);
-          return;
-        }
-        setError(data.error || "Incorrect password.");
+      const res = await fetch(`${API_BASE}/api/auth/login-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: e, password }),
+      });
+      const data = await res.json();
+      if (res.ok) { onSuccess(data); return; }
+      if (data.error === "no_password") {
+        // This specific account genuinely has no password on file yet (e.g.
+        // predates the mandatory-password requirement) — the one legitimate
+        // case where email-code login is still the correct path, decided by
+        // the server, not by the crew member leaving a field empty.
+        setInfo("This account doesn't have a password yet — sending a one-time code instead.");
+        await sendCode(e);
         return;
       }
+      setError(data.error || "Incorrect password.");
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    const e = email.trim().toLowerCase();
+    if (!e || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
+      setError("Enter your email above first.");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    setInfo("");
+    try {
       await sendCode(e);
     } catch {
       setError("Network error. Please try again.");
@@ -2172,7 +2198,7 @@ function LoginScreen({ onSent, onSuccess, onBack }) {
 
         <div style={{ background: C.card, border: `1px solid ${C.navyBorder}`, borderRadius: 16, padding: "28px 24px" }}>
           <div style={{ fontSize: 18, fontWeight: "bold", color: C.white, marginBottom: 6 }}>Sign in</div>
-          <div style={{ fontSize: 13, color: C.muted, marginBottom: 24 }}>Enter your email and password. No password yet? Leave it blank and we'll email you a one-time code.</div>
+          <div style={{ fontSize: 13, color: C.muted, marginBottom: 24 }}>Enter your email and password to sign in.</div>
 
           <div style={styles.inputWrap}>
             <span style={styles.inputIcon}>✉️</span>
@@ -2193,7 +2219,7 @@ function LoginScreen({ onSent, onSuccess, onBack }) {
             <input
               style={styles.input}
               type="password"
-              placeholder="Password (optional)"
+              placeholder="Password"
               value={password}
               onChange={e => setPassword(e.target.value)}
               onKeyDown={e => e.key === "Enter" && handleSend()}
@@ -2207,6 +2233,11 @@ function LoginScreen({ onSent, onSuccess, onBack }) {
           <button style={{ ...styles.primaryBtn, width: "100%", justifyContent: "center", marginTop: 16 }}
             onClick={handleSend} disabled={loading}>
             {loading ? "Signing in…" : "Continue"}
+          </button>
+          <button
+            style={{ background: "none", border: "none", color: C.muted, fontSize: 13, cursor: "pointer", marginTop: 14, width: "100%", textAlign: "center" }}
+            onClick={handleForgotPassword} disabled={loading}>
+            Forgot password? Email me a one-time code instead
           </button>
         </div>
       </div>

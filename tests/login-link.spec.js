@@ -14,7 +14,7 @@ test("a visitor with no cached account can reach login from the splash screen", 
   await expect(loginBtn).toBeVisible();
 
   await loginBtn.click();
-  await expect(page.getByText("Sign in")).toBeVisible();
+  await expect(page.getByText("Sign in", { exact: true })).toBeVisible();
   await expect(page.getByPlaceholder("your@email.com")).toBeVisible();
 
   // Back returns to the splash screen without side effects.
