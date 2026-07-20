@@ -82,7 +82,7 @@ test.describe("Duty Schedule → Boarding Pass", () => {
     await gotoReturningUser(page, { isPremium: true });
     await walkToDutySchedule(page);
 
-    await page.locator('input[type="time"]').fill("06:00");
+    await page.getByPlaceholder("14:30").fill("06:00");
     await page.getByRole("button", { name: "Continue →" }).click();
 
     // Confirm we landed on the boarding pass
@@ -102,7 +102,7 @@ test.describe("Duty Schedule → Boarding Pass", () => {
     await gotoReturningUser(page, { isPremium: false });
     await walkToDutySchedule(page);
 
-    await page.locator('input[type="time"]').fill("06:00");
+    await page.getByPlaceholder("14:30").fill("06:00");
     await page.getByRole("button", { name: "Continue →" }).click();
 
     await expect(
@@ -114,6 +114,26 @@ test.describe("Duty Schedule → Boarding Pass", () => {
     await expect(
       page.getByText("👑 UPGRADE TO PREMIUM")
     ).toBeVisible();
+  });
+
+  // Regression: the native <input type="time"> picker rendered in whatever
+  // format the OS regional settings used (12h on most US-locale systems),
+  // ignoring the input's own lang="en-GB" attribute — a known Chrome
+  // behavior, not something HTML markup can override. Report time is now a
+  // plain text field we fully control, so it must always display and accept
+  // 24h values, including ones a 12h picker would show completely
+  // differently (23:45, not "11:45 PM").
+  test("report time field always shows 24h format, never a 12h picker", async ({ page }) => {
+    await gotoReturningUser(page, { isPremium: true });
+    await walkToDutySchedule(page);
+
+    const timeInput = page.getByPlaceholder("14:30");
+    await expect(timeInput).toHaveAttribute("type", "text");
+    await expect(page.locator('input[type="time"]')).toHaveCount(0);
+
+    await timeInput.fill("2345");
+    await timeInput.blur();
+    await expect(timeInput).toHaveValue("23:45");
   });
 
   test("COGNITIVE MODE row is absent when duty schedule is skipped", async ({ page }) => {

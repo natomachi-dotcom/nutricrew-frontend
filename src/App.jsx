@@ -169,6 +169,9 @@ const T = {
     cancel_action: "Never mind",
     cancel_email_template: "I'd like to cancel my NutriCrew subscription. Please cancel the subscription on my account.",
     calorie_title: "Calorie Estimator",
+    logged_extras_title: "Logged Extras",
+    add_to_day_plan: "Add to",
+    add_to_plan: "Add to Plan",
     calorie_placeholder: "Describe what you ate (e.g. chicken sandwich, coffee with milk)...",
     calorie_btn: "Estimate Calories",
     airplane_meal_title: "Check Airplane Meal",
@@ -439,6 +442,9 @@ const T = {
     cancel_action: "Laisser tomber",
     cancel_email_template: "Je souhaite annuler mon abonnement NutriCrew. Merci d'annuler l'abonnement sur mon compte.",
     calorie_title: "Estimateur de Calories",
+    logged_extras_title: "Extras Enregistrés",
+    add_to_day_plan: "Ajouter au",
+    add_to_plan: "Ajouter au Plan",
     calorie_placeholder: "Décrivez ce que vous avez mangé...",
     calorie_btn: "Estimer les Calories",
     airplane_meal_title: "Vérifier le Repas à Bord",
@@ -709,6 +715,9 @@ const T = {
     cancel_action: "Dejarlo",
     cancel_email_template: "Me gustaría cancelar mi suscripción de NutriCrew. Por favor cancela la suscripción de mi cuenta.",
     calorie_title: "Estimador de Calorías",
+    logged_extras_title: "Extras Registrados",
+    add_to_day_plan: "Añadir al",
+    add_to_plan: "Añadir al Plan",
     calorie_placeholder: "Describe lo que comiste (ej: sándwich de pollo, café con leche)...",
     calorie_btn: "Estimar Calorías",
     airplane_meal_title: "Revisar Comida del Avión",
@@ -1785,6 +1794,26 @@ export default function NutriCrew() {
     });
   };
 
+  // Calorie-estimator entries logged against a specific pairing day — kept
+  // on the day object itself (not a separate calendar-date-scoped store like
+  // the old single undated log was) so they show up as a real line item in
+  // that day's meal plan and count toward that day's own total, the way a
+  // multi-day pairing needs (Day 1's log is unrelated to Day 2's).
+  const addCalorieExtra = (dayIndex, entry) => {
+    setPlan(p => {
+      if (!p?.days) return p;
+      const days = p.days.map((d, i) => i !== dayIndex ? d : { ...d, extras: [...(d.extras || []), entry] });
+      return { ...p, days };
+    });
+  };
+  const removeCalorieExtra = (dayIndex, extraId) => {
+    setPlan(p => {
+      if (!p?.days) return p;
+      const days = p.days.map((d, i) => i !== dayIndex ? d : { ...d, extras: (d.extras || []).filter(e => e.id !== extraId) });
+      return { ...p, days };
+    });
+  };
+
   // The dedicated Profile screen is the one place a deliberate default change
   // is always persisted, regardless of whether a default already existed —
   // unlike upd()'s per-trip fields (which only establish the default once).
@@ -1979,6 +2008,7 @@ export default function NutriCrew() {
           favorites={favorites} onToggleFavorite={toggleFavorite}
           onOpenAirplaneMeal={() => setShowAirplaneMeal(true)}
           onUpdateMeal={updateMeal}
+          onRemoveExtra={removeCalorieExtra}
           isOnline={isOnline}
           planKey={planCacheKey({ ...user, ...Object.fromEntries(Object.entries(pairing).filter(([, v]) => !(Array.isArray(v) && v.length === 0))) }, lang)}
           onShare={handleShare}
@@ -2005,6 +2035,7 @@ export default function NutriCrew() {
               onEstimate={handleEstimateCalories}
               onClose={() => { setShowCalorie(false); setCalorieResult(null); setCalorieText(""); }}
               calorieTarget={pairing.calorie_target || user?.calorie_target}
+              plan={plan} defaultDay={activeDay} onAddExtra={addCalorieExtra} onRemoveExtra={removeCalorieExtra}
             />
           )}
           <span style={styles.floatLabelJetlag}>{t.jetlag_fab}</span>
@@ -3317,7 +3348,7 @@ const PLAN_LOAD_STEPS = [
   "Finalizing your plan...",
 ];
 
-function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, activeDay, setActiveDay, onNewPairing, onRetry, favorites, onToggleFavorite, onOpenAirplaneMeal, onUpdateMeal, isOnline, planKey, onShare, shareCopied, onOpenReferral, lang }) {
+function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, activeDay, setActiveDay, onNewPairing, onRetry, favorites, onToggleFavorite, onOpenAirplaneMeal, onUpdateMeal, onRemoveExtra, isOnline, planKey, onShare, shareCopied, onOpenReferral, lang }) {
   const days = pairing.pairing_days || 1;
   const hasJetlag = Math.abs(parseInt(pairing.timezone||0)) >= 4;
   const [loadStep, setLoadStep] = useState(0);
@@ -3543,7 +3574,8 @@ function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, 
             )
             : <DayPlan day={plan.days[activeDay]} t={t} favorites={favorites} onToggleFavorite={onToggleFavorite} onOpenAirplaneMeal={onOpenAirplaneMeal}
                 pairing={pairing} user={user} lang={lang} byCountry={plan.foodRestrictions?.byCountry}
-                onUpdateMeal={(mealIdx, newMeal) => onUpdateMeal(activeDay, mealIdx, newMeal)}/>
+                onUpdateMeal={(mealIdx, newMeal) => onUpdateMeal(activeDay, mealIdx, newMeal)}
+                onRemoveExtra={(extraId) => onRemoveExtra(activeDay, extraId)}/>
         )}
         {activeTab === "grocery" && plan.groceryList && (
           <GroceryList list={plan.groceryList}/>
@@ -3642,7 +3674,7 @@ function PlanFeedback({ t, planKey }) {
   );
 }
 
-function DayPlan({ day, t, favorites, onToggleFavorite, onOpenAirplaneMeal, pairing, user, lang, onUpdateMeal, byCountry }) {
+function DayPlan({ day, t, favorites, onToggleFavorite, onOpenAirplaneMeal, pairing, user, lang, onUpdateMeal, byCountry, onRemoveExtra }) {
   const [expandedIdx, setExpandedIdx] = useState(null);
   const [regeneratingIdx, setRegeneratingIdx] = useState(null);
   const [regenError, setRegenError] = useState(null);
@@ -3776,8 +3808,25 @@ function DayPlan({ day, t, favorites, onToggleFavorite, onOpenAirplaneMeal, pair
           </div>
         );
       })}
+      {(day.extras || []).length > 0 && (
+        <div style={{ background: C.navyCard, borderRadius: 10, border: `1px solid ${C.navyBorder}`, overflow: "hidden", marginTop: 10 }}>
+          <div style={{ padding: "9px 14px", borderBottom: `1px solid ${C.navyBorder}`, fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "1px" }}>
+            {t.logged_extras_title}
+          </div>
+          {day.extras.map(entry => (
+            <div key={entry.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 14px", borderBottom: `1px solid ${C.navyBorder}22` }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, color: C.white }}>{entry.name}</div>
+                {entry.unit && <div style={{ fontSize: 11, color: C.muted }}>{entry.unit}</div>}
+              </div>
+              <span style={{ color: C.gold, fontWeight: 600, fontSize: 13, marginRight: 10 }}>{entry.calories} kcal</span>
+              <button onClick={() => onRemoveExtra?.(entry.id)} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 18, lineHeight: 1, padding: 0 }} aria-label="remove logged item">×</button>
+            </div>
+          ))}
+        </div>
+      )}
       <div style={styles.dailyTotal}>
-        Total: <strong>{day.totalCalories} kcal</strong>
+        Total: <strong>{day.totalCalories + (day.extras || []).reduce((s, e) => s + e.calories, 0)} kcal</strong>
       </div>
     </div>
   );
@@ -4888,27 +4937,22 @@ const FOOD_DB = [
   { name: "Pad Thai (takeaway)", calories: 430, unit: "1 serving", tags: ["pad thai","noodle","thai","asian"] },
 ];
 
-function loadDailyLog() {
-  try {
-    const saved = localStorage.getItem("nc_daily_cal");
-    if (!saved) return [];
-    const { date, items } = JSON.parse(saved);
-    return date === new Date().toDateString() ? (items || []) : [];
-  } catch { return []; }
-}
-
-function saveDailyLog(items) {
-  try {
-    localStorage.setItem("nc_daily_cal", JSON.stringify({ date: new Date().toDateString(), items }));
-  } catch {}
-}
-
 // ─── CALORIE MODAL ────────────────────────────────────────────────
-function CalorieModal({ t, text, setText, result, loading, onEstimate, onClose, calorieTarget }) {
+function CalorieModal({ t, text, setText, result, loading, onEstimate, onClose, calorieTarget, plan, defaultDay, onAddExtra, onRemoveExtra }) {
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState([]);
-  const [dailyLog, setDailyLog] = useState(() => loadDailyLog());
   const [showAI, setShowAI] = useState(false);
+  const days = plan?.days || [];
+  // A failed day has no meals/total to add to — steer past it to the
+  // nearest day that actually generated, same day the user is most likely
+  // looking at already (defaultDay is the tab they had open).
+  const [selectedDay, setSelectedDay] = useState(() => {
+    const start = Math.min(Math.max(defaultDay ?? 0, 0), Math.max(days.length - 1, 0));
+    if (!days[start]?.failed) return start;
+    const firstOk = days.findIndex(d => !d.failed);
+    return firstOk >= 0 ? firstOk : start;
+  });
+  const canLog = days.length > 0 && !days[selectedDay]?.failed;
 
   useEffect(() => {
     if (query.length < 2) { setSuggestions([]); return; }
@@ -4918,18 +4962,15 @@ function CalorieModal({ t, text, setText, result, loading, onEstimate, onClose, 
     );
   }, [query]);
 
+  const dayLog = days[selectedDay]?.extras || [];
   const addToLog = (food) => {
-    const next = [...dailyLog, { ...food, id: Date.now() }];
-    setDailyLog(next); saveDailyLog(next);
+    const entry = { ...food, id: Date.now() };
+    onAddExtra(selectedDay, entry);
     setQuery(""); setSuggestions([]);
   };
-  const removeFromLog = (id) => {
-    const next = dailyLog.filter(e => e.id !== id);
-    setDailyLog(next); saveDailyLog(next);
-  };
-  const clearLog = () => { setDailyLog([]); saveDailyLog([]); };
+  const clearLog = () => { for (const e of dayLog) onRemoveExtra(selectedDay, e.id); };
 
-  const total = dailyLog.reduce((s, e) => s + e.calories, 0);
+  const total = dayLog.reduce((s, e) => s + e.calories, 0);
   const pct = calorieTarget ? Math.min(100, Math.round((total / calorieTarget) * 100)) : null;
   const over = calorieTarget && total > calorieTarget;
 
@@ -4946,6 +4987,24 @@ function CalorieModal({ t, text, setText, result, loading, onEstimate, onClose, 
         </div>
         <div style={{ padding: "14px 20px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
 
+        {/* DAY PICKER — which pairing day this gets logged against */}
+        {days.length > 1 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {days.map((d, i) => (
+              <button key={i} disabled={d.failed} onClick={() => setSelectedDay(i)} aria-label={`log calories to Day ${d.day}`} style={{
+                padding: "7px 12px", borderRadius: 8, cursor: d.failed ? "not-allowed" : "pointer",
+                fontSize: 12, fontWeight: 600, fontFamily: "inherit",
+                border: `1.5px solid ${selectedDay === i ? C.gold : C.navyBorder}`,
+                background: selectedDay === i ? C.gold : "transparent",
+                color: d.failed ? C.muted : selectedDay === i ? C.navy : C.white,
+                opacity: d.failed ? 0.5 : 1,
+              }}>
+                {t.day} {d.day}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* SEARCH INPUT */}
         <div style={{ position: "relative" }}>
           <input
@@ -4953,11 +5012,13 @@ function CalorieModal({ t, text, setText, result, loading, onEstimate, onClose, 
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="Search food (e.g. chocolate, egg, coffee)…"
+            disabled={!canLog}
             style={{
               width: "100%", boxSizing: "border-box",
               background: C.navyMid, color: C.white,
               border: `1px solid ${C.navyBorder}`, borderRadius: 10,
               padding: "11px 14px", fontSize: 14, fontFamily: "inherit", outline: "none",
+              opacity: canLog ? 1 : 0.5,
             }}
           />
           {suggestions.length > 0 && (
@@ -4986,21 +5047,27 @@ function CalorieModal({ t, text, setText, result, loading, onEstimate, onClose, 
           )}
         </div>
 
-        {/* DAILY LOG */}
-        {dailyLog.length > 0 && (
+        {!canLog && (
+          <div style={{ fontSize: 12, color: C.muted }}>
+            {days.length === 0 ? "Generate a plan first to log calories against a day." : "This day couldn't be generated — pick another day to log against."}
+          </div>
+        )}
+
+        {/* DAY LOG — added items count toward this day's meal-plan total */}
+        {dayLog.length > 0 && (
           <div style={{ background: C.navyCard, borderRadius: 10, border: `1px solid ${C.navyBorder}`, overflow: "hidden" }}>
             <div style={{
               padding: "9px 14px", borderBottom: `1px solid ${C.navyBorder}`,
               display: "flex", justifyContent: "space-between", alignItems: "center",
             }}>
               <span style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "1px" }}>
-                Today's Intake
+                {days.length > 1 ? `${t.logged_extras_title} — ${t.day} ${days[selectedDay]?.day}` : t.logged_extras_title}
               </span>
               <button onClick={clearLog} style={{ background: "none", border: "none", color: C.muted, fontSize: 11, cursor: "pointer" }}>
                 Clear all
               </button>
             </div>
-            {dailyLog.map(entry => (
+            {dayLog.map(entry => (
               <div key={entry.id} style={{
                 display: "flex", alignItems: "center", justifyContent: "space-between",
                 padding: "8px 14px", borderBottom: `1px solid ${C.navyBorder}22`,
@@ -5010,7 +5077,7 @@ function CalorieModal({ t, text, setText, result, loading, onEstimate, onClose, 
                   <div style={{ fontSize: 11, color: C.muted }}>{entry.unit}</div>
                 </div>
                 <span style={{ color: C.gold, fontWeight: 600, fontSize: 13, marginRight: 10 }}>{entry.calories} kcal</span>
-                <button onClick={() => removeFromLog(entry.id)} style={{
+                <button onClick={() => onRemoveExtra(selectedDay, entry.id)} style={{
                   background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 18, lineHeight: 1, padding: 0,
                 }}>×</button>
               </div>
@@ -5032,7 +5099,7 @@ function CalorieModal({ t, text, setText, result, loading, onEstimate, onClose, 
                 </div>
               )}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                <span style={{ fontSize: 13, color: C.muted }}>Total today</span>
+                <span style={{ fontSize: 13, color: C.muted }}>Logged extra</span>
                 <div style={{ textAlign: "right" }}>
                   <span style={{ fontSize: 26, fontWeight: 800, color: over ? C.red : C.gold }}>{total.toLocaleString()}</span>
                   <span style={{ fontSize: 13, color: C.muted }}> kcal</span>
@@ -5078,17 +5145,16 @@ function CalorieModal({ t, text, setText, result, loading, onEstimate, onClose, 
                   </div>
                 ))}
                 {result.note && <div style={styles.calNote}>{result.note}</div>}
-                {result.total > 0 && (
+                {result.total > 0 && canLog && (
                   <button onClick={() => {
                     const entry = { name: text.slice(0, 60), calories: result.total, unit: "AI estimate", id: Date.now() };
-                    const next = [...dailyLog, entry];
-                    setDailyLog(next); saveDailyLog(next);
+                    onAddExtra(selectedDay, entry);
                   }} style={{
                     marginTop: 10, width: "100%", background: C.navyMid,
                     border: `1px solid ${C.gold}`, borderRadius: 8, color: C.gold,
                     padding: "9px", fontSize: 13, cursor: "pointer", fontFamily: "inherit",
                   }}>
-                    + Add to Today's Intake
+                    + {days.length > 1 ? `${t.add_to_day_plan} ${t.day} ${days[selectedDay]?.day}` : t.add_to_plan}
                   </button>
                 )}
               </div>
@@ -5863,6 +5929,25 @@ const DUTY_BTN_ACTIVE = { ...DUTY_BTN_BASE, background: C.gold, color: C.navy, b
 const DUTY_HR_BTN = { padding: "7px 10px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600, border: `1.5px solid ${C.navyBorder}`, background: "transparent", color: C.muted };
 const DUTY_HR_BTN_ACTIVE = { ...DUTY_HR_BTN, background: C.gold, color: C.navy, border: `1.5px solid ${C.gold}` };
 
+// Free-text 24h time entry — native <input type="time"> renders its picker
+// in whatever format the OS regional settings use (Chrome follows the OS,
+// not the input's own `lang` attribute, despite that being the commonly
+// suggested fix), so crew on a 12h-locale system saw a 12h picker no matter
+// what we set here. A plain text field we fully own the formatting/parsing
+// for is the only way to guarantee 24h across every browser and OS.
+function formatDutyTimeInput(raw) {
+  const digits = raw.replace(/\D/g, "").slice(0, 4);
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+}
+function clampDutyTime(value) {
+  const m = (value || "").match(/^(\d{1,2}):?(\d{0,2})$/);
+  if (!m) return "";
+  const h = Math.min(23, parseInt(m[1], 10) || 0);
+  const min = Math.min(59, parseInt(m[2], 10) || 0);
+  return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+}
+
 function DutyScheduleStep({ t, pairing, upd }) {
 
   return (
@@ -5873,10 +5958,13 @@ function DutyScheduleStep({ t, pairing, upd }) {
       <div style={{ marginBottom: 16 }}>
         <div style={{ ...styles.hint, marginBottom: 6 }}>{t.duty_report}</div>
         <input
-          type="time"
-          lang="en-GB"
+          type="text"
+          inputMode="numeric"
+          placeholder="14:30"
+          maxLength={5}
           value={pairing.report_time || ""}
-          onChange={e => upd("report_time", e.target.value)}
+          onChange={e => upd("report_time", formatDutyTimeInput(e.target.value))}
+          onBlur={e => { if (e.target.value) upd("report_time", clampDutyTime(e.target.value)); }}
           style={{ width: "100%", padding: "10px 12px", borderRadius: 10, background: C.navyCard, color: pairing.report_time ? C.white : C.muted, border: `1.5px solid ${C.navyBorder}`, fontSize: 14, boxSizing: "border-box", colorScheme: "dark", outline: "none" }}
         />
       </div>
