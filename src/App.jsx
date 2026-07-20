@@ -6136,7 +6136,11 @@ function CheckGroup({ label, options, values, onChange }) {
 // ─── API CALLS ────────────────────────────────────────────────────
 async function generatePlan(data, lang) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 45000); // 45s max
+  // Safety margin only, not the real fix for slow generation — the backend's
+  // own maxDuration ceiling is 120s (vercel.json), so 45s was aborting
+  // legitimately-slow-but-successful generations well before the server
+  // itself would ever give up. 90s leaves headroom under that ceiling.
+  const timeout = setTimeout(() => controller.abort(), 90000);
   let res;
   try {
     res = await fetch(`${API_BASE}/api/generate-plan`, {
