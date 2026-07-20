@@ -201,6 +201,7 @@ const T = {
     meal_updating: "Updating meal to remove that ingredient...",
     meal_update_failed: "Couldn't update this meal — please try again.",
     plan_loading: "Preparing your nutrition plan...",
+    plan_loading_note: "Good meal plans take a little time — we're checking every meal against your diet, allergies, and budget to get it right.",
     plan_error: "The kitchen's unavailable right now. Check your connection and tap Retry.",
     calorie_error: "Couldn't reach the kitchen. Check your connection and try again.",
     step_calorie_target: "Calorie Target",
@@ -470,6 +471,7 @@ const T = {
     meal_updating: "Mise à jour du repas pour retirer cet ingrédient...",
     meal_update_failed: "Impossible de mettre à jour ce repas — veuillez réessayer.",
     plan_loading: "Préparation de votre plan nutritionnel...",
+    plan_loading_note: "Un bon plan de repas prend un peu de temps — nous vérifions chaque repas selon votre régime, vos allergies et votre budget.",
     plan_error: "La cuisine est temporairement indisponible. Vérifiez votre connexion et réessayez.",
     calorie_error: "Impossible d'atteindre la cuisine. Vérifiez votre connexion.",
     step_calorie_target: "Objectif Calorique",
@@ -739,6 +741,7 @@ const T = {
     meal_updating: "Actualizando la comida para quitar ese ingrediente...",
     meal_update_failed: "No se pudo actualizar esta comida — inténtalo de nuevo.",
     plan_loading: "Preparando tu plan nutricional...",
+    plan_loading_note: "Un buen plan de comidas toma un poco de tiempo — estamos revisando cada comida según tu dieta, alergias y presupuesto.",
     plan_error: "La cocina no está disponible ahora. Revisa tu conexión y toca Reintentar.",
     calorie_error: "No se pudo alcanzar la cocina. Revisa tu conexión.",
     step_calorie_target: "Objetivo Calórico",
@@ -3339,6 +3342,9 @@ function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, 
           borderRadius: 2,
           transition: "width 0.5s ease",
         }}/>
+      </div>
+      <div style={{ color: C.muted, fontSize: 13, marginTop: 16, textAlign: "center", maxWidth: 280 }}>
+        {t.plan_loading_note}
       </div>
     </div>
   );
