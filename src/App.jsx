@@ -2601,7 +2601,7 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
     // Text fields debounce their parent writes — check localVal directly so the
     // Continue button responds instantly as the user types, not 250ms later.
     if (currentStep === "name" || currentStep === "email") return !!localVal.trim();
-    if (currentStep === "budget") return !!((pairing.budget_type || user?.budget_type) && (pairing.budget_amount || user?.budget_amount));
+    if (currentStep === "budget") return !!((pairing.budget_type || user?.budget_type) && (localBudgetAmount || user?.budget_amount));
     if (currentStep === "duty_schedule") return true;
     // departure is optional — placeholder looks identical to a real value and crews
     // can proceed without it (AI gets "unknown departure" context). They can fill it
@@ -2979,7 +2979,7 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
               ))}
             </div>
             <TextInput value={localBudgetAmount} type="number"
-              onChange={v => { setLocalBudgetAmount(v); upd("budget_amount", v); }}
+              onChange={v => { setLocalBudgetAmount(v); clearTimeout(textSaveTimerRef.current); textSaveTimerRef.current = setTimeout(() => upd("budget_amount", v), 250); }}
               placeholder="50" icon="💰"/>
           </div>
         );
