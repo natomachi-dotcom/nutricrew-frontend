@@ -5874,6 +5874,7 @@ function DutyScheduleStep({ t, pairing, upd }) {
         <div style={{ ...styles.hint, marginBottom: 6 }}>{t.duty_report}</div>
         <input
           type="time"
+          lang="en-GB"
           value={pairing.report_time || ""}
           onChange={e => upd("report_time", e.target.value)}
           style={{ width: "100%", padding: "10px 12px", borderRadius: 10, background: C.navyCard, color: pairing.report_time ? C.white : C.muted, border: `1.5px solid ${C.navyBorder}`, fontSize: 14, boxSizing: "border-box", colorScheme: "dark", outline: "none" }}
