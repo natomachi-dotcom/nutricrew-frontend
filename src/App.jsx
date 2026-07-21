@@ -201,6 +201,7 @@ const T = {
     allergy_warning_text: "This plan was generated to avoid your selected allergies/intolerances, but AI-generated content can make mistakes. NutriCrew is not a substitute for reading real ingredient labels or asking directly at restaurants. If you have a severe or life-threatening allergy, always verify every ingredient yourself and carry your prescribed medication (e.g. epinephrine auto-injector) as usual.",
     ingredients_label: "Tap an ingredient you're allergic to",
     ingredient_allergic_tooltip: "Allergic to this? Tap to remove it from the meal",
+    ingredient_remove_label: "remove",
     meal_updating: "Updating meal to remove that ingredient...",
     meal_update_failed: "Couldn't update this meal — please try again.",
     plan_loading: "Preparing your nutrition plan...",
@@ -474,6 +475,7 @@ const T = {
     allergy_warning_text: "Ce plan a été généré pour éviter vos allergies/intolérances sélectionnées, mais le contenu généré par IA peut contenir des erreurs. NutriCrew ne remplace pas la lecture des véritables étiquettes d'ingrédients ni les questions directes au restaurant. Si vous avez une allergie sévère ou potentiellement mortelle, vérifiez toujours chaque ingrédient vous-même et gardez votre médicament prescrit (ex. auto-injecteur d'épinéphrine) comme d'habitude.",
     ingredients_label: "Touchez un ingrédient auquel vous êtes allergique",
     ingredient_allergic_tooltip: "Allergique à ceci ? Touchez pour le retirer du repas",
+    ingredient_remove_label: "retirer",
     meal_updating: "Mise à jour du repas pour retirer cet ingrédient...",
     meal_update_failed: "Impossible de mettre à jour ce repas — veuillez réessayer.",
     plan_loading: "Préparation de votre plan nutritionnel...",
@@ -747,6 +749,7 @@ const T = {
     allergy_warning_text: "Este plan fue generado para evitar tus alergias/intolerancias seleccionadas, pero el contenido generado por IA puede contener errores. NutriCrew no sustituye la lectura de las etiquetas reales de ingredientes ni preguntar directamente en los restaurantes. Si tienes una alergia grave o potencialmente mortal, verifica siempre cada ingrediente tú mismo y lleva tu medicamento recetado (ej. autoinyector de epinefrina) como de costumbre.",
     ingredients_label: "Toca un ingrediente al que seas alérgico",
     ingredient_allergic_tooltip: "¿Eres alérgico a esto? Toca para quitarlo de la comida",
+    ingredient_remove_label: "quitar",
     meal_updating: "Actualizando la comida para quitar ese ingrediente...",
     meal_update_failed: "No se pudo actualizar esta comida — inténtalo de nuevo.",
     plan_loading: "Preparando tu plan nutricional...",
@@ -3777,8 +3780,10 @@ function DayPlan({ day, t, favorites, onToggleFavorite, onOpenAirplaneMeal, pair
                           return (
                             <button key={k} style={styles.ingredientChip}
                               onClick={e => { e.stopPropagation(); flagIngredient(i, meal, ingName); }}
-                              title={t.ingredient_allergic_tooltip}>
-                              {ingName} ✕
+                              title={t.ingredient_allergic_tooltip}
+                              aria-label={`${ingName} — ${t.ingredient_remove_label}`}>
+                              <span aria-hidden="true">{ingName}</span>
+                              <span style={styles.ingredientChipDelete} aria-hidden="true">🗑️</span>
                             </button>
                           );
                         })}
@@ -6706,10 +6711,12 @@ const styles = {
   },
   ingredientsLabel: { fontSize: 10, color: C.red, letterSpacing: 1, marginBottom: 6, fontWeight: 700 },
   ingredientChip: {
-    fontSize: 11, padding: "4px 10px", borderRadius: 20,
+    fontSize: 11, padding: "4px 8px 4px 10px", borderRadius: 20,
     background: "transparent", color: C.white, border: `1px solid ${C.navyBorder}`,
     cursor: "pointer", fontFamily: "inherit",
+    display: "inline-flex", alignItems: "center", gap: 5,
   },
+  ingredientChipDelete: { fontSize: 12, lineHeight: 1 },
   postIt: {
     marginTop: 10, background: "#FFE066", color: "#3a2f00",
     borderRadius: "2px 10px 10px 2px", padding: "8px 12px",

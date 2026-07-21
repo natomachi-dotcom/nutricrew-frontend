@@ -37,9 +37,9 @@ test("flagging an allergen ingredient regenerates just that meal", async ({ page
 
   // Expand the snack meal that contains almonds.
   await page.getByText("Greek Yogurt with Almonds").click();
-  await expect(page.getByRole("button", { name: /almonds ✕/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /almonds — remove/ })).toBeVisible();
 
-  await page.getByRole("button", { name: /almonds ✕/ }).click();
+  await page.getByRole("button", { name: /almonds — remove/ }).click();
 
   // Meal card updates to the regenerated, nut-free replacement.
   await expect(page.getByText("Greek Yogurt with Sunflower Seeds")).toBeVisible();

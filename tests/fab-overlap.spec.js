@@ -37,7 +37,7 @@ test("floating action buttons never overlap meal card content at 390px width", a
   for (const name of ["Oatmeal with Berries", "Grilled Chicken Salad", "Baked Salmon with Quinoa", "Greek Yogurt with Almonds"]) {
     await page.getByText(name).click();
   }
-  await expect(page.getByRole("button", { name: /almonds ✕/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /almonds — remove/ })).toBeVisible();
 
   // Scroll all the way down — the worst case for a fixed-position overlay.
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
@@ -61,7 +61,7 @@ test("floating action buttons never overlap meal card content at 390px width", a
   // background is just as much a bug as one sitting on specific text, since
   // it can clip/obscure whatever's underneath regardless of exact wrapping.
   const lastCard = page.locator("text=Greek Yogurt with Almonds").locator("xpath=ancestor::div[contains(@style,'border-radius') or position()=6][1]");
-  const almondChipHandle = await page.getByRole("button", { name: /almonds ✕/ }).elementHandle();
+  const almondChipHandle = await page.getByRole("button", { name: /almonds — remove/ }).elementHandle();
   const cardBox = await almondChipHandle.evaluate((el) => {
     let node = el;
     for (let i = 0; i < 5 && node.parentElement; i++) node = node.parentElement;
@@ -75,8 +75,8 @@ test("floating action buttons never overlap meal card content at 390px width", a
   // Specific elements the bug report named directly.
   const contentLocators = [
     page.getByText("Tap an ingredient you're allergic to"),
-    page.getByRole("button", { name: /almonds ✕/ }),
-    page.getByRole("button", { name: /blueberries ✕/ }), // last chip in the wrapped row — furthest right/lowest
+    page.getByRole("button", { name: /almonds — remove/ }),
+    page.getByRole("button", { name: /blueberries — remove/ }), // last chip in the wrapped row — furthest right/lowest
     page.getByText("protein-rich").first(),
     page.getByText("250ml round container with clip lid"),
   ];
