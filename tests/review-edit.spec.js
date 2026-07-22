@@ -17,7 +17,7 @@ test("editing a field from the review screen updates it and returns without losi
   await expect(page.getByText("Stay Focused")).toBeVisible(); // GOALS row
 
   // Edit the budget from the review screen.
-  await page.getByRole("button", { name: "Edit BUDGET" }).click();
+  await page.getByRole("button", { name: "Edit YOUR BUDGET" }).click();
   await expect(page.getByText("✏️ Edit")).toBeVisible(); // review-mode header indicator
   const amountInput = page.getByPlaceholder("50");
   await amountInput.fill("75");
@@ -31,7 +31,7 @@ test("editing a field from the review screen updates it and returns without losi
 
   // Edit a second, unrelated field (goals) to confirm the earlier budget edit
   // survives a second trip through review-edit.
-  await page.getByRole("button", { name: "Edit GOALS" }).click();
+  await page.getByRole("button", { name: "Edit YOUR GOALS" }).click();
   await page.getByRole("button", { name: "Avoid Bloating" }).click();
   await page.getByRole("button", { name: "Back to Review" }).click();
 

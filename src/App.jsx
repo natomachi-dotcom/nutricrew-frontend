@@ -60,6 +60,12 @@ const T = {
     destination_placeholder: "Where are you flying? (city or airport)",
     step_kitchen: "Kitchen Access",
     step_lunch_bag: "Lunch Bag Size",
+    review_calorie_target: "Calorie Target", review_departure: "Departure",
+    review_usa_rules: "USA Rules", review_food_restrictions_warning: "Food Restrictions",
+    review_usa_customs: "USA / Customs", review_duty_mode: "Duty Mode",
+    review_cognitive_mode: "Cognitive Mode | Duty Optimized", review_airplane_meal: "Airplane Meal",
+    review_passenger: "Passenger", review_position_label: "Position",
+    review_jet_lag: "Jet Lag", review_h_diff: "H Diff",
     bag_small: "Small  — fits 1–2 containers (~4L)",
     bag_medium: "Medium — fits 2–3 containers (~6L)",
     bag_large: "Large  — fits 3–4 containers + extras (~10L)",
@@ -342,6 +348,12 @@ const T = {
     destination_placeholder: "Où allez-vous ? (ville ou aéroport)",
     step_kitchen: "Accès Cuisine",
     step_lunch_bag: "Taille du Sac Repas",
+    review_calorie_target: "Objectif Calorique", review_departure: "Départ",
+    review_usa_rules: "Règles USA", review_food_restrictions_warning: "Restrictions Alimentaires",
+    review_usa_customs: "USA / Douanes", review_duty_mode: "Mode Service",
+    review_cognitive_mode: "Mode Cognitif | Service Optimisé", review_airplane_meal: "Repas Avion",
+    review_passenger: "Passager", review_position_label: "Poste",
+    review_jet_lag: "Décalage Horaire", review_h_diff: "H Décalage",
     bag_small: "Petit  — 1–2 boîtes (~4L)",
     bag_medium: "Moyen — 2–3 boîtes (~6L)",
     bag_large: "Grand  — 3–4 boîtes + extras (~10L)",
@@ -616,6 +628,12 @@ const T = {
     destination_placeholder: "¿A dónde vuelas? (ciudad o aeropuerto)",
     step_kitchen: "Acceso a Cocina",
     step_lunch_bag: "Tamaño del Bolso",
+    review_calorie_target: "Objetivo Calórico", review_departure: "Salida",
+    review_usa_rules: "Reglas de EE.UU.", review_food_restrictions_warning: "Restricciones Alimentarias",
+    review_usa_customs: "EE.UU. / Aduana", review_duty_mode: "Modo Servicio",
+    review_cognitive_mode: "Modo Cognitivo | Servicio Optimizado", review_airplane_meal: "Comida de Avión",
+    review_passenger: "Pasajero", review_position_label: "Posición",
+    review_jet_lag: "Desfase Horario", review_h_diff: "H Desfase",
     bag_small: "Pequeño — 1–2 recipientes (~4L)",
     bag_medium: "Mediano — 2–3 recipientes (~6L)",
     bag_large: "Grande  — 3–4 recipientes + extras (~10L)",
@@ -3108,6 +3126,10 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
       upd("destinations", localDests);
       upd("timezone", computeTimezoneDiff(pairing.departure, localDests) ?? 0);
     }
+    if (currentStep === "budget") {
+      clearTimeout(textSaveTimerRef.current);
+      upd("budget_amount", localBudgetAmount);
+    }
     onContinue();
   }
 
@@ -3162,10 +3184,10 @@ function BoardingPassScreen({ t, user, pairing, onGenerate, onBack, isPremiumNee
 
         {/* Identity + derived info (not user-editable choices) */}
         <div style={styles.bpGrid}>
-          <BPField label="PASSENGER" value={mergedUser.name || "—"}/>
-          <BPField label="POSITION" value={mergedUser.position?.toUpperCase() || "—"}/>
+          <BPField label={t.review_passenger?.toUpperCase()} value={mergedUser.name || "—"}/>
+          <BPField label={t.review_position_label?.toUpperCase()} value={mergedUser.position?.toUpperCase() || "—"}/>
           {Math.abs(parseInt(pairing.timezone||0)) >= 4 && (
-            <BPField label="JET LAG" value={`${pairing.timezone}H DIFF ⚠️`} highlight/>
+            <BPField label={t.review_jet_lag?.toUpperCase()} value={`${pairing.timezone}${t.review_h_diff?.toUpperCase()} ⚠️`} highlight/>
           )}
         </div>
 
@@ -3232,47 +3254,47 @@ function describeReviewField(key, pairing, user, t, isPremium) {
     const filtered = diets.filter(d => d && d !== "none");
     const value = filtered.length === 0 ? "—"
       : filtered.map(d => {
-          if (d === "other") return v("diet_other") || "Other";
-          if (d === "allergy_other") return `Allergic to: ${v("allergy_other_text") || "Other"}`;
-          return d.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+          if (d === "other") return v("diet_other") || t.diet_other;
+          if (d === "allergy_other") return `${t.allergic_to}: ${v("allergy_other_text") || t.diet_other}`;
+          return (t[d] || d.replace(/_/g, " ")).replace(/\b\w/g, c => c.toUpperCase());
         }).join(", ");
-    return { label: "DIET", value };
+    return { label: t.step_diet?.toUpperCase(), value };
   }
   if (key === "calorie_target") {
     const target = v("calorie_target");
-    return { label: "CALORIE TARGET", value: target ? `${target} kcal/day` : "—" };
+    return { label: t.review_calorie_target?.toUpperCase(), value: target ? `${target} kcal/day` : "—" };
   }
   if (key === "goals") {
     const goals = pairing.goals?.length ? pairing.goals : (user?.goals || []);
-    return { label: "GOALS", value: goals.length ? goals.map(g => g.replace(/_/g, " ")).join(", ") : "—" };
+    return { label: t.step_goals?.toUpperCase(), value: goals.length ? goals.map(g => (t[g] || g.replace(/_/g, " "))).join(", ") : "—" };
   }
   if (key === "budget") {
     const amt = v("budget_amount"), type = v("budget_type");
-    return { label: "BUDGET", value: amt ? `$${amt}/${type === "day" ? "DAY" : "TRIP"}` : "—" };
+    return { label: t.step_budget?.toUpperCase(), value: amt ? `$${amt}/${(type === "day" ? t.day : t.budget_total)?.toUpperCase()}` : "—" };
   }
   if (key === "cooking_pref") {
     const map = { enjoys_cooking: t.cooking_enjoy, simple_recipes: t.cooking_simple };
-    return { label: "COOKING PREFERENCE", value: map[v("cooking_pref")] || "—" };
+    return { label: t.step_cooking_pref?.toUpperCase(), value: map[v("cooking_pref")] || "—" };
   }
   if (key === "lunch_bag") {
     const map = { small: t.bag_small, medium: t.bag_medium, large: t.bag_large };
-    return { label: "LUNCH BAG", value: map[v("lunch_bag")] || "—" };
+    return { label: t.step_lunch_bag?.toUpperCase(), value: map[v("lunch_bag")] || "—" };
   }
   if (key === "pairing_days") {
-    return { label: "PAIRING LENGTH", value: `${pairing.pairing_days || 1} ${t.days?.toUpperCase()}` };
+    return { label: t.step_pairing?.toUpperCase(), value: `${pairing.pairing_days || 1} ${t.days?.toUpperCase()}` };
   }
   if (key === "departure") {
-    return { label: "DEPARTURE", value: pairing.departure || "—" };
+    return { label: t.review_departure?.toUpperCase(), value: pairing.departure || "—" };
   }
   if (key === "destination") {
     const dests = pairing.destinations || [];
-    return { label: "DESTINATIONS", value: dests.length ? dests.join(" → ") : "—" };
+    return { label: t.destination_label?.toUpperCase(), value: dests.length ? dests.join(" → ") : "—" };
   }
   if (key.startsWith("kitchen_day_")) {
     const dayNum = key.replace("kitchen_day_", "");
     const vals = pairing[key] || [];
     const map = { full_kitchen: t.full_kitchen, hotel: t.hotel_no_kitchen, fridge: t.fridge, microwave: t.microwave, airplane_food: t.airplane_food };
-    return { label: `KITCHEN ACCESS — DAY ${dayNum}`, value: vals.length ? vals.map(x => map[x] || x).join(", ") : "—" };
+    return { label: `${t.step_kitchen?.toUpperCase()} — ${t.day?.toUpperCase()} ${dayNum}`, value: vals.length ? vals.map(x => map[x] || x).join(", ") : "—" };
   }
   if (key === "duty_schedule") {
     if (!pairing.report_time) return { label: "DUTY SCHEDULE", value: "—" };
@@ -3286,7 +3308,7 @@ function describeReviewField(key, pairing, user, t, isPremium) {
   }
   if (key === "airplane_meal_plan") {
     const desc = pairing.airplane_meal_description;
-    return { label: "AIRPLANE MEAL", value: desc ? (desc.length > 60 ? desc.slice(0, 60) + "…" : desc) : "—" };
+    return { label: t.review_airplane_meal?.toUpperCase(), value: desc ? (desc.length > 60 ? desc.slice(0, 60) + "…" : desc) : "—" };
   }
   return { label: key.toUpperCase(), value: "—" };
 }
