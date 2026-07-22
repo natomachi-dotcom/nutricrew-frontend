@@ -4609,7 +4609,11 @@ function RosterModal({ t, user, onClose, onRequirePremium }) {
             </div>
 
             {showGymPlan && (
-              <GymPlanModal t={t} user={user} month={pairings[0] ? new Date(pairings[0].pairingDate).toISOString().slice(0, 7) : null} onClose={() => setShowGymPlan(false)} />
+              // Matches the backend's storage key (server.js gym-plan/generate
+              // stores under TODAY's month, not the first pairing's month —
+              // the plan's own content always starts today, "cover the
+              // calendar from today through the last return date").
+              <GymPlanModal t={t} user={user} month={new Date().toISOString().slice(0, 7)} onClose={() => setShowGymPlan(false)} />
             )}
           </div>
         )}
