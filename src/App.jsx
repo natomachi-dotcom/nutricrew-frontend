@@ -1394,6 +1394,32 @@ export default function NutriCrew() {
     setScreen("premium");
   }, [premiumSuccess, screen]); // eslint-disable-line
 
+  // Persist premium status locally the moment Stripe redirects back, even
+  // before any session token exists. A user who hits the paywall on their
+  // VERY FIRST pairing attempt (the common case: free pairing blocked, sent
+  // straight to checkout) has never been through OTP verification, so they
+  // have no token yet — the verify-session poll below silently no-ops for
+  // them, and without this, `isPremium` was only ever true via the one-shot
+  // `premiumSuccess` flag (tied to a URL param stripped immediately after
+  // reading). Any reload/re-render after that (tab backgrounded, PWA
+  // resumed, anything) lost it entirely and sent them back to the paywall
+  // in a loop, even though they'd already paid. This is a local UI
+  // convenience only, not a security boundary — /api/generate-plan always
+  // re-checks the real isPremium in MongoDB server-side regardless of what
+  // the client believes, so a stale/spoofed local flag can't actually
+  // unlock generation it shouldn't.
+  useEffect(() => {
+    if (!premiumSuccess) return;
+    setUser(prev => {
+      const u = prev?.email
+        ? { ...prev, isPremium: true, needsPremium: false }
+        : prev;
+      if (!u) return prev;
+      storage.set(USER_KEY, u);
+      return u;
+    });
+  }, [premiumSuccess]); // eslint-disable-line
+
   // Poll verify-session after a Stripe payment until the webhook has written
   // isPremium=true to MongoDB (webhook fires ~1–3s after redirect; page may
   // load before it arrives). Persists to localStorage so next open is seamless.
