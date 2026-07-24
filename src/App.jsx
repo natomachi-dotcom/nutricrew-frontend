@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, startTransition } from "react";
 import { getFAQ } from "./faq.js";
-import { searchAirports } from "./airports.js";
+import { searchAirports, isRecognizedAirportEntry } from "./airports.js";
 
 // AI backend base URL. Empty in local dev (Vite proxies /api to localhost:3001);
 // set VITE_API_BASE_URL on Vercel to point at the deployed nutricrew-backend.
@@ -2850,6 +2850,13 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
             setLocalVal(v);
             clearTimeout(depTimerRef.current);
             depTimerRef.current = setTimeout(() => {
+              // Only persist a value that's empty or resolves to a real
+              // airport — otherwise a partial, abandoned entry (e.g. "YU"
+              // typed but never finished/selected) gets silently saved as
+              // the permanent home base and auto-fills every future
+              // pairing. An unrecognized fragment is simply left
+              // unsaved — same as if nothing had been typed.
+              if (!isRecognizedAirportEntry(v)) return;
               save(v);
               upd("timezone", computeTimezoneDiff(v, pairing.destinations) ?? 0);
             }, 250);
@@ -5750,11 +5757,15 @@ function ProfileModal({ t, user, onSave, onClose, onManageSubscription, onSwitch
       return;
     }
     setSaveError("");
+    // Same reasoning as the check-in step's departure field: only persist a
+    // value that's empty or resolves to a real airport, so an abandoned
+    // partial edit here ("YU") can't overwrite a previously-good home base
+    // with garbage. Falls back to whatever was already saved, not to blank.
     onSave({
       gender,
       weight: weightVal ? `${weightVal}${weightUnit}` : user?.weight,
       position,
-      departure,
+      departure: isRecognizedAirportEntry(departure) ? departure : (user?.departure || ""),
       lunch_bag: lunchBag,
       cooking_pref: cookingPref,
       diets,

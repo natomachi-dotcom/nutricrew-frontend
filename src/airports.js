@@ -326,3 +326,20 @@ export function searchAirports(query, limit = 6) {
   scored.sort((x, y) => y.score - x.score || x.airport.city.localeCompare(y.airport.city));
   return scored.slice(0, limit).map(x => x.airport);
 }
+
+// Gates what's allowed to actually be SAVED as a departure/home-base value —
+// distinct from searchAirports above, which just powers the autocomplete
+// dropdown while typing. A free-text field with no validation lets someone
+// stop typing partway through ("YU" instead of "YUL") and have that
+// fragment silently persisted as their permanent home base, auto-filling
+// every future pairing and feeding "unknown"-quality context to the AI.
+// Empty is always allowed (the app already treats a blank departure as
+// "unknown departure" gracefully) — only a non-empty value that doesn't
+// resolve to a real airport is rejected.
+export function isRecognizedAirportEntry(value) {
+  const v = (value || "").trim();
+  if (!v) return true;
+  const parenMatch = v.match(/\(([A-Za-z]{3,4})\)\s*$/);
+  const code = (parenMatch ? parenMatch[1] : v).toLowerCase();
+  return AIRPORTS.some(a => a.iata.toLowerCase() === code || a.icao?.toLowerCase() === code);
+}
