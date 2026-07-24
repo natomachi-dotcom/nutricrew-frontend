@@ -3885,8 +3885,23 @@ function DayPlan({ day, t, favorites, onToggleFavorite, onOpenAirplaneMeal, pair
   );
 }
 
+// btoa() throws InvalidCharacterError on any character outside Latin-1
+// (0x00-0xFF) — smart quotes, em-dashes, ellipses, etc., all common in
+// AI-generated grocery item text. That crashed the whole GroceryList
+// component with no error boundary the moment a single item contained one,
+// blanking the screen. A plain hash has no character-range restriction at
+// all, and collision risk is a non-issue here (worst case, two different
+// lists share a checked-state key — a minor cosmetic overlap, not a crash).
+function safeHashKey(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash * 31 + str.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash).toString(36);
+}
+
 function GroceryList({ list }) {
-  const storageKey = "grocery_checked_" + btoa(JSON.stringify(list)).slice(0, 32);
+  const storageKey = "grocery_checked_" + safeHashKey(JSON.stringify(list));
   const [checked, setChecked] = useState(() => {
     try { return JSON.parse(localStorage.getItem(storageKey) || "{}"); } catch { return {}; }
   });
