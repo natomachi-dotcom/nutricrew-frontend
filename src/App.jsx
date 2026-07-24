@@ -178,6 +178,9 @@ const T = {
     logged_extras_title: "Logged Extras",
     add_to_day_plan: "Add to",
     add_to_plan: "Add to Plan",
+    trade_for_meal: "Trade for a planned meal instead",
+    trade_swap_out: "Tap to skip this meal and log the extra in its place",
+    trade_no_meals: "No planned meals left to trade — everything's already been swapped.",
     calorie_placeholder: "Describe what you ate (e.g. chicken sandwich, coffee with milk)...",
     calorie_btn: "Estimate Calories",
     airplane_meal_title: "Check Airplane Meal",
@@ -210,6 +213,8 @@ const T = {
     ingredient_remove_label: "remove",
     meal_updating: "Updating meal to remove that ingredient...",
     meal_update_failed: "Couldn't update this meal — please try again.",
+    meal_skipped_badge: "Skipped",
+    meal_restore: "Restore this meal",
     plan_loading: "Preparing your nutrition plan...",
     plan_loading_note: "Good meal plans take a little time — we're checking every meal against your diet, allergies, and budget to get it right.",
     plan_error: "The kitchen's unavailable right now. Check your connection and tap Retry.",
@@ -458,6 +463,9 @@ const T = {
     logged_extras_title: "Extras Enregistrés",
     add_to_day_plan: "Ajouter au",
     add_to_plan: "Ajouter au Plan",
+    trade_for_meal: "Échanger contre un repas prévu",
+    trade_swap_out: "Touchez pour sauter ce repas et enregistrer l'extra à sa place",
+    trade_no_meals: "Plus aucun repas prévu à échanger — tout a déjà été remplacé.",
     calorie_placeholder: "Décrivez ce que vous avez mangé...",
     calorie_btn: "Estimer les Calories",
     airplane_meal_title: "Vérifier le Repas à Bord",
@@ -490,6 +498,8 @@ const T = {
     ingredient_remove_label: "retirer",
     meal_updating: "Mise à jour du repas pour retirer cet ingrédient...",
     meal_update_failed: "Impossible de mettre à jour ce repas — veuillez réessayer.",
+    meal_skipped_badge: "Sauté",
+    meal_restore: "Restaurer ce repas",
     plan_loading: "Préparation de votre plan nutritionnel...",
     plan_loading_note: "Un bon plan de repas prend un peu de temps — nous vérifions chaque repas selon votre régime, vos allergies et votre budget.",
     plan_error: "La cuisine est temporairement indisponible. Vérifiez votre connexion et réessayez.",
@@ -738,6 +748,9 @@ const T = {
     logged_extras_title: "Extras Registrados",
     add_to_day_plan: "Añadir al",
     add_to_plan: "Añadir al Plan",
+    trade_for_meal: "Cambiar por una comida planificada",
+    trade_swap_out: "Toca para omitir esta comida y registrar el extra en su lugar",
+    trade_no_meals: "No quedan comidas planificadas para cambiar — todo ya ha sido reemplazado.",
     calorie_placeholder: "Describe lo que comiste (ej: sándwich de pollo, café con leche)...",
     calorie_btn: "Estimar Calorías",
     airplane_meal_title: "Revisar Comida del Avión",
@@ -770,6 +783,8 @@ const T = {
     ingredient_remove_label: "quitar",
     meal_updating: "Actualizando la comida para quitar ese ingrediente...",
     meal_update_failed: "No se pudo actualizar esta comida — inténtalo de nuevo.",
+    meal_skipped_badge: "Omitida",
+    meal_restore: "Restaurar esta comida",
     plan_loading: "Preparando tu plan nutricional...",
     plan_loading_note: "Un buen plan de comidas toma un poco de tiempo — estamos revisando cada comida según tu dieta, alergias y presupuesto.",
     plan_error: "La cocina no está disponible ahora. Revisa tu conexión y toca Reintentar.",
@@ -1860,6 +1875,21 @@ export default function NutriCrew() {
       return { ...p, days };
     });
   };
+  // "Trade" a logged extra against one of the day's planned meals — marks
+  // the meal skipped (not deleted) so it's still visible, just excluded
+  // from the day's calorie total, and reversible from the plan view. Same
+  // toggle handles both directions: skip when tapped from the calorie
+  // estimator's trade picker, restore when tapped again from the plan.
+  const toggleMealSkipped = (dayIndex, mealIndex) => {
+    setPlan(p => {
+      if (!p?.days) return p;
+      const days = p.days.map((d, i) => i !== dayIndex ? d : {
+        ...d,
+        meals: d.meals.map((m, j) => j !== mealIndex ? m : { ...m, skipped: !m.skipped }),
+      });
+      return { ...p, days };
+    });
+  };
 
   // The dedicated Profile screen is the one place a deliberate default change
   // is always persisted, regardless of whether a default already existed —
@@ -2055,6 +2085,7 @@ export default function NutriCrew() {
           favorites={favorites} onToggleFavorite={toggleFavorite}
           onOpenAirplaneMeal={() => setShowAirplaneMeal(true)}
           onUpdateMeal={updateMeal}
+          onToggleMealSkipped={toggleMealSkipped}
           onRemoveExtra={removeCalorieExtra}
           isOnline={isOnline}
           planKey={planCacheKey({ ...user, ...Object.fromEntries(Object.entries(pairing).filter(([, v]) => !(Array.isArray(v) && v.length === 0))) }, lang)}
@@ -2083,6 +2114,7 @@ export default function NutriCrew() {
               onClose={() => { setShowCalorie(false); setCalorieResult(null); setCalorieText(""); }}
               calorieTarget={pairing.calorie_target || user?.calorie_target}
               plan={plan} defaultDay={activeDay} onAddExtra={addCalorieExtra} onRemoveExtra={removeCalorieExtra}
+              onSkipMeal={toggleMealSkipped}
             />
           )}
           <span style={styles.floatLabelJetlag}>{t.jetlag_fab}</span>
@@ -3406,7 +3438,7 @@ const PLAN_LOAD_STEPS = [
   "Finalizing your plan...",
 ];
 
-function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, activeDay, setActiveDay, onNewPairing, onRetry, favorites, onToggleFavorite, onOpenAirplaneMeal, onUpdateMeal, onRemoveExtra, isOnline, planKey, onShare, shareCopied, onOpenReferral, lang }) {
+function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, activeDay, setActiveDay, onNewPairing, onRetry, favorites, onToggleFavorite, onOpenAirplaneMeal, onUpdateMeal, onToggleMealSkipped, onRemoveExtra, isOnline, planKey, onShare, shareCopied, onOpenReferral, lang }) {
   const days = pairing.pairing_days || 1;
   const hasJetlag = Math.abs(parseInt(pairing.timezone||0)) >= 4;
   const [loadStep, setLoadStep] = useState(0);
@@ -3633,6 +3665,7 @@ function PlanScreen({ t, plan, loading, pairing, user, activeTab, setActiveTab, 
             : <DayPlan day={plan.days[activeDay]} t={t} favorites={favorites} onToggleFavorite={onToggleFavorite} onOpenAirplaneMeal={onOpenAirplaneMeal}
                 pairing={pairing} user={user} lang={lang} byCountry={plan.foodRestrictions?.byCountry}
                 onUpdateMeal={(mealIdx, newMeal) => onUpdateMeal(activeDay, mealIdx, newMeal)}
+                onToggleMealSkipped={(mealIdx) => onToggleMealSkipped(activeDay, mealIdx)}
                 onRemoveExtra={(extraId) => onRemoveExtra(activeDay, extraId)}/>
         )}
         {activeTab === "grocery" && plan.groceryList && (
@@ -3732,7 +3765,7 @@ function PlanFeedback({ t, planKey }) {
   );
 }
 
-function DayPlan({ day, t, favorites, onToggleFavorite, onOpenAirplaneMeal, pairing, user, lang, onUpdateMeal, byCountry, onRemoveExtra }) {
+function DayPlan({ day, t, favorites, onToggleFavorite, onOpenAirplaneMeal, pairing, user, lang, onUpdateMeal, onToggleMealSkipped, byCountry, onRemoveExtra }) {
   const [expandedIdx, setExpandedIdx] = useState(null);
   const [regeneratingIdx, setRegeneratingIdx] = useState(null);
   const [regenError, setRegenError] = useState(null);
@@ -3789,18 +3822,19 @@ function DayPlan({ day, t, favorites, onToggleFavorite, onOpenAirplaneMeal, pair
         const isOpen = expandedIdx === i;
         const color = mealColors[meal.type] || C.muted;
         return (
-          <div key={i} style={{...styles.mealCard, borderLeftColor: color, padding: 0, overflow: "hidden"}}>
+          <div key={i} style={{...styles.mealCard, borderLeftColor: color, padding: 0, overflow: "hidden", opacity: meal.skipped ? 0.55 : 1}}>
             {/* Collapsed header — tap to expand */}
             <div style={styles.mealHeader} onClick={() => setExpandedIdx(isOpen ? null : i)}>
               {meal.emoji && <span style={styles.mealEmoji}>{meal.emoji}</span>}
               <div style={{flex: 1, minWidth: 0}}>
                 <div style={{...styles.mealType, color, marginBottom: 3}}>
                   <PlaneIcon size={10} color={color}/> {mealTypeLabel(t, meal.type)}
+                  {meal.skipped && <span style={{ marginLeft: 6, color: C.muted, textTransform: "uppercase", letterSpacing: "0.5px" }}>· {t.meal_skipped_badge}</span>}
                 </div>
-                <div style={styles.mealName}>{meal.name}</div>
+                <div style={{...styles.mealName, textDecoration: meal.skipped ? "line-through" : "none"}}>{meal.name}</div>
               </div>
               <div style={styles.mealHeaderRight}>
-                <span style={styles.mealCals}>🔥 {meal.calories}</span>
+                <span style={{...styles.mealCals, textDecoration: meal.skipped ? "line-through" : "none"}}>🔥 {meal.calories}</span>
                 <span style={{fontSize: 10, color: C.muted}}>{isOpen ? "▲" : "▼"}</span>
               </div>
             </div>
@@ -3859,7 +3893,15 @@ function DayPlan({ day, t, favorites, onToggleFavorite, onOpenAirplaneMeal, pair
                     <span style={styles.postItPin}>♻️</span><span>{meal.recyclingTip}</span>
                   </div>
                 )}
-                <div style={{display:"flex", gap:8, justifyContent:"flex-end", marginTop:8}}>
+                <div style={{display:"flex", gap:8, justifyContent:"flex-end", alignItems: "center", marginTop:8}}>
+                  {meal.skipped && (
+                    <button style={{
+                      background: "none", border: `1px solid ${C.navyBorder}`, borderRadius: 8,
+                      color: C.gold, fontSize: 12, padding: "6px 10px", cursor: "pointer", fontFamily: "inherit", marginRight: "auto",
+                    }} onClick={e => { e.stopPropagation(); onToggleMealSkipped?.(i); }}>
+                      ↩ {t.meal_restore}
+                    </button>
+                  )}
                   <button style={styles.favoriteBtn} onClick={e => { e.stopPropagation(); onOpenAirplaneMeal?.(); }} aria-label="check airplane meal" title={t?.airplane_meal_title}>🍱</button>
                   <button style={styles.favoriteBtn} onClick={e => { e.stopPropagation(); onToggleFavorite?.(meal); }} aria-label="favorite">{isFav ? "❤️" : "🤍"}</button>
                 </div>
@@ -3886,7 +3928,11 @@ function DayPlan({ day, t, favorites, onToggleFavorite, onOpenAirplaneMeal, pair
         </div>
       )}
       <div style={styles.dailyTotal}>
-        Total: <strong>{day.totalCalories + (day.extras || []).reduce((s, e) => s + e.calories, 0)} kcal</strong>
+        Total: <strong>{
+          day.totalCalories
+          - (day.meals || []).filter(m => m.skipped).reduce((s, m) => s + (m.calories || 0), 0)
+          + (day.extras || []).reduce((s, e) => s + e.calories, 0)
+        } kcal</strong>
       </div>
     </div>
   );
@@ -5017,10 +5063,11 @@ const FOOD_DB = [
 ];
 
 // ─── CALORIE MODAL ────────────────────────────────────────────────
-function CalorieModal({ t, text, setText, result, loading, onEstimate, onClose, calorieTarget, plan, defaultDay, onAddExtra, onRemoveExtra }) {
+function CalorieModal({ t, text, setText, result, loading, onEstimate, onClose, calorieTarget, plan, defaultDay, onAddExtra, onRemoveExtra, onSkipMeal }) {
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const [showAI, setShowAI] = useState(false);
+  const [showTradePicker, setShowTradePicker] = useState(false);
   const days = plan?.days || [];
   // A failed day has no meals/total to add to — steer past it to the
   // nearest day that actually generated, same day the user is most likely
@@ -5054,8 +5101,8 @@ function CalorieModal({ t, text, setText, result, loading, onEstimate, onClose, 
   const over = calorieTarget && total > calorieTarget;
 
   return (
-    <div style={styles.modalOverlay}>
-      <div style={{ ...styles.modal, maxHeight: "88vh", overflowY: "auto", gap: 12, padding: 0 }}>
+    <div style={{ ...styles.modalOverlay, alignItems: "center", padding: "20px 0" }}>
+      <div style={{ ...styles.modal, borderRadius: 20, maxHeight: "88vh", overflowY: "auto", gap: 12, padding: 0 }}>
         <div style={{
           ...styles.modalHeader, padding: "18px 20px 14px",
           position: "sticky", top: 0, background: C.navyMid, zIndex: 10,
@@ -5225,16 +5272,57 @@ function CalorieModal({ t, text, setText, result, loading, onEstimate, onClose, 
                 ))}
                 {result.note && <div style={styles.calNote}>{result.note}</div>}
                 {result.total > 0 && canLog && (
-                  <button onClick={() => {
-                    const entry = { name: text.slice(0, 60), calories: result.total, unit: "AI estimate", id: Date.now() };
-                    onAddExtra(selectedDay, entry);
-                  }} style={{
-                    marginTop: 10, width: "100%", background: C.navyMid,
-                    border: `1px solid ${C.gold}`, borderRadius: 8, color: C.gold,
-                    padding: "9px", fontSize: 13, cursor: "pointer", fontFamily: "inherit",
-                  }}>
-                    + {days.length > 1 ? `${t.add_to_day_plan} ${t.day} ${days[selectedDay]?.day}` : t.add_to_plan}
-                  </button>
+                  <>
+                    <button onClick={() => {
+                      const entry = { name: text.slice(0, 60), calories: result.total, unit: "AI estimate", id: Date.now() };
+                      onAddExtra(selectedDay, entry);
+                      setShowTradePicker(false);
+                    }} style={{
+                      marginTop: 10, width: "100%", background: C.navyMid,
+                      border: `1px solid ${C.gold}`, borderRadius: 8, color: C.gold,
+                      padding: "9px", fontSize: 13, cursor: "pointer", fontFamily: "inherit",
+                    }}>
+                      + {days.length > 1 ? `${t.add_to_day_plan} ${t.day} ${days[selectedDay]?.day}` : t.add_to_plan}
+                    </button>
+                    {/* Trade: skip one of this day's planned meals and log the
+                        extra in its place, instead of just piling it on top
+                        of the daily total. */}
+                    <button onClick={() => setShowTradePicker(v => !v)} style={{
+                      marginTop: 8, width: "100%", background: "none",
+                      border: `1px solid ${C.navyBorder}`, borderRadius: 8, color: C.muted,
+                      padding: "9px", fontSize: 13, cursor: "pointer", fontFamily: "inherit",
+                    }}>
+                      🔄 {t.trade_for_meal}
+                    </button>
+                    {showTradePicker && (
+                      <div style={{ marginTop: 8, background: C.navyCard, borderRadius: 10, border: `1px solid ${C.navyBorder}`, overflow: "hidden" }}>
+                        {(days[selectedDay]?.meals || []).filter(m => !m.skipped).length === 0 && (
+                          <div style={{ padding: "10px 14px", fontSize: 12, color: C.muted }}>{t.trade_no_meals}</div>
+                        )}
+                        {(days[selectedDay]?.meals || []).map((meal, mi) => !meal.skipped && (
+                          <button key={mi} onClick={() => {
+                            onSkipMeal(selectedDay, mi);
+                            const entry = { name: text.slice(0, 60), calories: result.total, unit: "AI estimate", id: Date.now() };
+                            onAddExtra(selectedDay, entry);
+                            setShowTradePicker(false);
+                          }} style={{
+                            display: "flex", alignItems: "center", justifyContent: "space-between",
+                            width: "100%", background: "none", border: "none",
+                            borderBottom: `1px solid ${C.navyBorder}`, color: C.white,
+                            padding: "10px 14px", cursor: "pointer", textAlign: "left", fontSize: 13, fontFamily: "inherit",
+                          }}>
+                            <div>
+                              <div style={{ fontWeight: 600 }}>{mealTypeLabel(t, meal.type)}: {meal.name}</div>
+                              <div style={{ color: C.muted, fontSize: 11 }}>{t.trade_swap_out}</div>
+                            </div>
+                            <div style={{ color: C.gold, fontWeight: 700, whiteSpace: "nowrap", marginLeft: 10 }}>
+                              {meal.calories} kcal
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
