@@ -1687,6 +1687,41 @@ export default function NutriCrew() {
     });
   };
 
+  // Gym plans were previously ONLY ever generated from the roster-upload
+  // flow, scoped to the full month — a user who just generates a single
+  // pairing (no roster) never got one at all, and the gym plan FAB would
+  // sit on "being generated, check back" forever. Firing this after every
+  // successful single-pairing generation too gives that path its own gym
+  // plan, scoped to just this pairing's days (today through pairing_days
+  // days from now) — matching what a single pairing actually is, rather
+  // than the whole-month scope that only makes sense for a roster.
+  // isPremium-gated client-side to avoid a wasted round-trip for a
+  // brand-new user's free first pairing (the backend would reject it
+  // anyway, but there's no reason to even ask).
+  const maybeGenerateGymPlan = (data, result) => {
+    if (!result?.isPremium) return;
+    const days = parseInt(data.pairing_days, 10) || 1;
+    const pairingDate = new Date().toISOString();
+    const returnDate = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+    const profile = {
+      name: data.name || "", gender: data.gender || "", weight: data.weight || "",
+      dob: data.dob || "", position: data.position || "cabin",
+      diets: data.diets || ["none"], goals: data.goals || ["energy"],
+      budgetAmount: data.budget_amount || "30", budgetType: data.budget_type || "day",
+      lang: data.lang || lang, lunchBag: data.lunch_bag || null,
+      kitchen: data.kitchen || [],
+    };
+    fetch(`${API_BASE}/api/gym-plan/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: data.email,
+        pairings: [{ departure: data.departure || "", destinations: data.destinations || [], pairingDate, returnDate, pairingDays: days }],
+        profile,
+      }),
+    }).catch(() => {});
+  };
+
   const handleGenerate = async () => {
     if (!isOnline) return; // blocked by UI; boarding pass shows offline banner
     if (isPremiumNeeded || needsPremiumForDiet) { setScreen("premium"); return; }
@@ -1746,6 +1781,7 @@ export default function NutriCrew() {
         saveSavedPlan(cacheKey, data, result);
         storage.set(CHECKIN_DRAFT_KEY, null);
       }
+      maybeGenerateGymPlan(data, result);
     } catch (e) {
       if (e.code === "premium_required") {
         setPairingCount(e.pairingCount ?? pairingCount, e.needsPremium ?? true);
@@ -1768,6 +1804,7 @@ export default function NutriCrew() {
       saveSavedPlan(cacheKey, data, result);
       storage.set(CHECKIN_DRAFT_KEY, null);
     }
+    maybeGenerateGymPlan(data, result);
     setPendingFirstPlan(null);
     setScreen("plan");
   };
@@ -4750,6 +4787,80 @@ const DAY_TYPE_LABELS = {
   rest:     { emoji: "😴",  label: "Rest",           color: "#4ACC8E" },
 };
 
+// Simple line-drawing stick-figure diagrams, one per movement pattern (not
+// per exercise — several exercises share a pose, e.g. Push-Up/Diamond
+// Push-Up/Pike Push-Up all read as the same silhouette). Rendered inline as
+// SVG, so unlike the YouTube thumbnail below they can never fail to load,
+// go missing, or point at a deleted video — always-on, consistent, no
+// network dependency. Coordinates are on a fixed 64x56 canvas; verified by
+// rendering the full set and visually checking it before shipping.
+const POSE_ICONS = {
+  standing:          { circles: [[32,10,6]], lines: [[32,16,32,34],[32,20,20,30],[32,20,44,30],[32,34,24,52],[32,34,40,52]] },
+  squat:             { circles: [[32,8,6]],  lines: [[32,14,34,30],[32,18,18,22],[32,18,46,22],[34,30,20,40],[20,40,18,54],[34,30,44,42],[44,42,52,50]] },
+  lunge:             { circles: [[28,8,6]],  lines: [[28,14,30,30],[28,18,16,22],[28,18,40,16],[30,30,18,38],[18,38,16,54],[30,30,44,42],[44,42,52,50]] },
+  "push-up":         { circles: [[10,34,5]], lines: [[14,32,46,26],[26,29,26,44],[46,26,56,30]] },
+  plank:             { circles: [[10,20,5]], lines: [[14,20,48,18],[22,20,22,34],[48,18,58,22]] },
+  "side-plank":      { circles: [[12,16,5]], lines: [[16,18,46,14],[20,18,20,32],[30,15,34,4],[46,14,56,16]] },
+  "glute-bridge":    { circles: [[8,44,5]],  lines: [[12,42,32,26],[12,44,4,48],[32,26,44,38],[44,38,44,52]] },
+  "calf-raise":      { circles: [[32,6,6]],  lines: [[32,12,32,30],[32,16,24,24],[32,16,40,24],[32,30,30,46],[32,30,34,46],[30,46,34,50],[34,46,38,50],[20,40,24,34,2.5],[44,40,40,34,2.5]], paths: ["M 22 32 l 3 1 l -1 3","M 42 32 l -3 1 l 1 3"] },
+  "wall-sit":        { circles: [[14,14,6]], lines: [[14,20,14,36],[14,24,6,30],[14,36,32,36],[32,36,32,52]] },
+  "core-floor":      { circles: [[8,44,5]],  lines: [[12,42,26,34],[16,40,28,30],[26,34,36,18],[36,18,50,18]] },
+  twist:             { circles: [[24,12,6]], lines: [[24,18,22,34],[22,22,38,26],[22,34,34,32],[34,32,44,38]] },
+  superman:          { circles: [[10,24,5]], lines: [[14,24,40,20],[16,22,6,14],[40,20,52,12]] },
+  "mountain-climber":{ circles: [[10,20,5]], lines: [[14,20,42,14],[18,19,18,32],[42,14,54,20],[30,17,24,28],[24,28,16,30]] },
+  "cardio-jump":     { circles: [[32,8,6]],  lines: [[32,14,32,28],[32,16,20,4],[32,16,44,4],[32,28,20,50],[32,28,44,50]] },
+  "high-knee":       { circles: [[26,8,6]],  lines: [[26,14,28,30],[26,18,16,14],[28,18,38,24],[28,30,36,26],[36,26,38,16],[28,30,24,44],[24,44,22,52]] },
+  "dumbbell-standing":{ circles: [[32,8,6]], lines: [[32,14,32,32],[32,18,24,24],[24,24,24,14],[32,18,40,28],[32,32,26,50],[32,32,38,50]], rects: [[21,11,6,4]] },
+  "dumbbell-row":    { circles: [[12,20,5]], lines: [[16,22,42,16],[24,20,24,34],[34,18,28,10],[42,16,52,30],[46,16,56,30]], rects: [[25,7,6,4]] },
+  "tricep-dip":      { circles: [[16,14,6]], lines: [[16,20,18,34],[18,22,28,22],[28,22,28,34],[18,34,34,40],[34,40,48,40]] },
+  "kneeling-stretch":{ circles: [[22,8,6]],  lines: [[22,14,24,28],[24,18,34,24],[24,28,36,30],[36,30,38,48],[24,28,14,38],[14,38,4,42]] },
+  "standing-stretch":{ circles: [[20,34,5]], lines: [[30,14,28,50],[30,14,36,50],[24,20,18,36]], paths: ["M 22 32 Q 26 20 30 14"] },
+  "cat-cow":         { circles: [[8,32,5]],  lines: [[14,34,14,44],[34,30,36,44]], paths: ["M 14 34 Q 24 24 34 30"] },
+  "downward-dog":    { circles: [[18,32,5]], lines: [[10,44,24,20],[24,20,38,20],[38,20,52,44]] },
+};
+
+// Maps every name in EXERCISE_LIBRARY (server.js) to a pose above — several
+// exercises intentionally share one (e.g. all three push-up variants read
+// as the same silhouette; the difference between them is hand position,
+// which doesn't read at icon size anyway).
+const EXERCISE_POSE_MAP = {
+  "Push-Up": "push-up", "Diamond Push-Up": "push-up", "Pike Push-Up": "push-up",
+  "Squat": "squat", "Dumbbell Squat": "squat",
+  "Jump Squat": "cardio-jump", "Burpee": "cardio-jump", "Jumping Jack": "cardio-jump",
+  "Lunge": "lunge", "Reverse Lunge": "lunge", "Dumbbell Lunge": "lunge",
+  "Glute Bridge": "glute-bridge",
+  "Calf Raise": "calf-raise",
+  "Wall Sit": "wall-sit",
+  "Plank": "plank",
+  "Side Plank": "side-plank",
+  "Crunch": "core-floor", "Bicycle Crunch": "core-floor", "Leg Raise": "core-floor",
+  "Russian Twist": "twist",
+  "Superman": "superman",
+  "Mountain Climber": "mountain-climber",
+  "High Knee": "high-knee",
+  "Tricep Dip": "tricep-dip",
+  "Dumbbell Curl": "dumbbell-standing", "Dumbbell Shoulder Press": "dumbbell-standing",
+  "Dumbbell Row": "dumbbell-row",
+  "Hip Flexor Stretch": "kneeling-stretch", "Child's Pose": "kneeling-stretch", "Pigeon Pose": "kneeling-stretch",
+  "Hamstring Stretch": "standing-stretch",
+  "Cat-Cow": "cat-cow",
+  "Downward Dog": "downward-dog",
+  "Neck Roll": "standing", "Shoulder Roll": "standing",
+};
+
+function ExercisePoseIcon({ exerciseName, color }) {
+  const pose = EXERCISE_POSE_MAP[exerciseName] || "standing";
+  const icon = POSE_ICONS[pose] || POSE_ICONS.standing;
+  return (
+    <svg width="100%" height="70" viewBox="0 0 64 56" fill="none" stroke={color} strokeWidth="3.5" strokeLinecap="round" style={{ display: "block" }}>
+      {icon.circles?.map((c, i) => <circle key={`c${i}`} cx={c[0]} cy={c[1]} r={c[2]} fill={color} stroke="none" />)}
+      {icon.lines?.map((l, i) => <line key={`l${i}`} x1={l[0]} y1={l[1]} x2={l[2]} y2={l[3]} strokeWidth={l[4] || undefined} />)}
+      {icon.paths?.map((d, i) => <path key={`p${i}`} d={d} strokeWidth="2.5" />)}
+      {icon.rects?.map((r, i) => <rect key={`r${i}`} x={r[0]} y={r[1]} width={r[2]} height={r[3]} fill={color} stroke="none" />)}
+    </svg>
+  );
+}
+
 function GymPlanModal({ t, user, month, onClose, onUploadRoster }) {
   const [plan, setPlan] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -4822,26 +4933,32 @@ function GymPlanModal({ t, user, month, onClose, onUploadRoster }) {
                   {hasWorkout && (
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
                       {(day.workout.exercises || []).map((ex, ei) => {
-                        const thumbUrl = ex.vid ? `https://img.youtube.com/vi/${ex.vid}/hqdefault.jpg` : null;
-                        const watchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(ex.name + " exercise proper form")}`;
+                        // Was always a generic search-results link even when a
+                        // specific vid was known — tapping "watch" landed on a
+                        // results page instead of the actual demonstration.
+                        // Only fall back to search for the rare exercise with
+                        // no known video ID.
+                        const watchUrl = ex.vid
+                          ? `https://www.youtube.com/watch?v=${ex.vid}`
+                          : `https://www.youtube.com/results?search_query=${encodeURIComponent(ex.name + " exercise proper form")}`;
                         const muscleColor = MUSCLE_COLORS[ex.muscle] || C.gold;
                         const isActive = activeEx === `${wi}-${di}-${ei}`;
                         return (
                           <div key={ei} style={{ background: "#0A1628", borderRadius: 8, overflow: "hidden", border: `1px solid ${isActive ? muscleColor : C.navyBorder}`, cursor: "pointer" }}
                             onClick={() => setActiveEx(isActive ? null : `${wi}-${di}-${ei}`)}>
-                            {thumbUrl && (
-                              <div style={{ position: "relative" }}>
-                                <img src={thumbUrl} alt={ex.name}
-                                  style={{ width: "100%", display: "block", height: 70, objectFit: "cover", objectPosition: "center" }}
-                                  onError={e => { e.target.style.display = "none"; }} />
-                                <a href={watchUrl} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
-                                  style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.25)", color: "#fff", fontSize: 18, textDecoration: "none", opacity: 0 }}
-                                  onMouseEnter={e => e.currentTarget.style.opacity = 1}
-                                  onMouseLeave={e => e.currentTarget.style.opacity = 0}>
-                                  ▶
-                                </a>
-                              </div>
-                            )}
+                            {/* Custom line-drawing diagram — always renders, no
+                                network dependency, unlike the old YouTube
+                                thumbnail (which could 404/go missing). The
+                                play button still links out to a real video. */}
+                            <div style={{ position: "relative" }}>
+                              <ExercisePoseIcon exerciseName={ex.name} color={muscleColor} />
+                              <a href={watchUrl} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
+                                style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.25)", color: "#fff", fontSize: 18, textDecoration: "none", opacity: 0 }}
+                                onMouseEnter={e => e.currentTarget.style.opacity = 1}
+                                onMouseLeave={e => e.currentTarget.style.opacity = 0}>
+                                ▶
+                              </a>
+                            </div>
                             <div style={{ padding: "6px 7px" }}>
                               <div style={{ color: C.white, fontSize: 10, fontWeight: 700, lineHeight: 1.3, marginBottom: 2 }}>{ex.name}</div>
                               <div style={{ color: C.muted, fontSize: 10 }}>{ex.sets}×{ex.reps}</div>
