@@ -1060,6 +1060,18 @@ const PASSWORD_PROMPT_DISMISSED_KEY = "nutricrew_password_prompt_dismissed";
 const SAVED_PLANS_KEY = "nutricrew_saved_plans";
 const FEEDBACK_KEY = "nutricrew_plan_feedback";
 const CHECKIN_DRAFT_KEY = "nutricrew_checkin_draft";
+// A draft with no expiration meant a check-in abandoned days or weeks ago
+// permanently stood between a returning user and the splash/home screen —
+// every single app open routed them back into the same stale form instead
+// (flagged in a UX review: "navigation to reach the main landing page...
+// currently defaults to an intermediate step"). 24h covers the genuine
+// interrupted-session case (app backgrounded, tab closed, resumed next
+// day) while making sure nobody's stuck out of their home screen for more
+// than a day over a form they may not even remember starting.
+const CHECKIN_DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+function isCheckinDraftFresh(draft) {
+  return !!draft && typeof draft.savedAt === "number" && (Date.now() - draft.savedAt) < CHECKIN_DRAFT_MAX_AGE_MS;
+}
 const PENDING_REFERRAL_KEY = "nutricrew_pending_referral";
 const MAX_SAVED_PLANS = 10;
 
@@ -1169,8 +1181,11 @@ export default function NutriCrew() {
       // If we already have a cached user profile, skip the loading spinner and
       // render immediately — verify-session will update isPremium in background.
       if (storage.get(USER_KEY)?.email) {
-        // Resume in-progress onboarding if a draft was saved at step ≥ 1.
-        if ((storage.get(CHECKIN_DRAFT_KEY)?.step ?? 0) >= 1) return "checkin";
+        // Resume in-progress onboarding if a draft was saved at step ≥ 1 —
+        // but only if it's recent (see CHECKIN_DRAFT_MAX_AGE_MS above). A
+        // stale draft just falls through to splash instead of blocking it.
+        const draft = storage.get(CHECKIN_DRAFT_KEY);
+        if ((draft?.step ?? 0) >= 1 && isCheckinDraftFresh(draft)) return "checkin";
         return "splash";
       }
       return "loading";
@@ -1178,8 +1193,10 @@ export default function NutriCrew() {
     // No session token. A first-time user who got interrupted mid-checkin (app
     // backgrounded/reloaded right after typing name+email) also has USER_KEY.email
     // set at this point, even though they never signed up — resume their draft
-    // instead of throwing them onto an unexpected sign-in wall.
-    if ((storage.get(CHECKIN_DRAFT_KEY)?.step ?? 0) >= 1) return "checkin";
+    // instead of throwing them onto an unexpected sign-in wall. Same 24h
+    // freshness check as above — a stale draft here falls through to login instead.
+    const soloDraft = storage.get(CHECKIN_DRAFT_KEY);
+    if ((soloDraft?.step ?? 0) >= 1 && isCheckinDraftFresh(soloDraft)) return "checkin";
     if (storage.get(USER_KEY)?.email) return "login"; // returning user, session expired
     return "splash"; // first time — show the welcome screen before check-in
   }); // login | otp | set-password | loading | splash | checkin | boarding | plan | premium
@@ -1348,7 +1365,7 @@ export default function NutriCrew() {
   // Persist in-progress check-in so a refresh or return resumes at the same step.
   useEffect(() => {
     if (screen !== "checkin") return;
-    storage.set(CHECKIN_DRAFT_KEY, { step, pairing, checkinReturning });
+    storage.set(CHECKIN_DRAFT_KEY, { step, pairing, checkinReturning, savedAt: Date.now() });
   }, [screen, step, pairing, checkinReturning]); // eslint-disable-line
 
   useEffect(() => {
