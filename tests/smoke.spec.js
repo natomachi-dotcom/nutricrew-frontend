@@ -32,6 +32,14 @@ import { test, expect } from "@playwright/test";
 // reliably satisfy) that mocked mode can never see.
 const MOCK = process.env.SMOKE_MOCK !== "0";
 const API_BASE = process.env.SMOKE_API_BASE || "http://localhost:3001";
+// MOCK mode's generate-plan route.fulfill() resolves instantly, so a short
+// wait is enough there. Live mode makes real sequential Anthropic calls
+// (initial generation, wall validation, up to REPAIR_ATTEMPTS repair passes,
+// then extras) that routinely run well past 10s — a wait tuned for MOCK's
+// near-instant response was timing out mid-generation, not on an actual
+// failure (confirmed via backend logs showing an in-flight repair pass at
+// the moment the old 10s wait expired).
+const GENERATION_WAIT_MS = MOCK ? 10000 : 90000;
 const testEmail = `smoke-${Date.now()}@nutricrew-test.local`;
 const testPassword = "smoke-test-password-123";
 
@@ -236,8 +244,10 @@ test("SMOKE: signup -> onboarding -> plan -> second pairing -> paywall", async (
   });
 
   await test.step("2. Complete signup via OTP (no live inbox needed)", async () => {
+    const genStart = Date.now();
     await page.getByRole("button", { name: "Generate My Plan" }).click();
-    await expect(page.getByText("Check your email")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText("Check your email")).toBeVisible({ timeout: GENERATION_WAIT_MS });
+    console.log(`TIMING  first-pairing generation took ${Date.now() - genStart}ms`);
 
     let otp;
     if (MOCK) {
@@ -263,7 +273,7 @@ test("SMOKE: signup -> onboarding -> plan -> second pairing -> paywall", async (
   });
 
   await test.step("4. Plan actually generates — not empty, not an error, reflects diet/kitchen/destination", async () => {
-    await expect(page.getByText("Day 1").first()).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText("Day 1").first()).toBeVisible({ timeout: GENERATION_WAIT_MS });
     await expect(page.getByText(/error/i)).not.toBeVisible();
     const mealsVisible = await page.getByText(/Breakfast|Lunch|Dinner|Snack/).count();
     expect(mealsVisible, "plan rendered with zero meals").toBeGreaterThan(0);
@@ -319,8 +329,13 @@ test("SMOKE: signup -> onboarding -> plan -> second pairing -> paywall", async (
 
     await page.getByRole("button", { name: "Generate My Plan" }).click();
     await expect(page.getByText("Premium Feature")).toBeVisible({ timeout: 15000 });
-    await expect(page.getByRole("button", { name: /Subscribe/ })).toBeVisible();
-    console.log("PASS  [6] paywall appears on pairing #2, not before pairing #1");
+    // CTA copy depends on TRIAL_ENABLED (now permanently true — see server.js):
+    // trial mode reads "Start Your Free Month", non-trial reads "Subscribe".
+    // Matching both keeps this test correct regardless of that flag's state.
+    await expect(page.getByRole("button", { name: /Start Your Free Month|Subscribe/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Monthly/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Annual/ })).toBeVisible();
+    console.log("PASS  [6] paywall appears on pairing #2 with Monthly/Annual options, not before pairing #1");
   });
 
   console.log("\n=== SMOKE TEST: ALL STEPS PASSED ===");
