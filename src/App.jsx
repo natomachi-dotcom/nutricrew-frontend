@@ -1204,7 +1204,10 @@ export default function NutriCrew() {
   // Holds a just-generated plan while a brand-new/passwordless account verifies
   // its email and sets a real password — the plan is revealed once that's done.
   const [pendingFirstPlan, setPendingFirstPlan] = useState(null);
-  const [step, setStep] = useState(() => storage.get(CHECKIN_DRAFT_KEY)?.step ?? 0);
+  const [step, setStep] = useState(() => {
+    const draft = storage.get(CHECKIN_DRAFT_KEY);
+    return isCheckinDraftFresh(draft) ? (draft.step ?? 0) : 0;
+  });
   // Non-null while editing a single field jumped to from the review/boarding
   // screen — see `currentStep`/`jumpToReviewField` below.
   const [reviewEditStep, setReviewEditStep] = useState(null);
@@ -1219,7 +1222,7 @@ export default function NutriCrew() {
       if (saved) return saved.data;
     }
     const draft = storage.get(CHECKIN_DRAFT_KEY);
-    if (draft?.pairing) return draft.pairing;
+    if (isCheckinDraftFresh(draft) && draft.pairing) return draft.pairing;
     return {};
   });
   const [plan, setPlan] = useState(() => {
@@ -1255,7 +1258,7 @@ export default function NutriCrew() {
   // still answering it, skipping kitchen/diet/goals/budget on a first run.
   const [checkinReturning, setCheckinReturning] = useState(() => {
     const draft = storage.get(CHECKIN_DRAFT_KEY);
-    return draft?.checkinReturning ?? returningUser;
+    return (isCheckinDraftFresh(draft) ? draft.checkinReturning : undefined) ?? returningUser;
   });
   const [showRoster, setShowRoster] = useState(false);
   const [showGymPlan, setShowGymPlan] = useState(false);
@@ -1991,6 +1994,19 @@ export default function NutriCrew() {
   const handleLoginSuccess = (sessionData) => {
     storage.set(SESSION_KEY, { token: sessionData.token, email: sessionData.email });
     const hasPassword = sessionData.hasPassword !== false;
+    // A different email logging in on this device (e.g. testing a fresh
+    // signup on a browser that already has an in-progress draft from a
+    // previous account) must not inherit that account's checkin draft —
+    // same "different email = wipe stale local state" principle already
+    // applied to the user object below, extended to CHECKIN_DRAFT_KEY.
+    // Without this, a genuinely brand-new user could land mid-onboarding
+    // (e.g. step 14) instead of step 1.
+    if (user?.email && user.email !== sessionData.email) {
+      storage.set(CHECKIN_DRAFT_KEY, null);
+      setStep(0);
+      setPairing({});
+      setCheckinReturning(false);
+    }
     setUser(prev => {
       // Only merge with `prev` when it's the SAME account continuing a session —
       // otherwise (a different email logging in on this device) stale fields
