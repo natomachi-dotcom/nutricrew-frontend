@@ -2783,6 +2783,12 @@ function CheckInScreen({ t, lang, step, totalSteps, currentStep, pairing, user, 
     if (currentStep === "name" || currentStep === "email") return !!localVal.trim();
     if (currentStep === "budget") return !!((pairing.budget_type || user?.budget_type) && (localBudgetAmount || user?.budget_amount));
     if (currentStep === "duty_schedule") return true;
+    // Optional, and its answer lives in pairing.airplane_meal_description, not
+    // pairing.airplane_meal_plan (the step key) — the generic fallback below
+    // reads `pairing[currentStep]`, which is always undefined here, so without
+    // this case Continue stayed permanently disabled on this step regardless
+    // of what was typed (only the separate Skip button worked).
+    if (currentStep === "airplane_meal_plan") return true;
     // departure is optional — placeholder looks identical to a real value and crews
     // can proceed without it (AI gets "unknown departure" context). They can fill it
     // freely; it's saved to profile on type so it auto-fills on every future pairing.
